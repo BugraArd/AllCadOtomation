@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from .base import Placement, PlacementContext, Placer, validate
 from .anneal import SimulatedAnnealing
+from .auto import Auto
 from .baseline import Identity, RandomShuffle
 from .cluster import ClusterPlacer
 from .codex import Codex
@@ -22,6 +23,8 @@ PLACERS: dict[str, type] = {
     # Referans alt sinirlar (hakem dogrulamasi)
     "identity": Identity,
     "random": RandomShuffle,
+    # Uretim yerlestiricisi (Asama 3 ciktisi)
+    "auto": Auto,
     # Yarisan yerlestiriciler
     "cluster": ClusterPlacer,
     "force": ForcePlacer,

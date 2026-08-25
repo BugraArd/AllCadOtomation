@@ -35,10 +35,29 @@ def _competitive_placers() -> list[str]:
     return [name for name in placement_mod.PLACERS if name not in BASELINE_PLACERS]
 
 
+# Skor duseni kazanan saymamak icin tolerans (kayan nokta gurultusu)
+REGRESSION_EPS = 0.05
+
+
 def select_winner(candidates: list[Candidate]) -> Candidate:
+    """Karta yazilacak adayi secer.
+
+    Gerileme koruyucusu (Asama 3): karti mevcut halinden KOTU yapan bir
+    yerlestirme asla uygulanmaz. Kullanicinin calisan tasarimini bozmaktansa
+    hicbir sey yapmamak dogru davranistir.
+    """
     valid = [c for c in candidates if not c.result.problems]
     if not valid:
         raise ValueError("gecerli yerlestirme sonucu yok")
+    improving = [c for c in valid if c.result.gain >= -REGRESSION_EPS]
+    if not improving:
+        best = max(valid, key=lambda c: c.result.gain)
+        raise ValueError(
+            "hicbir yerlestirici karti iyilestiremedi "
+            f"(en iyisi {best.placer}: {best.result.gain:+.1f} puan); "
+            "karta dokunulmadi"
+        )
+    valid = improving
     return max(
         valid,
         key=lambda c: (
@@ -84,11 +103,19 @@ def write_placement_json(path: Path, candidate: Candidate, board: Path, seed: in
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+# Varsayilan uretim yerlestiricisi: kaba yerlesim + hakem gudumlu cila +
+# gerileme tabani. Tek basina yarisan motorlarin hepsini kapsar, bu yuzden
+# hepsini ayri ayri kosturmaya gerek yok (`--all` hala mumkun).
+DEFAULT_PLACER = "auto"
+
+
 def _names_from_args(args: argparse.Namespace) -> list[str]:
     if args.placer:
         names = args.placer
     elif args.all:
         names = list(placement_mod.PLACERS)
+    elif DEFAULT_PLACER in placement_mod.PLACERS:
+        names = [DEFAULT_PLACER]
     else:
         names = _competitive_placers()
 
@@ -125,6 +152,11 @@ def _load_or_run_candidate(args: argparse.Namespace, design, rules) -> tuple[lis
                 "problems": problems,
             },
         )()
+        if result.gain < -REGRESSION_EPS:
+            raise ValueError(
+                f"{args.placement_json.name} karti kotulestiriyor "
+                f"({result.gain:+.1f} puan); karta dokunulmadi"
+            )
         return [result], Candidate(args.placement_json.stem, result, placement)
 
     names = _names_from_args(args)
@@ -174,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     args = build_parser().parse_args(argv)
+    if args.target is None and args.board == DEFAULT_BOARD:
+        args.target = DEFAULT_TARGET
     try:
         if not args.board.exists():
             raise ValueError(f"kart bulunamadi: {args.board}")

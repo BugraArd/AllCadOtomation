@@ -26,7 +26,7 @@ from . import placement as placement_mod
 from .model import Design, build_design
 from .netlist import netlist_from_board
 from .pcb import Board, read_board
-from .placement.base import Placement, PlacementContext, validate
+from .placement.base import Evaluation, Placement, PlacementContext, validate
 from .report import PENALTY, Report, enable_ansi
 from .rules import load_rules, run_rules
 from .sexpr import dumps, parse_with_stats
@@ -40,6 +40,34 @@ DEFAULT_TARGET = Path("samples/bench_good.kicad_pcb")
 DEFAULT_LOCK_PREFIXES = ("J", "P", "MH", "H")
 
 
+def evaluate_design(design: Design, rules) -> Evaluation:
+    """Bir tasarimi kural motoruyla olcer. Hakemin tek gercek olcutu."""
+    findings = run_rules(design, rules)
+    report = Report(design=design, metrics=design.metrics(), findings=findings)
+    return Evaluation(
+        score=report.score,
+        errors=report.count("error"),
+        warnings=report.count("warning"),
+        total_hpwl_mm=report.metrics.total_hpwl_mm,
+        findings=findings,
+    )
+
+
+def make_evaluator(design: Design, rules):
+    """`placement -> Evaluation` kapanisi uretir (yerlestiricilere verilir).
+
+    Degerlendirme HER ZAMAN tasarimin bozulmamis bir kopyasi uzerinden
+    yapilir; boylece sozlesmeyi ihlal edip ctx.design'i degistiren bir
+    yerlestirici olcumu kirletemez.
+    """
+    pristine = copy.deepcopy(design)
+
+    def evaluate(placement: Placement) -> Evaluation:
+        return evaluate_design(apply_placement(pristine, placement), rules)
+
+    return evaluate
+
+
 @dataclass
 class Score:
     score: float
@@ -49,13 +77,12 @@ class Score:
 
     @classmethod
     def of(cls, design: Design, rules) -> "Score":
-        findings = run_rules(design, rules)
-        report = Report(design=design, metrics=design.metrics(), findings=findings)
+        ev = evaluate_design(design, rules)
         return cls(
-            score=report.score,
-            errors=report.count("error"),
-            warnings=report.count("warning"),
-            total_hpwl_mm=report.metrics.total_hpwl_mm,
+            score=ev.score,
+            errors=ev.errors,
+            warnings=ev.warnings,
+            total_hpwl_mm=ev.total_hpwl_mm,
         )
 
     def as_dict(self) -> dict:
@@ -93,8 +120,13 @@ class Result:
 
 
 def best_result(results: list[Result]) -> Result | None:
-    """Sozlesme ihlali olmayan en iyi sonucu secer."""
-    valid = [r for r in results if not r.problems]
+    """Sozlesme ihlali olmayan ve karti KOTULESTIRMEYEN en iyi sonucu secer.
+
+    Gerileme koruyucusu (Asama 3): skoru baslangictan dusuk bir yerlestirme
+    asla kazanan sayilmaz. Boyle bir cikti karta yazilirsa kullanicinin
+    tasarimi elle yaptigindan kotu hale gelir; hicbir sey yapmamak yeglenir.
+    """
+    valid = [r for r in results if not r.problems and r.gain >= -0.05]
     if not valid:
         return None
     return max(
@@ -165,7 +197,11 @@ def write_board(source: Path, placement: Placement, target: Path) -> None:
 def run_one(name: str, design: Design, rules, seed: int, budget: float) -> Result:
     placer = placement_mod.get(name)
     ctx = PlacementContext(
-        design=design, locked=locked_refs(design), seed=seed, time_budget_s=budget
+        design=design,
+        locked=locked_refs(design),
+        seed=seed,
+        time_budget_s=budget,
+        evaluator=make_evaluator(design, rules),
     )
 
     before = Score.of(design, rules)
@@ -225,6 +261,60 @@ def render(results: list[Result], target: Score | None, color: bool) -> str:
     return "\n".join(lines)
 
 
+def discover_boards(root: Path) -> list[Path]:
+    """Bir klasordeki tum .kicad_pcb dosyalarini bulur (yedekler haric)."""
+    boards = [
+        p
+        for p in sorted(root.rglob("*.kicad_pcb"))
+        if not p.name.startswith("_") and "-backups" not in str(p)
+    ]
+    return boards
+
+
+def run_suite(boards: list[Path], names: list[str], rules, seed: int, budget: float) -> dict:
+    """Yerlestiricileri bir kart kumesinde kosturur.
+
+    Asama 3'un asil kabul olcutu burada: hicbir kartta gerileme olmamali.
+    Tek kartta iyi sonuc, sentetik tezgaha asiri uyum olabilir.
+    """
+    rows: list[dict] = []
+    for board_path in boards:
+        try:
+            design = load_design(board_path)
+        except Exception as exc:  # bozuk/eksik kart suiti durdurmasin
+            rows.append({"board": board_path.name, "error": str(exc)[:80]})
+            print(f"  {board_path.stem[:33]:<33} ATLANDI ({str(exc)[:40]})", flush=True)
+            continue
+        if not design.board.components:
+            rows.append({"board": board_path.name, "error": "bilesen yok"})
+            print(f"  {board_path.stem[:33]:<33} ATLANDI (bilesen yok)", flush=True)
+            continue
+
+        entry = {"board": board_path.name, "components": len(design.board.components), "placers": {}}
+        for name in names:
+            result, _ = run_one(name, copy.deepcopy(design), rules, seed, budget)
+            entry["placers"][name] = result.as_dict()
+            flag = "GERILEME" if result.gain < -0.05 else ""
+            label = board_path.stem
+            if len(label) > 32:
+                label = label[:31] + "~"
+            print(
+                f"  {label:<33} {name:<9}"
+                f"{result.before.score:>6.0f} ->{result.after.score:>6.0f}"
+                f"{result.gain:>+8.1f}  {flag}",
+                flush=True,
+            )
+        rows.append(entry)
+
+    regressions = [
+        (r["board"], n, p["gain"])
+        for r in rows
+        for n, p in r.get("placers", {}).items()
+        if p["gain"] < -0.05
+    ]
+    return {"rows": rows, "regressions": regressions}
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -237,13 +327,29 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--all", action="store_true", help="Kayitli tum yerlestiricileri calistir")
     ap.add_argument("--board", type=Path, default=DEFAULT_BOARD)
     ap.add_argument("--rules", type=Path, default=DEFAULT_RULES)
-    ap.add_argument("--target", type=Path, default=DEFAULT_TARGET, help="Hedef kart (referans skor)")
+    ap.add_argument(
+        "--target",
+        type=Path,
+        default=None,
+        help="Hedef kart (referans skor). Varsayilan: yalnizca tezgah kartinda bench_good",
+    )
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--budget", type=float, default=30.0, help="Saniye cinsinden sure butcesi")
     ap.add_argument("--write", type=Path, default=None, help="Sonucu .kicad_pcb olarak yaz")
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--no-color", action="store_true")
+    ap.add_argument(
+        "--suite",
+        type=Path,
+        default=None,
+        help="Klasordeki tum .kicad_pcb dosyalarinda kostur (regresyon paketi)",
+    )
     args = ap.parse_args(argv)
+
+    # Referans kart yalnizca tezgahin kendisinde anlamlidir. Baska bir kart
+    # verilmisken bench_good'u referans gostermek yaniltici bir satir uretiyordu.
+    if args.target is None and args.board == DEFAULT_BOARD:
+        args.target = DEFAULT_TARGET
 
     names = list(placement_mod.PLACERS) if args.all else (args.placer or ["identity"])
     unknown = [n for n in names if n not in placement_mod.PLACERS]
@@ -256,6 +362,35 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     rules = load_rules(args.rules)
+
+    if args.suite is not None:
+        if not args.suite.exists():
+            print(f"hata: klasor bulunamadi: {args.suite}", file=sys.stderr)
+            return 2
+        boards = discover_boards(args.suite)
+        if not boards:
+            print(f"hata: {args.suite} altinda .kicad_pcb yok", file=sys.stderr)
+            return 2
+        print()
+        print(f"  REGRESYON PAKETI - {len(boards)} kart x {len(names)} yerlestirici"
+              f"  (kural: {args.rules.name}, butce: {args.budget:g}s)")
+        print()
+        summary = run_suite(boards, names, rules, args.seed, args.budget)
+        print()
+        if summary["regressions"]:
+            print(f"  SONUC: {len(summary['regressions'])} GERILEME")
+            for board, name, gain in summary["regressions"]:
+                print(f"    {board} / {name}: {gain:+.1f}")
+        else:
+            print("  SONUC: hicbir kartta gerileme yok")
+        if args.json:
+            args.json.parent.mkdir(parents=True, exist_ok=True)
+            args.json.write_text(
+                json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            print(f"  JSON: {args.json}")
+        return 1 if summary["regressions"] else 0
+
     design = load_design(args.board)
 
     # Bos yol Path(".") olur ve exists() True doner; klasoru kart sanmayalim.

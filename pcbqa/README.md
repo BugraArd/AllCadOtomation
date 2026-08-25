@@ -54,6 +54,45 @@ $env:PCBQA_KICAD_CLI = "C:\Program Files\KiCad\10.0\bin\kicad-cli.exe"
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
 
+## Aşama 3: otomatik yerleştirme (`auto`)
+
+`auto` üretim yerleştiricisidir. Üç katmandan oluşur:
+
+1. **Kaba yerleşim** — `cluster` ile sıfırdan bir aday üretilir.
+2. **Cila** — `refine.polish` hakemin **gerçek puanını** optimize eder.
+   Hamleler doğrudan bulgulardan üretilir: "C1, U2.14'ten 33 mm uzakta"
+   bulgusu, C1'i U2 çevresinde limitin içindeki halkalara taşımayı dener ve
+   yalnızca ölçüm iyileşirse kabul eder.
+3. **Gerileme tabanı** — kartın **mevcut hali** de bir aday olarak yarışır.
+
+3. madde tasarım gereğidir: `auto` hiçbir kartı mevcut halinden kötü yapamaz.
+Aynı koruma hakemde (`best_result`) ve IPC yazma yolunda (`select_winner`) da
+vardır — skoru düşüren bir yerleştirme karta **hiçbir zaman** yazılmaz;
+böyle bir durumda araç hata verip karta dokunmaz.
+
+```powershell
+# Tek kartta
+.\.venv\Scripts\python -m pcbqa.harness --placer auto
+
+# Yarışma: auto'yu diğer motorlarla karşılaştır
+.\.venv\Scripts\python -m pcbqa.harness --all
+
+# Regresyon paketi: bir klasördeki TÜM kartlarda koştur
+.\.venv\Scripts\python -m pcbqa.harness --placer auto --budget 15 `
+  --suite "C:\Program Files\KiCad\10.0\share\kicad\demos" `
+  --rules pcbqa\default_rules.yaml
+```
+
+`--suite` herhangi bir kartta gerileme bulursa çıkış kodu `1` verir; tek kartta
+iyi sonuç almak yetmez, sentetik tezgâha aşırı uyum tam olarak böyle yakalanır.
+
+### Kendi yerleştiricinizi yazarken
+
+`ctx.evaluate(placement)` hakemin gerçek ölçümünü döndürür (60 bileşenli kartta
+~5 ms, yani 30 saniyelik bütçede binlerce deneme). Vekil bir maliyet
+fonksiyonu uydurmak yerine bunu optimize edin — Aşama 3'te gerçek kartlardaki
+gerilemelerin sebebi tam olarak bu ikisinin ayrışmasıydı.
+
 ## Aşama 2: IPC ile KiCad'e placement uygulama
 
 Yerleştirme motorları `ref -> (x_mm, y_mm, rot_deg)` sözleşmesiyle ham placement

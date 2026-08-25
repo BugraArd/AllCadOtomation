@@ -103,6 +103,19 @@ sys.path'e girer), yani düzenlemelerin anında etkili olur. Doğrulamak için:
 `"$PY" -c "import pcbqa; print(pcbqa.__file__)"` — yolun senin kopyanı
 göstermesi gerekir.
 
+### Vekil maliyet uydurma — gerçek ölçümü optimize et
+
+Aşama 3'ün en pahalı dersi: dört motor da kendi vekil maliyetini (HPWL +
+genel cezalar) optimize ediyordu, hakem ise YAML kurallarına bakıyordu.
+Sentetik tezgâhta ikisi örtüştüğü için sorun görünmedi; gerçek kartta
+(`pic_programmer`) ayrıştı ve dört motorun **üçü kartı bozdu**.
+
+`ctx.evaluate(placement)` sana hakemin gerçek ölçümünü verir — skor, hata,
+uyarı ve **bulgu listesi**. 60 bileşenli kartta ~5 ms, yani 30 saniyelik
+bütçede binlerce deneme yapabilirsin. Bulgulardaki `refs`, `measured` ve
+`limit` alanları hamleyi doğrudan hedefe yöneltir. Örnek için
+`refine.py`'ye bak.
+
 Hakem hem skoru hem **toplam HPWL**'i gösterir. Skor alt uçta sıkışıktır
 (2 → 0 arası dar), bu yüzden geliştirme sırasında **HPWL'e bak**: 485'ten
 329'a doğru inmeli. Hata sayısı da (10 → 1) net bir sinyal.

@@ -1,8 +1,13 @@
 """DONMUS ARAYUZ - yerlestirme motorlarinin uymak zorunda oldugu sozlesme.
 
-Bu dosyayi degistirmeyin. Birden fazla agent paralel calisiyor ve hepsi bu
-arayuzu uyguluyor; arayuz degisirse hepsinin ciktisi uyumsuz hale gelir ve
-karsilastirilamaz. Yeni bir ihtiyac varsa once bu dosyanin sahibiyle konusun.
+Bu dosyayi GERI UYUMSUZ sekilde degistirmeyin. Birden fazla agent paralel
+calisiyor ve hepsi bu arayuzu uyguluyor; arayuz degisirse hepsinin ciktisi
+uyumsuz hale gelir ve karsilastirilamaz. Yeni bir ihtiyac varsa once bu
+dosyanin sahibiyle konusun.
+
+Asama 3'te eklenen (varsayilanli, eski yerlestiriciler etkilenmez):
+`ctx.evaluate(placement)` -> hakemin gercek puani. Vekil maliyet yerine bunu
+optimize edin; genelleme farki buradan cikiyor.
 
 Bir yerlestirici yazmak icin tek yapmaniz gereken:
 
@@ -24,12 +29,35 @@ Sonra hakem calistirir ve puanlar:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from ..model import Design
 
 # ref -> (x_mm, y_mm, rotation_derece)
 Placement = dict[str, tuple[float, float, float]]
+
+
+@dataclass
+class Evaluation:
+    """Hakemin bir yerlestirme icin verdigi gercek olcum.
+
+    Yerlestiriciler vekil maliyet yerine BUNU optimize etmeli - hakem
+    puanlamayi bununla yapiyor.
+    """
+
+    score: float
+    errors: int
+    warnings: int
+    total_hpwl_mm: float
+    findings: list[Any] = field(default_factory=list)
+
+    @property
+    def key(self) -> tuple:
+        """Siralamada kullanilan anahtar; buyuk olan daha iyidir."""
+        return (self.score, -self.errors, -self.warnings, -self.total_hpwl_mm)
+
+    def better_than(self, other: "Evaluation | None") -> bool:
+        return other is None or self.key > other.key
 
 
 @dataclass
@@ -54,10 +82,29 @@ class PlacementContext:
     # Saniye cinsinden yumusak butce. Asarsaniz hakem yine de bekler ama
     # karsilastirma adil olmaz.
     time_budget_s: float = 30.0
+    # Hakemin gercek hedef fonksiyonu; harness dolduruyor. None ise
+    # yerlestirici kendi vekil maliyetiyle calisir (eski davranis korunur).
+    evaluator: Callable[[Placement], Evaluation] | None = None
 
     def movable(self) -> list[str]:
         """Tasinabilir bilesenlerin referanslari."""
         return [c.ref for c in self.design.board.components if c.ref not in self.locked]
+
+    def evaluate(self, placement: Placement) -> Evaluation | None:
+        """Bir yerlestirmeyi hakemin kendi olcutuyle puanlar.
+
+        Vekil maliyetle ugrasmak yerine bunu cagirin: 60 bilesenli bir kartta
+        ~5 ms surer, yani 30 saniyelik butcede binlerce deneme yapabilirsiniz.
+        `None` donerse hakem hedef fonksiyonu vermemistir (eski cagri yolu).
+        """
+        return self.evaluator(placement) if self.evaluator is not None else None
+
+    def current(self) -> Placement:
+        """Kartin su anki yerlesimi - iyilestirmeye buradan baslamak
+        gercek kartlarda sifirdan baslamaktan neredeyse her zaman iyidir."""
+        return {
+            c.ref: (c.x, c.y, c.rotation) for c in self.design.board.components
+        }
 
     def outline(self) -> tuple[float, float, float, float]:
         """Kart siniri. Yoksa bilesenleri saran kutuya duser."""

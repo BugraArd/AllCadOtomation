@@ -14,16 +14,15 @@ KiCad üzerinde bir otomasyon sistemi geliştiriyorum. Nihai hedef: **PCB ve
 sorusunu makineye sordurmak ve zamanla her şeyi kendi yerleştiren bir sisteme
 dönüştürmek istiyorum.
 
-Proje 4 aşamaya bölündü. **Aşama 0, 1 ve Aşama 2'nin IPC yazma hattı bitti**.
-Yerleştirme kalitesini yükselten Aşama 3 çalışması devam edecek.
+Proje 4 aşamaya bölündü. **Aşama 0, 1, 2 ve 3 bitti.** Sırada Aşama 4 var.
 
 | Aşama | Kapsam | Durum |
 |---|---|---|
 | 0 | Salt-okunur analiz + rapor + ölçüm | ✅ Bitti |
 | 1 | Kural motoru (YAML) + KiCad ERC/DRC entegrasyonu | ✅ Bitti |
-| 2 | Kazanan placement çıktısını çalışan KiCad PCB Editor'e IPC ile yaz | ✅ İlk sürüm bitti |
-| 3 | Tam otomatik PCB yerleştirme kalitesi / daha iyi optimizer | ⬜ |
-| 4 | KiCad 11 ile şematik API'si + headless | ⬜ (KiCad'e bağlı) |
+| 2 | Kazanan placement çıktısını çalışan KiCad PCB Editor'e IPC ile yaz | ✅ Bitti |
+| 3 | Tam otomatik PCB yerleştirme (`auto`) + gerileme koruması | ✅ Bitti |
+| 4 | KiCad 11 ile şematik API'si + headless | ⬜ Sırada (bkz. §10) |
 
 ---
 
@@ -96,6 +95,13 @@ pcbqa/
   report.py        terminal raporu + skor
   synth.py         sentetik test kartı üreteci
   harness.py       yerleştiricileri koşturur, puanlar, kazanan kartı yazabilir
+  placement/
+    base.py        DONMUŞ arayüz: Placer, PlacementContext, Evaluation
+    refine.py      bulgu güdümlü cila — hakemin gerçek puanını optimize eder
+    auto.py        ÜRETİM yerleştiricisi: kaba + cila + gerileme tabanı
+    cluster.py     kümeleme tabanlı kaba yerleşim (auto bunu kullanır)
+    force.py / anneal.py / codex.py   yarışan diğer motorlar
+    baseline.py    identity / random (hakem doğrulaması)
   __main__.py      komut satırı
   default_rules.yaml
 samples/
@@ -104,6 +110,14 @@ samples/
   pic_programmer/  + pic_programmer.rules.yaml  (demo kopyası)
 run.cmd  README.md  requirements.txt  .gitignore
 ```
+
+**Kritik mimari kararı 2 (Aşama 3'te öğrenildi):** yerleştirici, hakemin
+puanladığı şeyi optimize etmeli. Motorlar vekil bir maliyet (HPWL + genel
+cezalar) optimize ederken hakem YAML kurallarına bakıyordu; sentetik tezgâhta
+ikisi örtüştüğü için sorun görünmedi, gerçek kartta ayrıştı ve dört motorun
+üçü `pic_programmer`ı **bozdu**. Çözüm: `ctx.evaluate(placement)` ile gerçek
+ölçüm yerleştiricinin eline verildi (60 bileşenli kartta ~5 ms). Yeni bir
+motor yazarken vekil maliyet uydurmayın.
 
 **Kritik mimari kararı:** `model.py` ve `rules.py` KiCad'i **hiç bilmez** —
 sadece kendi veri modelini görürler. Aşama 3'ün yerleştirme motoru da aynı
@@ -279,6 +293,10 @@ proje ayarlarından bağımsız yapar.
 - Aşama 2 IPC yazıcı için mock board unittestleri eklendi:
   dry-run mutasyon yapmıyor, `--apply` yalnız taşınabilir footprint'i güncelliyor,
   kazanan seçimi sözleşme ihlali olan sonucu dışarıda bırakıyor.
+- Aşama 3 için 12 test daha (`tests/test_refine.py`): cila monotonluğu,
+  kilitli bileşen sözleşmesi, `auto`nun iyi bir kartı bozmaması ve üç
+  gerileme koruyucusunun ayrı ayrı doğrulanması. Toplam 15 test geçiyor.
+- Aşama 3 regresyon paketi: 19 KiCad demo kartında `auto` (bkz. §9).
 
 ## 8. Bilinen sınırlar
 
@@ -291,30 +309,115 @@ proje ayarlarından bağımsız yapar.
 
 ---
 
-## 9. SIRADAKİ ADIM — Aşama 3: yerleştirme motorunu iyileştirme
+## 9. Aşama 3 — TAMAMLANDI: `auto` yerleştiricisi
 
-`bench_bad`'i alıp skorunu `bench_good` seviyesine (2 → 67) çıkaracak motor.
-IPC yazma hattı var; artık riskli kısım koordinat optimizasyonunun kalitesi.
-Geliştirme akışı yine önce dosya/dry-run üzerinden doğrulanmalı, sonra
-`pcbqa.ipc_apply --apply` ile çalışan KiCad'e aktarılmalı.
+Kabul ölçütü hem sentetik tezgâhta hem gerçek kartlarda karşılandı.
 
-Planlanan maliyet fonksiyonu:
+### Ne inşa edildi
 
+**Kök sebep:** dört yarışan motor vekil bir maliyet (HPWL + genel cezalar)
+optimize ediyordu, hakem ise YAML kurallarına bakıyordu. Sentetik tezgâhta
+ikisi örtüştü, gerçek kartta ayrıştı: `pic_programmer` üzerinde dört motorun
+**üçü kartı bozuyordu** (codex −2.6, force −7.6, anneal −16.5).
+
+Üç parçalı çözüm:
+
+1. `base.py` → `ctx.evaluate(placement)` — hakemin gerçek ölçümü artık
+   yerleştiricinin elinde. Geriye uyumlu (varsayılanlı alan); eski motorlar
+   değişmeden çalışıyor. 60 bileşenli kartta ~5 ms, yani 30 sn'de binlerce
+   deneme.
+2. `refine.py` → **bulgu güdümlü cila.** Hamleler doğrudan bulgulardan
+   üretilir ve yalnızca ölçüm iyileşirse kabul edilir (first-improvement
+   tepe tırmanışı). Bulgunun yönü `measured`/`limit` karşılaştırmasından
+   çıkarılır: `measured > limit` yaklaştır (decoupling), `measured < limit`
+   uzaklaştır (courtyard çakışması). **Bu ayrım şart** — ilk sürüm çakışan
+   iki bileşeni birbirine yaklaştırmaya çalışıyordu.
+3. `auto.py` → üretim yerleştiricisi: `cluster` (kaba) + cila + kartın
+   **mevcut hali de aday**. Son madde `auto`nun hiçbir kartı kötüleştiremeyeceğini
+   tasarım gereği garanti eder.
+
+**Gerileme koruması üç noktada:** `refine.polish` (monoton), `harness.best_result`
+ve `ipc_apply.select_winner`. Skoru düşüren bir yerleştirme karta asla yazılmaz;
+hiçbir motor iyileştiremezse `ipc_apply` hata verip karta dokunmaz.
+
+### Ölçümler
+
+Sentetik tezgâh (`bench_bad`, hedef `bench_good` = 67):
+
+| yerleştirici | önce | sonra | hata | HPWL mm |
+|---|---|---|---|---|
+| **auto** | 2 | **67** | 1 | **220** |
+| cluster / force / codex | 2 | 67 | 1 | 224 / 256 / 261 |
+| anneal | 2 | 30 | 3 | 444 |
+| identity (doğrulama) | 2 | 2 | 10 | 485 |
+| random (duyarlılık) | 2 | 0 | 18 | 802 |
+
+Cila **tek başına** (kaba yerleşim olmadan, sıfırdan): `bench_bad` 1.7 → 30.1,
+hata 10 → 3, HPWL 485 → 265.
+
+Gerçek kart (`pic_programmer`, kendi kural seti):
+
+| yerleştirici | önce | sonra | kazanç |
+|---|---|---|---|
+| **auto** | 83 | **100** | **+17.3** — 0 hata, HPWL 1489 → **1203** |
+| cluster | 83 | 88 | +5.4 |
+| codex | 83 | 83 | +0.0 |
+| force | 83 | 75 | −7.6 |
+| anneal | 83 | 66 | −16.5 |
+
+`force` ve `anneal` gerçek kartı hâlâ bozuyor — bunlar araştırma motorları
+olarak duruyor, gerileme koruyucusu çıktılarının karta yazılmasını engelliyor.
+
+`auto`, Aşama 0'dan beri duran `U2.14 → C1 33.3 mm` decoupling hatasını kapattı.
+
+### Regresyon paketi
+
+`--suite` ile 19 KiCad demo kartının tamamında koşuluyor. Bu, kabul ölçütünün
+asıl yeri: tek kartta iyi sonuç, sentetik tezgâha aşırı uyum olabilir.
+
+```powershell
+.\.venv\Scripts\python -m pcbqa.harness --placer auto --budget 15 --suite "SUITE_PATH" --rules pcbqa\default_rules.yaml
 ```
-Cost = Σ_net w(net)·HPWL(net)              # ana terim, model.hpwl() hazır
-     + λ₁·Σ courtyard çakışma alanı         # sert kısıt, geom.overlap() hazır
-     + λ₂·Σ kart sınırı ihlali              # geom + board.outline hazır
-     + λ₃·Σ_kritik (dist(cap, ic_pin) − hedef)²
-     + λ₄·rotasyon cezası
-```
 
-Planlanan 4 fazlı akış (klasik EDA sırası — atlanırsa 200 bileşende saatlerce
-dönüp kötü sonuç verir):
+Herhangi bir kartta gerileme varsa çıkış kodu `1`. 19 KiCad demo kartının **hiçbirinde gerileme yok** (çıkış kodu 0):
 
-1. **Kümeleme** — netlist grafiğinden her IC + kendi decoupling'leri tek blok
-2. **Global yerleştirme** — force-directed, sürekli uzayda kaba konum
-3. **Legalizasyon** — courtyard çakışmalarını çöz, ızgaraya oturt
-4. **Detaylı iyileştirme** — simulated annealing (`move`, `swap`, `rotate90`)
+| Kart | önce → sonra | | Kart | önce → sonra |
+|---|---|---|---|---|
+| pic_programmer | 45 → **94** (+48.6) | | RoyalBlue54L-Feather | 80 → 84 (+4.6) |
+| complex_hierarchy | 54 → **97** (+43.2) | | One-Air-Max | 93 → 97 (+3.7) |
+| multichannel_mixer-unrouted | 70 → **100** (+29.6) | | tinytapeout-demo | 74 → 78 (+3.5) |
+| sonde xilinx | 73 → **100** (+27.4) | | multichannel_mixer | 98 → 100 (+1.7) |
+| interf_u | 5 → 30 (+25.3) | | ecc83-pp / ecc83-pp_v2 | 100 → 100 |
+| video | 29 → 38 (+8.5) | | microwave / RoyalBlue54L-NFC | 100 → 100 |
+| CM5_MINIMA_3 | 81 → 85 (+4.5) | | jetson / kit-dev / StickHub / vme-wren | değişmedi |
 
-Başarı kriteri: `bench_bad` üzerinde skor 2 → 67'ye ulaşmalı, ekilen 7
-yerleşim kusurunun tamamı kapanmalı, `nRESET` bulgusu (devre kusuru) kalmalı.
+11 kartta iyileşme, 8 kartta değişiklik yok. Değişmeyenlerde `auto` doğru
+davranıp kartın **mevcut halini** döndürüyor.
+
+Testler: `python -m unittest discover -s tests` → 15 test, hepsi geçiyor.
+Yeni testler kilitli bileşen sözleşmesini, monotonluk garantisini ve üç
+gerileme koruyucusunu ayrı ayrı doğruluyor.
+
+### Bilinen sınır
+
+Bütçe **yumuşak**. Çok büyük kartlarda (ör. `jetson-agx-thor-baseboard`) tek
+değerlendirme pahalı olduğu için `auto` verilen süreyi belirgin şekilde aşabilir.
+Kesme yok; sonuç doğru, süre uzun.
+
+---
+
+## 10. SIRADAKİ ADIM — Aşama 4: şematik
+
+Şematik yazma bugüne kadar "KiCad 11'i bekliyoruz" diye ertelenmişti (IPC'de
+şematik API'si yok). Konnect (AGPL, KiCad 10 MCP sunucusu) incelemesi bunun
+zorunlu olmadığını gösterdi: `.kicad_sch` dosyasını kendi S-expression
+motoruyla, atomik yazma + UUID koruma + round-trip testleriyle düzenliyor.
+
+Bizde `sexpr.py` okuyucusu zaten var; eksik olan yazma tarafı.
+
+**Karar bekleyen:** Aşama 4 (a) KiCad 11'in şematik API'sini mi beklesin,
+(b) yoksa `.kicad_sch`'i doğrudan mı yazsın? (b) bugün mümkün ama şematik
+dosya biçiminin sürüm değişimlerini kendimiz takip etmek demek.
+
+Konnect'in kendi kodu **AGPL-3.0** ve ticari lisans satılıyor — yaklaşımı
+örnek alınabilir, kodu kopyalanamaz. Projenin lisans temizliği (§1) korunmalı.
