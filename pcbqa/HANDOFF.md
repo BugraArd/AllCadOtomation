@@ -14,9 +14,9 @@ KiCad üzerinde bir otomasyon sistemi geliştiriyorum. Nihai hedef: **PCB ve
 sorusunu makineye sordurmak ve zamanla her şeyi kendi yerleştiren bir sisteme
 dönüştürmek istiyorum.
 
-Proje 4 aşamaya bölündü. **Aşama 0-3 ve 4a/4b bitti.** Sırada şematiğe
-yazma (4c/4d) var. **KiCad 11 beklenmiyor** — şematik okuma KiCad 10 ile
-çalışıyor, yazmanın da çalıştığı doğrulandı (bkz. §10).
+Proje 4 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4d).**
+**KiCad 11 beklenmedi** — şematik okuma da yazma da KiCad 10 ile çalışıyor
+(bkz. §10). Sırada şematik yerleştirme kalitesi var (4e).
 
 | Aşama | Kapsam | Durum |
 |---|---|---|
@@ -26,7 +26,8 @@ yazma (4c/4d) var. **KiCad 11 beklenmiyor** — şematik okuma KiCad 10 ile
 | 3 | Tam otomatik PCB yerleştirme (`auto`) + gerileme koruması | ✅ Bitti |
 | 4a | Şematik okuma (hiyerarşik) + yapısal kontroller | ✅ Bitti |
 | 4b | Netlist değişmezliği kalkanı | ✅ Bitti |
-| 4c/4d | Atomik yazma + bağlantı koruyan taşıma | ⬜ Sırada (bkz. §10) |
+| 4c | Atomik yazma + açık-proje koruması | ✅ Bitti |
+| 4d | Bağlantı koruyan sembol taşıma | ✅ Bitti |
 
 ---
 
@@ -96,6 +97,8 @@ pcbqa/
   kicadcli.py      kicad-cli sarmalayıcısı (netlist, ERC, DRC)
   schematic.py     .kicad_sch okuyucu (hiyerarşik, pin/bbox geometrisi çözülmüş)
   sch_verify.py    netlist değişmezliği kalkanı (yazma için ön koşul)
+  sch_write.py     atomik yazma + açık-proje (lck) koruması + yedek
+  sch_move.py      bağlantı koruyan sembol taşıma + komut satırı
   ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement uygular
   ipc_apply.py     yarışmayı koşturur, kazananı seçer, IPC dry-run/apply yapar
   report.py        terminal raporu + skor
@@ -307,7 +310,11 @@ proje ayarlarından bağımsız yapar.
   %98.7 örtüşme, 0 bozuk parantez, 0 okunamayan proje (bkz. §10).
 - Aşama 4a/4b için 11 test daha (`tests/test_schematic.py`): dönüşüm
   doğruluğu, hiyerarşi, sanal sembol ayrımı, kalkanın doğru değişmezi
-  kullanması. Toplam 45 test geçiyor.
+  kullanması.
+- Aşama 4c/4d için 19 test daha (`tests/test_sch_move.py`): atomik yazma,
+  yedek çakışması, kilit koruması, ızgara oturtmasının kaydırmayı değiştirmesi,
+  doğrudan pin temasının engellenmesi, net birleştiren taşımanın kalkanla
+  reddedilmesi, UUID korunması. **Toplam 64 test geçiyor.**
 
 ## 8. Bilinen sınırlar
 
@@ -418,7 +425,7 @@ Kesme yok; sonuç doğru, süre uzun.
 
 ---
 
-## 10. Aşama 4a/4b TAMAMLANDI — sıradaki: 4c/4d (yazma)
+## 10. Aşama 4 TAMAMLANDI — şematik okuma, kalkan, yazma, taşıma
 
 ### KiCad 11 beklenmiyor, çünkü gerek yok
 
@@ -486,23 +493,74 @@ yazma (geçer), 12.7 mm kayma (yakalar), 1.27 mm kayma (yakalar).
 
 Testler: `python -m unittest discover -s tests` → **45 test**, hepsi geçiyor.
 
-### SIRADAKİ — 4c/4d
+### 4c — atomik yazma (`sch_write.py`)
 
-- **4c atomik yazma:** aynı dizine geçici dosya → `fsync` → `os.replace`.
-  UUID'ler asla yeniden üretilmez. Yazmadan önce git commit. Kalkan geçmezse
-  yazma yok. **KiCad kapalı olmalı** (IPC'de şematik yok); açık proje
-  `~<proje>.kicad_pro.lck` dosyasından anlaşılır.
-- **4d bağlantı koruyan taşıma:** sembol taşınırken pinlerine değen tel uçları
-  da taşınır (stub uzatma/kısaltma), 1.27 mm ızgaraya oturtulur, kalkandan
-  geçirilir. Pin geometrisi 4a'da çözüldüğü için zemin hazır.
-- **4e (sonraki tur):** Aşama 3 mimarisi doğrudan taşınır — şematik için bir
-  `evaluate` yazılır, `refine.polish` olduğu gibi çalışır.
+IPC sematikte calismadigi icin PCB tarafindaki "calisan editore uygula, undo
+ile geri al" secenegi YOK. Yazma dogrudan dosyaya, dolayisiyla:
 
-### Bilinen sınırlar (4a/4b)
+- Gecici dosya **ayni dizine** yazilir → `fsync` → `os.replace`. Windows'ta da
+  atomiktir; **ayni dizin sart** cunku farkli birimler arasinda atomiklik
+  garanti edilmez.
+- Yazmadan once yedek alinir (`.pcbqa-bak`, mevcut yedegin uzerine yazmaz).
+- Proje KiCad'de acikken (`~<proje>.kicad_pro.lck`) yazma REDDEDILIR. Eeschema
+  dosyayi bellekte tutar; kullanici kaydederse bizim degisikligimiz sessizce
+  kaybolur.
+- **UUID'ler asla yeniden uretilmez** — KiCad sembol orneklerini ve netlist
+  yollarini onlarla izler; yenilenirse PCB ile sematik arasindaki bag kopar.
+- Varsayilan dry-run.
 
-- `dumps()` dosyayı yeniden biçimlendiriyor; git diff'i şişiriyor. KiCad de her
-  kaydedişte aynısını yaptığı için kabul edildi, ama 4c'de cerrahi (bayt
-  düzeyi) düzenleme alternatifi yeniden değerlendirilebilir.
-- Şematik dosya biçimini (`version 20260101`) artık kendimiz takip ediyoruz.
-- Kalkan her çağrıda `kicad-cli` çalıştırır (~1-2 sn); yerleştirme döngüsünde
-  her adımda değil, yalnızca yazma öncesi kullanılmalı.
+### 4d — bağlantı koruyan taşıma (`sch_move.py`)
+
+Sembol tasinirken ona TUTUNAN her sey birlikte tasinir: pinlerine degen tel
+uclari (telin oteki ucu yerinde kalir, tel uzar/kisalir), pin konumundaki
+junction ve no_connect isaretleri, etiketler, sembolun kendi property
+konumlari. Hiyerarside sembol hangi alt sayfadaysa **o dosya** duzenlenir.
+
+Izgaraya oturtma kaydirma miktarini degistirir; tel uclari AYNI miktarda
+kaydirilir - yoksa pinden kopar.
+
+**Uc katmanli koruma, uctan uca dogrulandi:**
+
+| Katman | Ornek | Sonuc |
+|---|---|---|
+| Geometrik engel | `#PWR022` pini `J1.5`'e dogrudan yapisik (arada tel yok) | tasima reddedildi |
+| Netlist kalkani | R1 (+12.7, −10.16) → `/VPP_ON` agi `VCC`'ye kayniyor (12→15 pin) | `--apply` verilmisken bile yazilmadi, dosya bayt bayt ayni kaldi |
+| Atomik yazma | `~pic_programmer.kicad_pro.lck` var | cikis kodu 2, yazma yok |
+
+Basarili tasima ornegi (gercek cikti):
+
+```
+R1: (78.74, 43.18) -> (81.28, 43.18)  [tel ucu 2, junction 0, ... property 5]
+KALKAN: baglanti degismedi
+UYGULANDI: 230,132 bayt yazildi
+```
+
+Bagimsiz dogrulama: yazilan dosyanin netlist'i orijinalle **birebir ayni**,
+0 bozuk parantez, UUID'ler korunmus. Alt sayfadaki `C6` tasindiginda yalnizca
+`pic_sockets.kicad_sch` degisti, kok dosya el degmedi.
+
+Testler: `python -m unittest discover -s tests` → **64 test**, hepsi geciyor.
+`kicad-cli` yoksa uctan uca testler atlanir.
+
+### Bilinen sınırlar (4c/4d)
+
+- **Yalnizca oteleme.** Rotasyon ve ayna desteklenmiyor: pin konumlari donunce
+  tel uclarinin nasil uzatilacagi otelemedeki gibi tek bir delta degil.
+- Dogrudan pin-pine temasta tasima reddediliyor; "ikisini birlikte tasi"
+  secenegi henuz yok (`--force` var ama baglantiyi koparir).
+- Ayni .kicad_sch birden fazla sayfada ornenmisse duzenleme TUM orneklerini
+  etkiler; bu durum engel olarak isaretleniyor.
+- Kalkan her tasimada iki `kicad-cli` ihracati calistirir (~2-4 sn). Toplu
+  tasimalarda her adimda degil, sonunda bir kez calistirmak gerekir.
+- `dumps()` dosyayi yeniden bicimlendirir; git diff sisiyor. KiCad de her
+  kaydediste ayni sey yaptigi icin kabul edildi.
+
+### SIRADAKİ — 4e: şematik yerleştirme kalitesi
+
+Asama 3 mimarisi dogrudan tasinabilir: sematik icin bir `evaluate` yazilir
+(kural motoru + `run_schematic_checks` zaten var), `refine.polish` oldugu gibi
+calisir. Tek fark, hakem her adimda `kicad-cli` calistiramayacagi icin
+kalkanin yalnizca yazma oncesi devreye girmesi.
+
+Toplu tasima icin `sch_move` uzerine bir "plan listesi" arayuzu gerekir:
+tum tasimalari agac uzerinde uygula, tek seferde dogrula, tek seferde yaz.

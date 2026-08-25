@@ -214,6 +214,9 @@ class Schematic:
     labels: list[SchLabel] = field(default_factory=list)
     sheets: list[SchSheetRef] = field(default_factory=list)
     files: list[Path] = field(default_factory=list)
+    # sayfa yolu -> o sayfanin bulundugu dosya. Duzenleme yaparken hangi
+    # dosyanin acilacagini bilmek sart (hiyerarside sembol kok dosyada olmayabilir).
+    file_of_sheet: dict[str, Path] = field(default_factory=dict)
     # Toleransli okuyucunun atladigi bozuk parantez sayisi (0 olmali)
     stray_parens: int = 0
 
@@ -227,6 +230,18 @@ class Schematic:
 
     def on_sheet(self, sheet_path: str) -> list[SchSymbol]:
         return [s for s in self.symbols if s.sheet_path == sheet_path]
+
+    def sheets_sharing_a_file(self) -> dict[Path, list[str]]:
+        """Ayni dosyayi kullanan sayfa yollari.
+
+        Bir .kicad_sch birden fazla kez ornenebilir (ayni alt devrenin iki
+        kopyasi). Boyle bir dosyayi duzenlemek TUM orneklerini etkiler -
+        yazma islemleri bunu fark etmek zorunda.
+        """
+        out: dict[Path, list[str]] = {}
+        for sheet_path, file_path in self.file_of_sheet.items():
+            out.setdefault(file_path, []).append(sheet_path)
+        return {f: paths for f, paths in out.items() if len(paths) > 1}
 
     def sheet_paths(self) -> list[str]:
         seen: list[str] = []
@@ -457,6 +472,7 @@ _LABEL_KINDS = {
 def _read_file(path: Path, sheet_path: str, schematic: Schematic, visited: set[Path]) -> None:
     """Tek bir .kicad_sch dosyasini okur ve alt sayfalarina iner."""
     schematic.files.append(path)
+    schematic.file_of_sheet[sheet_path] = path
 
     root, stray = parse_with_stats(path.read_text(encoding="utf-8", errors="replace"))
     schematic.stray_parens += stray

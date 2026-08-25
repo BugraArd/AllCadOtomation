@@ -123,6 +123,84 @@ kaldığı sürece devre elektriksel olarak aynıdır.
 Bu kalkan, şematiğe yazma (Aşama 4c/4d) için ön koşuldur: yazma öncesi/sonrası
 karşılaştırılır, `ok=False` ise yazma reddedilir.
 
+## Aşama 4c/4d: şematiğe yazma ve bağlantı koruyan taşıma
+
+Bir sembolü kaydırıp bırakmak, pinlerine değen tel uçlarını yerinde bırakır ve
+bağlantı **sessizce** kopar. `pcbqa.sch_move` sembolü taşırken ona tutunan her
+şeyi birlikte taşır: tel uçları, junction ve no-connect işaretleri, etiketler,
+sembolün kendi metin alanları.
+
+```powershell
+# Dry-run (varsayılan): ne olacağını söyler, dosyaya dokunmaz
+.\.venv\Scripts\python -m pcbqa.sch_move --sch proje\proje.kicad_sch --ref R1 --dx 2.54 --dy 0
+
+# Gerçekten yaz
+.\.venv\Scripts\python -m pcbqa.sch_move --sch proje\proje.kicad_sch --ref R1 --dx 2.54 --dy 0 --apply
+```
+
+Çıktı:
+
+```
+  R1: (78.74, 43.18) -> (81.28, 43.18)  [tel ucu 2, junction 0, no-connect 0, etiket 0, property 5]
+  KALKAN: baglanti degismedi
+  UYGULANDI: 230,132 bayt yazildi
+  yedek: pic_programmer.kicad_sch.pcbqa-bak
+```
+
+Hiyerarşide sembol hangi alt sayfadaysa **o dosya** düzenlenir; kök dosyaya
+dokunulmaz.
+
+### Üç katmanlı koruma
+
+**1. Geometrik engel.** İki sembolün pini araya tel girmeden birbirine
+değiyorsa (güç sembolleri çoğunlukla böyle bağlanır), uzatılacak tel yoktur ve
+taşıma reddedilir:
+
+```
+  ENGEL: #PWR022 pini J1.5 ile dogrudan temas halinde (43.18, 101.6);
+         arada tel yok, tasima baglantiyi koparir
+```
+
+**2. Netlist kalkanı.** Geometri her şeyi göremez. Taşınan bir tel ucu başka
+bir netin üstüne oturabilir. Değişiklik önce bir kum havuzunda uygulanır ve
+netlist karşılaştırılır:
+
+```
+  KALKAN: BAGLANTI DEGISTI: 15 pin baska aga tasindi
+    J1.3: '/VPP_ON' (3 pin) -> 'VCC' (15 pin)
+  tasima yapilmadi - baglanti bozulurdu
+```
+
+Bu örnek gerçek: `--apply` verilmiş olmasına rağmen dosyaya dokunulmadı.
+
+**3. Atomik yazma.** IPC şematikte çalışmadığı için "editöre uygula, undo ile
+geri al" seçeneği yok — yazma doğrudan dosyaya. Bu yüzden:
+
+- geçici dosya **aynı dizine** yazılır → `fsync` → `os.replace` (Windows'ta da
+  atomik; ayrı birimler arasında atomiklik garanti edilmez, o yüzden aynı dizin)
+- yazmadan önce **yedek** alınır
+- proje KiCad'de açıksa (`~<proje>.kicad_pro.lck`) yazma **reddedilir** —
+  Eeschema dosyayı bellekte tutar, kullanıcı kaydederse değişikliğimiz kaybolur
+- **UUID'ler asla yeniden üretilmez**; KiCad sembol örneklerini ve netlist
+  yollarını onlarla izler
+
+### Bayraklar
+
+| Bayrak | Açıklama |
+|---|---|
+| `--apply` | Gerçekten yaz (varsayılan dry-run) |
+| `--sheet` | Sembol birden fazla sayfadaysa sayfa yolu |
+| `--no-snap` | 1.27 mm ızgaraya oturtma |
+| `--no-verify` | Netlist kalkanını atla (**önerilmez**) |
+| `--no-backup` | Yedek alma |
+| `--force` | Engelleri ve kalkan reddini yok say |
+| `--allow-open-project` | KiCad açıkken de yaz |
+
+Izgaraya oturtma kaydırma miktarını değiştirir; tel uçları **aynı** miktarda
+kaydırılır, yoksa pinden kopar.
+
+Çıkış kodları: `0` başarılı · `1` engel/kalkan reddi · `2` araç hatası.
+
 ## Aşama 3: otomatik yerleştirme (`auto`)
 
 `auto` üretim yerleştiricisidir. Üç katmandan oluşur:
