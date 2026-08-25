@@ -1,0 +1,39 @@
+version: 1
+
+# Demo projeye ozel kural ornegi.
+#   .venv\Scripts\python -m pcbqa samples\pic_programmer --rules samples\pic_programmer.rules.yaml
+#
+# Buradaki fark, "same_net" kuralinin acik olmasi: projeye ozel niyet kontrolu.
+
+defaults:
+  severity: warning
+  ignore_nets: ["GND", "earth"]
+
+rules:
+  # Bu kartta decoupling kondansatorleri THT ve seyrek; esik gercekci tutuldu.
+  - id: decoupling-mesafe
+    type: proximity
+    severity: error
+    description: "IC guc pinlerinin yakininda decoupling kondansatoru olmali"
+    pin:
+      kind: ic
+      pintype: power_in
+    partner:
+      kind: capacitor
+    max_distance_mm: 20
+
+  # Niyet kontrolu: tum PIC soketleri ayni VCC rayindan beslenmeli.
+  # Sematige bakip tek tek dogrulamak yerine kural olarak yaziyoruz;
+  # birisi ileride U6'yi baska raya baglarsa rapor aninda yakalar.
+  - id: pic-soketleri-ortak-vcc
+    type: same_net
+    severity: error
+    description: "24C16, PIC ve GP soketleri ayni VCC rayinda olmali"
+    pins: ["U1.8", "U5.14", "U6.1"]
+
+  - id: net-uzunluk-butcesi
+    type: net_length
+    severity: warning
+    net: ".*"
+    max_hpwl_mm: 140
+    max_findings: 5

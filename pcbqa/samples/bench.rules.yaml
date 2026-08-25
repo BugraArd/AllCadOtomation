@@ -1,0 +1,127 @@
+version: 1
+
+# ---------------------------------------------------------------------------
+# Sentetik test tezgahi kural seti - dort alani da kapsar.
+#
+#   .venv\Scripts\python -m pcbqa samples\bench_bad.kicad_pcb --rules samples\bench.rules.yaml
+#
+# Bu kartin "dogru cevabi" pcbqa/synth.py icinde tanimli, yani kurallarin
+# gercekten dogru seyi yakalayip yakalamadigini kanitlayabiliyoruz.
+# ---------------------------------------------------------------------------
+
+defaults:
+  severity: warning
+  ignore_nets: ["GND", "AGND", "NC"]
+
+rules:
+  # =========================================================== GUC BUTUNLUGU
+
+  # Her IC guc pini KENDI decoupling kondansatorune sahip olmali.
+  # exclusive: true kritik - kapali olsaydi 3V3 rayindaki tek bir kondansator
+  # butun guc pinlerini tatmin eder ve eksik kondansatorler gorunmez olurdu.
+  - id: guc-decoupling
+    type: proximity
+    severity: error
+    description: "Her IC guc pininin yaninda kendi decoupling kondansatoru olmali"
+    pin:
+      kind: ic
+      pintype: power_in
+    partner:
+      kind: capacitor
+    max_distance_mm: 6
+    exclusive: true
+
+  # Regulator giris/cikis kondansatorleri regulatore yakin olmali.
+  - id: regulator-kondansator
+    type: proximity
+    severity: error
+    description: "Regulator giris/cikis kondansatorleri regulatore yakin olmali"
+    pin:
+      ref: "^U2$"
+    partner:
+      kind: capacitor
+      value: "uF"
+    max_distance_mm: 8
+
+  # Guc raylari kisa olmali - uzun guc rayi = yuksek empedans.
+  - id: guc-rayi-uzunlugu
+    type: net_length
+    severity: warning
+    description: "Guc raylari asiri uzun olmamali"
+    net: "^(3V3|VBUS|AVDD)$"
+    max_hpwl_mm: 60
+
+  # =========================================================== SINYAL BUTUNLUGU
+
+  # USB diferansiyel cifti dengeli yerlestirilmeli.
+  - id: usb-diferansiyel-cift
+    type: length_match
+    severity: error
+    description: "USB D+/D- cifti dengeli olmali"
+    groups:
+      - ["USB_DP", "USB_DM"]
+    tolerance_mm: 3
+
+  # Kristal netleri cok kisa olmali - uzun kristal izi = kararsiz osilasyon.
+  - id: kristal-net-uzunlugu
+    type: net_length
+    severity: error
+    description: "Kristal netleri cok kisa tutulmali"
+    net: "^(XIN|XOUT)$"
+    max_hpwl_mm: 12
+
+  # Genel sinyal uzunluk butcesi.
+  - id: sinyal-uzunluk-butcesi
+    type: net_length
+    severity: warning
+    description: "Sinyal netleri makul uzunlukta olmali"
+    net: "^(SDA|SCL|TX|RX|nRESET|GPIO)"
+    max_hpwl_mm: 45
+    max_findings: 8
+
+  # =========================================================== BAGLANTI NIYETI
+
+  # Kristal yuk kondansatorleri kristale yapisik olmali.
+  - id: kristal-yuk-kondansatoru
+    type: proximity
+    severity: error
+    description: "Kristal yuk kondansatorleri kristale cok yakin olmali"
+    pin:
+      kind: crystal
+    partner:
+      kind: capacitor
+      value: "pF"
+    max_distance_mm: 6
+    exclusive: true
+
+  # I2C ve reset hatlarinda pull-up direnci bekleriz.
+  - id: pullup-gerekli
+    type: require_on_net
+    severity: error
+    description: "I2C ve reset hatlarinda pull-up direnci olmali"
+    net: "^(SDA|SCL|nRESET)$"
+    partner:
+      kind: resistor
+
+  # Niyet: butun sayisal IC'ler ayni 3V3 rayindan beslenmeli.
+  - id: ortak-guc-rayi
+    type: same_net
+    severity: error
+    description: "MCU ve EEPROM ayni 3V3 rayindan beslenmeli"
+    pins: ["U1.1", "U1.20", "U3.8"]
+
+  # =========================================================== URETILEBILIRLIK
+
+  # Bilesenler ust uste binmemeli, aralarinda montaj boslugu olmali.
+  - id: courtyard-cakisma
+    type: courtyard_overlap
+    severity: error
+    description: "Bilesenler cakismamali, aralarinda montaj boslugu olmali"
+    clearance_mm: 0.2
+
+  # Kart kenarina cok yakin bilesenler panelizasyon/frezeleme sirasinda sorun cikarir.
+  - id: kart-kenari-mesafesi
+    type: edge_clearance
+    severity: error
+    description: "Bilesenler kart kenarindan yeterince iceride olmali"
+    min_distance_mm: 2.0

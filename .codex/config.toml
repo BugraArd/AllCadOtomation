@@ -1,0 +1,12 @@
+# Project-local Codex settings for this workspace.
+# Use this when launching Codex from C:\Users\ardaa\OneDrive\Desktop\Kicad.
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+writable_roots = [
+  'C:\Users\ardaa\OneDrive\Desktop\Kicad',
+  'C:\tmp',
+]
+network_access = false

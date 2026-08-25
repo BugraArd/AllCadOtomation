@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# pcbqa ara dosyalari
+pcbqa/.work/
+
+# KiCad yerel ayar/yedek dosyalari
+*.kicad_prl
+*-backups/
+fp-info-cache
