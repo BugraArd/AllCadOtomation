@@ -14,14 +14,15 @@ KiCad üzerinde bir otomasyon sistemi geliştiriyorum. Nihai hedef: **PCB ve
 sorusunu makineye sordurmak ve zamanla her şeyi kendi yerleştiren bir sisteme
 dönüştürmek istiyorum.
 
-Proje 4 aşamaya bölündü. **Aşama 0 ve 1 bitti**, Aşama 2-3'e geçilecek.
+Proje 4 aşamaya bölündü. **Aşama 0, 1 ve Aşama 2'nin IPC yazma hattı bitti**.
+Yerleştirme kalitesini yükselten Aşama 3 çalışması devam edecek.
 
 | Aşama | Kapsam | Durum |
 |---|---|---|
 | 0 | Salt-okunur analiz + rapor + ölçüm | ✅ Bitti |
 | 1 | Kural motoru (YAML) + KiCad ERC/DRC entegrasyonu | ✅ Bitti |
-| 2 | Yerleştirme **önerisi** üret, görselleştir, kullanıcı onaylar | ⬜ Sırada |
-| 3 | Tam otomatik PCB yerleştirme | ⬜ |
+| 2 | Kazanan placement çıktısını çalışan KiCad PCB Editor'e IPC ile yaz | ✅ İlk sürüm bitti |
+| 3 | Tam otomatik PCB yerleştirme kalitesi / daha iyi optimizer | ⬜ |
 | 4 | KiCad 11 ile şematik API'si + headless | ⬜ (KiCad'e bağlı) |
 
 ---
@@ -70,7 +71,7 @@ Proje        : C:\Users\ardaa\OneDrive\Desktop\Kicad\pcbqa\
 kicad-cli    : C:\Program Files\KiCad\10.0\bin\kicad-cli.exe  (sürüm 10.0.4)
 Demo projeler: C:\Program Files\KiCad\10.0\share\kicad\demos  (19 adet)
 Python       : 3.13.14 (Microsoft Store), venv proje içinde .venv
-Tek bağımlılık: pyyaml 6.0.3
+Bağımlılıklar : pyyaml 6.0.3; IPC yazma için kicad-python
 Platform     : Windows 11, PowerShell
 ```
 
@@ -90,8 +91,11 @@ pcbqa/
   model.py         ikisini birleştirir + ölçümler (HPWL, yoğunluk)
   rules.py         YAML kural motoru (7 kural tipi)
   kicadcli.py      kicad-cli sarmalayıcısı (netlist, ERC, DRC)
+  ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement uygular
+  ipc_apply.py     yarışmayı koşturur, kazananı seçer, IPC dry-run/apply yapar
   report.py        terminal raporu + skor
   synth.py         sentetik test kartı üreteci
+  harness.py       yerleştiricileri koşturur, puanlar, kazanan kartı yazabilir
   __main__.py      komut satırı
   default_rules.yaml
 samples/
@@ -126,11 +130,41 @@ sadece `.kicad_pcb` ile çalışır.
 .\.venv\Scripts\python -m pcbqa <proje>                       # klasör veya .kicad_pcb
 .\.venv\Scripts\python -m pcbqa <proje> --rules r.yaml --json rapor.json
 .\.venv\Scripts\python -m pcbqa.synth --out samples           # tezgâhı yeniden üret
+.\.venv\Scripts\python -m pcbqa.harness --all                 # yerleştirici yarışması
+.\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb
+.\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb --apply
 run.cmd samples\pic_programmer                                # kısayol
 ```
 
-Bayraklar: `--rules --json --work-dir --kicad-cli --no-kicad-checks --no-color --fail-on`
+Analiz bayrakları: `--rules --json --work-dir --kicad-cli --no-kicad-checks --no-color --fail-on`
 Çıkış kodları: `0` temiz · `1` eşiği aşan bulgu · `2` araç hatası.
+
+### IPC uygulama hattı (`pcbqa.ipc_apply`)
+
+Amaç: Aşama 3 yerleştiricisinin/kazananın ham çıktısını çalışan KiCad PCB
+Editor'e yazmak. Sözleşme `Placement = dict[str, tuple[float, float, float]]`,
+yani `ref -> (x_mm, y_mm, rot_deg)`.
+
+Akış:
+
+1. `--board` üzerinden mevcut tasarım okunur ve kilitli referanslar belirlenir.
+2. `--placer`/`--all` verilirse harness ile placement yarışması çalışır.
+   Hiçbiri verilmezse `identity/random` dışındaki yarışmacılar çalışır.
+3. Sözleşme ihlali olmayan en iyi skor seçilir.
+4. Çalışan KiCad'e `kicad-python` ile bağlanır, aktif kart adı `--board`
+   dosya adıyla karşılaştırılır.
+5. Varsayılan dry-run'dır. `--apply` verilirse footprint `position` ve
+   `orientation` değerleri `Board.begin_commit()` / `Board.update_items()` /
+   `Board.push_commit()` ile tek undo adımı olarak uygulanır.
+6. `--save` verilirse KiCad kartı kaydedilir; verilmezse sadece editor'de
+   uygulanmış halde kalır ve kullanıcı inceleyebilir/undo yapabilir.
+
+Önemli bayraklar:
+
+- `--write-placement-json .work\winner-placement.json`: kazanan ham çıktıyı saklar.
+- `--placement-json PATH`: yarışmayı tekrar koşturmadan aynı çıktıyı uygular.
+- `--allow-board-mismatch`: aktif KiCad kart adı farklıysa yine de uygula.
+- `--ignore-kicad-locks`: KiCad'de kilitli footprint'leri taşıma korumasını kapatır.
 
 ### Kural sistemi (7 tip)
 
@@ -241,7 +275,10 @@ proje ayarlarından bağımsız yapar.
 - 7 kural tipinin de hem geçen hem hata veren yolu test edildi.
 - Çıkış kodları, JSON çıktısı, hata mesajları doğrulandı.
 - Referans skorlar: `pic_programmer` 45, `video` 29, `ecc83` 100,
-  `bench_good` 67, `bench_bad` 1.
+  `bench_good` 67, `bench_bad` 2.
+- Aşama 2 IPC yazıcı için mock board unittestleri eklendi:
+  dry-run mutasyon yapmıyor, `--apply` yalnız taşınabilir footprint'i güncelliyor,
+  kazanan seçimi sözleşme ihlali olan sonucu dışarıda bırakıyor.
 
 ## 8. Bilinen sınırlar
 
@@ -254,11 +291,12 @@ proje ayarlarından bağımsız yapar.
 
 ---
 
-## 9. SIRADAKİ ADIM — Aşama 2/3: yerleştirme motoru
+## 9. SIRADAKİ ADIM — Aşama 3: yerleştirme motorunu iyileştirme
 
 `bench_bad`'i alıp skorunu `bench_good` seviyesine (2 → 67) çıkaracak motor.
-**Önce KiCad'e hiç dokunmadan**: sadece koordinat optimizasyonu + öncesi/sonrası
-skor karşılaştırması. IPC ile karta yazma en sona bırakılacak (bindings alpha).
+IPC yazma hattı var; artık riskli kısım koordinat optimizasyonunun kalitesi.
+Geliştirme akışı yine önce dosya/dry-run üzerinden doğrulanmalı, sonra
+`pcbqa.ipc_apply --apply` ile çalışan KiCad'e aktarılmalı.
 
 Planlanan maliyet fonksiyonu:
 

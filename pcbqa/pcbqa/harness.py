@@ -92,6 +92,24 @@ class Result:
         }
 
 
+def best_result(results: list[Result]) -> Result | None:
+    """Sozlesme ihlali olmayan en iyi sonucu secer."""
+    valid = [r for r in results if not r.problems]
+    if not valid:
+        return None
+    return max(
+        valid,
+        key=lambda r: (
+            r.after.score,
+            -r.after.errors,
+            -r.after.warnings,
+            -r.after.total_hpwl_mm,
+            r.gain,
+            -r.seconds,
+        ),
+    )
+
+
 def load_design(board_path: Path) -> Design:
     board = read_board(board_path)
     return build_design(board, netlist_from_board(board), project_name=board_path.stem)
@@ -246,18 +264,22 @@ def main(argv: list[str] | None = None) -> int:
         target_score = Score.of(load_design(args.target), rules)
 
     results: list[Result] = []
-    last: Placement = {}
+    raw_by_placer: dict[str, Placement] = {}
     for name in names:
         # Her yerlestirici taze bir kopyayla calisir - adil karsilastirma
         result, raw = run_one(name, copy.deepcopy(design), rules, args.seed, args.budget)
         results.append(result)
-        last = raw
+        raw_by_placer[name] = raw
 
     print(render(results, target_score, enable_ansi() and not args.no_color))
 
-    if args.write and last:
-        write_board(args.board, last, args.write)
-        print(f"  kart yazildi: {args.write}  (KiCad'de acip inceleyebilirsiniz)\n")
+    winner = best_result(results)
+    if args.write and winner:
+        write_board(args.board, raw_by_placer[winner.placer], args.write)
+        print(
+            f"  kazanan kart yazildi: {args.write}  "
+            f"({winner.placer}, KiCad'de acip inceleyebilirsiniz)\n"
+        )
 
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
@@ -266,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
             "rules": str(args.rules),
             "seed": args.seed,
             "target": target_score.as_dict() if target_score else None,
+            "winner": winner.placer if winner else None,
             "results": [r.as_dict() for r in results],
         }
         args.json.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")

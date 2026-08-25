@@ -1,1 +1,4 @@
 pyyaml>=6.0
+
+# Asama 2: calisan KiCad PCB Editor'e IPC ile placement uygulama.
+kicad-python>=0.7.0

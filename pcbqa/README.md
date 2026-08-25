@@ -28,11 +28,12 @@ sakladığı için kuralların neredeyse tamamı sadece `.kicad_pcb` ile çalı�
 ## Kurulum
 
 Gereksinim: KiCad 9 veya üzeri (`kicad-cli` için) ve Python 3.10+.
+IPC ile çalışan KiCad'e placement yazmak için ayrıca `kicad-python` kurulur.
 
 ```powershell
 cd C:\Users\ardaa\OneDrive\Desktop\Kicad\pcbqa
 python -m venv .venv
-.\.venv\Scripts\python -m pip install pyyaml
+.\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 
 `kicad-cli` otomatik bulunur (PATH → `C:\Program Files\KiCad\*\bin`). Gerekirse:
@@ -52,6 +53,39 @@ $env:PCBQA_KICAD_CLI = "C:\Program Files\KiCad\10.0\bin\kicad-cli.exe"
 ```
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
+
+## Aşama 2: IPC ile KiCad'e placement uygulama
+
+Yerleştirme motorları `ref -> (x_mm, y_mm, rot_deg)` sözleşmesiyle ham placement
+üretir. `pcbqa.ipc_apply` bu çıktıyı çalışan KiCad PCB Editor oturumuna yazar.
+Varsayılan mod **dry-run**'dır; KiCad'e gerçek yazma için `--apply` açıkça
+verilmelidir.
+
+Önce KiCad'de aynı `.kicad_pcb` dosyasını açın ve Preferences > Plugins altında
+IPC API'nin etkin olduğundan emin olun.
+
+```powershell
+# Yarışmayı çalıştır, kazananı seç, aktif KiCad kartına yazmadan doğrula
+.\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb --no-color
+
+# Kazanan placement'ı tek undo adımı olarak çalışan KiCad'e uygula
+.\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb --apply --no-color
+
+# Uygulamadan sonra KiCad kartını da kaydet
+.\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb --apply --save
+
+# Kazanan ham placement çıktısını kaydet; sonra aynı çıktıyı tekrar uygula
+.\.venv\Scripts\python -m pcbqa.ipc_apply --write-placement-json .work\winner-placement.json
+.\.venv\Scripts\python -m pcbqa.ipc_apply --placement-json .work\winner-placement.json --apply
+```
+
+Güvenlik davranışı:
+
+- aktif KiCad kart adı `--board` dosya adıyla uyuşmazsa durur;
+  bilinçli uygulama için `--allow-board-mismatch` gerekir.
+- harness'in kilitli saydığı konnektör/montaj deliği referanslarını taşımaz.
+- KiCad'de kilitli footprint'leri de taşımaz; gerekirse `--ignore-kicad-locks`.
+- değişiklikleri `begin_commit` / `push_commit` ile tek undo adımı yapar.
 
 ### Seçenekler
 
@@ -211,6 +245,8 @@ pcbqa/
   model.py         ikisini birleştirir + ölçümler (HPWL, yoğunluk)
   rules.py         YAML kural motoru (7 kural tipi)
   kicadcli.py      kicad-cli sarmalayıcısı (netlist, ERC, DRC)
+  ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement yazar
+  ipc_apply.py     kazanan yerleştiriciyi seçip IPC uygulamasını koşturan CLI
   report.py        terminal raporu + skor
   synth.py         sentetik test kartı üreteci
   __main__.py      komut satırı
@@ -221,15 +257,16 @@ görürler. Bu ayrım bilinçli: Aşama 3'ün yerleştirme motoru da aynı model
 kullanacak, ve KiCad 11 şematik API'sini getirdiğinde sadece yeni bir okuyucu
 eklenecek.
 
-## Neden IPC API (kicad-python) değil?
+## Neden Aşama 0/1'de IPC API (kicad-python) değil?
 
-Aşama 0'ın tamamı `kicad-cli` ile çalışır. Bunun sonucu:
+Aşama 0/1'in tamamı `kicad-cli` ile çalışır. Bunun sonucu:
 
 - KiCad'in açık olması gerekmez → CI'da / komut satırında çalışır
 - IPC bindings'in alpha olmasından ve Python sürüm desteği sorunlarından etkilenmez
 - Yazma işlemi olmadığı için tasarımı bozma riski sıfır
 
-IPC API'ye Aşama 2'de (yerleştirme önerilerini karta uygulamak için) geçilecek.
+Aşama 2'de IPC sadece seçilmiş placement çıktısını çalışan PCB Editor'e
+uygulamak için kullanılır; analiz ve skor modeli hâlâ KiCad'den bağımsızdır.
 
 ## Dayanıklılık
 
