@@ -19,11 +19,15 @@ yükselt. Referans noktaları:
 
 | Kart | Skor | Toplam HPWL |
 |---|---|---|
-| `bench_bad` (başlangıç) | 1 / 100 | 524 mm |
+| `bench_bad` (başlangıç) | 2 / 100 | 485 mm |
 | `bench_good` (**hedef**) | 67 / 100 | 329 mm |
 
 Hedef 100 değil **67** — `bench_good`'da da 1 hata var (`nRESET` pull-up'ı yok).
 O bir **devre** kusuru, yerleşimle düzeltilemez. Peşine düşme.
+
+67 gerçekten ulaşılabilir bir hedef: ekilen kusurların tamamı taşınabilir
+bileşenlerde. J1/J2 kilitli ama iki kartta da kural ihlali yapmayan
+konumlarda duruyorlar, yani sana ceza yazdırmıyorlar.
 
 ## Sınırların — bunlar pazarlık dışı
 
@@ -60,7 +64,7 @@ class MyPlacer:
 
 ```python
 ctx.movable()                  # taşıyabileceğin referanslar
-ctx.locked                     # DOKUNMA (bench_bad'de J1, J2)
+ctx.locked                     # DOKUNMA (J1, J2 - konnektorler, mekanik sabit)
 ctx.outline()                  # (minx, miny, maxx, maxy) kart sınırı
 ctx.seed                       # rastgelelik kullanıyorsan BUNU kullan
 ctx.time_budget_s              # yumuşak süre bütçesi (varsayılan 30 sn)
@@ -100,8 +104,8 @@ sys.path'e girer), yani düzenlemelerin anında etkili olur. Doğrulamak için:
 göstermesi gerekir.
 
 Hakem hem skoru hem **toplam HPWL**'i gösterir. Skor alt uçta sıkışıktır
-(1 → 0 arası dar), bu yüzden geliştirme sırasında **HPWL'e bak**: 524'ten
-329'a doğru inmeli. Hata sayısı da (12 → 1) net bir sinyal.
+(2 → 0 arası dar), bu yüzden geliştirme sırasında **HPWL'e bak**: 485'ten
+329'a doğru inmeli. Hata sayısı da (10 → 1) net bir sinyal.
 
 İki alt sınır referansı zaten kayıtlı:
 - `identity` → kazanç **+0.0** olmalı (hakemin doğruluk testi)
@@ -117,7 +121,8 @@ Skoru yükselten şeyler, ağırlık sırasına göre:
    kondansatörü (`exclusive` eşleme: bir kondansatör bir pine sayılır)
 2. **Kristal** — `XIN`/`XOUT` netleri ≤12 mm; yük kondansatörleri kristale ≤6 mm
 3. **Courtyard çakışması** — bileşenler arasında ≥0.2 mm boşluk
-4. **Kart kenarı** — bileşenler kenardan ≥2 mm içeride (J1/J2 kilitli, muaf)
+4. **Kart kenarı** — bileşenler kenardan ≥2 mm içeride (kural muafiyeti YOK;
+   J1/J2 kilitli ama zaten yasal konumdalar)
 5. **USB diferansiyel çifti** — `USB_DP`/`USB_DM` uzunluk farkı ≤3 mm
 6. **Regülatör kondansatörleri** — U2'ye ≤8 mm
 7. **Güç rayı uzunluğu** — `3V3` ≤60 mm

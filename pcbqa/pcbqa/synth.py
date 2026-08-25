@@ -464,8 +464,13 @@ def place_bad(spec: BoardSpec, seed: int = 7) -> None:
         "U2": (20, 33, 0),
         "C1": (15, 33, 0),
         "C2": (26, 33, 0),
-        "J1": (1.6, 25, 90),        # KUSUR: kart kenarina tasiyor
-        "J2": (34, 43.6, 0),        # KUSUR: kart kenarina cok yakin
+        # J1/J2 KILITLI bilesenlerdir (konnektorler mekanik olarak sabittir) ve
+        # bu yuzden bench_good ile AYNI konumda dururlar. Kilitli bir bilesene
+        # kusur ekmek tutarsiz olurdu: yerlestirici onu tasiyamayacagi icin
+        # duzeltilemez bir ceza olur ve ulasilabilir tavani dusururdu.
+        # Ekilen kusurlar yalnizca tasinabilir bilesenlerde.
+        "J1": (8, 25, 90),
+        "J2": (34, 39, 0),
         "R1": (44, 20, 0),
         "R2": (44, 20.9, 0),        # KUSUR: R1 ile cakisma
         "R4": (16, 26.27, 0),
@@ -480,6 +485,9 @@ def place_bad(spec: BoardSpec, seed: int = 7) -> None:
         part.x += rng.uniform(-1.5, 1.5)
         part.y += rng.uniform(-1.5, 1.5)
 
+    # Ekilen kusurlarin tamami TASINABILIR bilesenlerde, yani yerlestirme
+    # motorunun duzeltebilecegi seyler. Hepsi kapanirsa skor bench_good ile
+    # ayni seviyeye (67) cikar.
     spec.truth["planted_defects"] = [
         "C4 uzak (U1 decoupling)",
         "C5 uzak (AVDD decoupling)",
@@ -487,13 +495,15 @@ def place_bad(spec: BoardSpec, seed: int = 7) -> None:
         "C8 uzak (kristal yuk kondansatoru)",
         "C7/Y1 courtyard cakismasi",
         "R1/R2 courtyard cakismasi",
-        "J1 kart kenarina tasiyor",
-        "J2 kart kenarina cok yakin",
         "R5 yanlis yerde -> USB cift simetrisi bozuk",
     ]
     spec.truth["circuit_defects"] = [
         "nRESET pull-up yok (her iki kartta da var, yerlesimle duzeltilemez)",
     ]
+    spec.truth["locked_components"] = {
+        "J1": "konnektor - mekanik olarak sabit, bench_good ile ayni konumda",
+        "J2": "konnektor - mekanik olarak sabit, bench_good ile ayni konumda",
+    }
 
 
 def _apply(spec: BoardSpec, layout: dict[str, tuple[float, float, float]]) -> None:

@@ -174,19 +174,22 @@ iki kart üretir:
 | Kart | Ne | Skor |
 |---|---|---|
 | `bench_good.kicad_pcb` | Makul yerleşim — **hedef** | 67 / 100 |
-| `bench_bad.kicad_pcb` | Kasıtlı kusurlu yerleşim — motorun düzelteceği kart | 1 / 100 |
+| `bench_bad.kicad_pcb` | Kasıtlı kusurlu yerleşim — motorun düzelteceği kart | 2 / 100 |
 
 Devre küçük bir MCU kartı: regülatör + MCU + EEPROM + kristal + USB. Devrenin
 "doğru cevabı" `synth.py` içinde tanımlı — hangi kondansatörün hangi IC'ye ait
 olduğunu, hangi netlerin diferansiyel çift olduğunu kod belirliyor. Yani
 kuralların gerçekten doğru şeyi yakalayıp yakalamadığı kanıtlanabiliyor.
 
-`bench_bad`'e ekilen kusurlar: 4 uzak decoupling/yük kondansatörü, 2 courtyard
-çakışması, 2 kart kenarı ihlali, bozuk USB çift simetrisi.
+`bench_bad`'e ekilen 7 kusurun tamamı **taşınabilir** bileşenlerde: 4 uzak
+decoupling/yük kondansatörü, 2 courtyard çakışması, bozuk USB çift simetrisi.
+Kilitli bileşenlere (J1/J2 konnektörleri) kusur ekilmez — yerleştirici onları
+taşıyamayacağı için düzeltilemez bir ceza olur ve ulaşılabilir tavanı
+düşürürdü. Bu yüzden J1/J2 iki kartta da aynı, yasal konumda durur.
 
 `bench_good`'un 1 hatası kasıtlıdır: `nRESET` pull-up'ı yok. Bu bir **devre**
 kusuru, yerleşim kusuru değil — her iki kartta da var ve yerleştirme motoru
-bunu asla düzeltemez. Motorun işi `1 → 67` mesafesini kapatmak.
+bunu asla düzeltemez. Motorun işi `2 → 67` mesafesini kapatmak.
 
 ```powershell
 .\.venv\Scripts\python -m pcbqa samples\bench_bad.kicad_pcb --rules samples\bench.rules.yaml --no-kicad-checks

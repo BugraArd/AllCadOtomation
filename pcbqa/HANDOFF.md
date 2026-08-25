@@ -168,7 +168,7 @@ optimize edilecek bir şey yoktur. Aynı devreden iki kart üretiliyor:
 | Kart | Ne | Skor |
 |---|---|---|
 | `bench_good.kicad_pcb` | Makul yerleşim — **hedef** | 67 / 100 |
-| `bench_bad.kicad_pcb` | 9 kasıtlı kusur | 1 / 100 |
+| `bench_bad.kicad_pcb` | 7 kasıtlı kusur (hepsi taşınabilir bileşende) | 2 / 100 |
 
 Devre: USB-C → LDO regülatör → MCU (SOIC-20) + EEPROM (SOIC-8) + 12MHz kristal
 + UART header. 18 bileşen, 60×45 mm kart. Footprint'ler dosya içine gömülü
@@ -180,13 +180,16 @@ IC'ye ait olduğunu, hangi netlerin diferansiyel çift olduğunu tutuyor. Yani
 kuralların doğru şeyi yakalayıp yakalamadığı kanıtlanabiliyor.
 
 `bench_bad`'e ekilen kusurlar: 4 uzak decoupling/yük kondansatörü, 2 courtyard
-çakışması (Y1/C7, R1/R2), 2 kart kenarı ihlali (J1, J2), bozuk USB çift
-simetrisi (R5 yanlış yerde).
+çakışması (Y1/C7, R1/R2), bozuk USB çift simetrisi (R5 yanlış yerde).
+
+Kilitli bileşenlere (J1/J2 konnektörleri) **kusur ekilmez**: yerleştirici
+onları taşıyamayacağı için düzeltilemez bir ceza olur ve ulaşılabilir tavanı
+düşürür. J1/J2 bu yüzden her iki kartta da aynı, yasal konumdadır.
 
 ⚠️ **`bench_good`'un 1 hatası kasıtlıdır**: `nRESET` pull-up'ı yok. Bu bir
 **devre** kusuru, yerleşim kusuru değil — her iki kartta da var ve yerleştirme
 motoru bunu asla düzeltemez. Bu yüzden hedef 100 değil **67**. Motorun işi
-`1 → 67` mesafesini kapatmak.
+`2 → 67` mesafesini kapatmak.
 
 ⚠️ Tezgâh kartlarında **yönlendirme (track) yok**. KiCad DRC'si her neti
 "bağlanmamış" sayıp 65 gürültülü ihlal üretir → yerleşim çalışmasında
@@ -253,7 +256,7 @@ proje ayarlarından bağımsız yapar.
 
 ## 9. SIRADAKİ ADIM — Aşama 2/3: yerleştirme motoru
 
-`bench_bad`'i alıp skorunu `bench_good` seviyesine (1 → 67) çıkaracak motor.
+`bench_bad`'i alıp skorunu `bench_good` seviyesine (2 → 67) çıkaracak motor.
 **Önce KiCad'e hiç dokunmadan**: sadece koordinat optimizasyonu + öncesi/sonrası
 skor karşılaştırması. IPC ile karta yazma en sona bırakılacak (bindings alpha).
 
@@ -275,5 +278,5 @@ dönüp kötü sonuç verir):
 3. **Legalizasyon** — courtyard çakışmalarını çöz, ızgaraya oturt
 4. **Detaylı iyileştirme** — simulated annealing (`move`, `swap`, `rotate90`)
 
-Başarı kriteri: `bench_bad` üzerinde skor 1 → 67'ye yaklaşmalı, ekilen 9
+Başarı kriteri: `bench_bad` üzerinde skor 2 → 67'ye ulaşmalı, ekilen 7
 yerleşim kusurunun tamamı kapanmalı, `nRESET` bulgusu (devre kusuru) kalmalı.
