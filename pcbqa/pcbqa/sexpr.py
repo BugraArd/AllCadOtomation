@@ -20,6 +20,18 @@ _ESCAPES = {"n": "\n", "t": "\t", "r": "\r"}
 SExpr = list  # ic ice listeler; atomlar str
 
 
+class QuotedStr(str):
+    """Dosyada tirnak icinde yazilmis bir atom.
+
+    Ayrimi korumak sart: `(at 110.49 78.867 180)` icindeki sayilar tirnaksiz,
+    `(layer "F.Cu")` icindeki deger tirnaklidir. Ayrim kaybolursa dosyayi geri
+    yazarken ya sayilar tirnaklanir ya da bosluklu metinler bozulur - iki
+    durumda da KiCad dosyayi reddeder.
+    """
+
+    __slots__ = ()
+
+
 class SExprError(ValueError):
     """Bozuk s-expression."""
 
@@ -88,7 +100,7 @@ def parse_with_stats(text: str, strict: bool = False) -> tuple[SExpr, int]:
             else:
                 raise SExprError("kapanmamis tirnak")
             if stack:
-                stack[-1].append("".join(buf))
+                stack[-1].append(QuotedStr("".join(buf)))
 
         else:
             start = pos
@@ -113,6 +125,50 @@ def parse_with_stats(text: str, strict: bool = False) -> tuple[SExpr, int]:
     for extra in tops[1:]:
         root.append(extra)
     return root, stray
+
+
+def _quote(text: str) -> str:
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def dumps(node, indent: int = 0) -> str:
+    """Ayristirilmis agaci tekrar .kicad_pcb metnine cevirir.
+
+    Bicimlendirme KiCad'inkiyle bayt bayt ayni degildir ama gecerlidir ve
+    KiCad dosyayi sorunsuz acar. Alt dugumu olmayan kisa ifadeler tek satirda
+    yazilir (`(at 10 20)`), digerleri girintili coklu satir olur.
+    """
+    if isinstance(node, QuotedStr):
+        return _quote(node)
+    if isinstance(node, str):
+        return node
+    if not isinstance(node, list):
+        return _quote(str(node))
+
+    pad = "\t" * indent
+    if not node:
+        return pad + "()"
+
+    has_list_child = any(isinstance(c, list) for c in node)
+    if not has_list_child:
+        inner = " ".join(dumps(c) for c in node)
+        return f"{pad}({inner})"
+
+    lines = [f"{pad}({dumps(node[0])}"]
+    inline: list[str] = []
+    for child in node[1:]:
+        if isinstance(child, list):
+            if inline:
+                lines[-1] += " " + " ".join(inline)
+                inline = []
+            lines.append(dumps(child, indent + 1))
+        else:
+            inline.append(dumps(child))
+    if inline:
+        lines[-1] += " " + " ".join(inline)
+    lines.append(f"{pad})")
+    return "\n".join(lines)
 
 
 def head(node) -> str | None:

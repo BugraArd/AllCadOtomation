@@ -28,6 +28,10 @@ class Pad:
     x: float
     y: float
     pintype: str = ""
+    # Footprint'e gore yerel, DONDURULMEMIS ofset. Bileseni yeniden
+    # konumlandirabilmek icin gerekli (yerlestirme motoru bunu kullanir).
+    dx: float = 0.0
+    dy: float = 0.0
 
     @property
     def connected(self) -> bool:
@@ -50,6 +54,23 @@ class Component:
     # Dondurulmus bilesenlerde sinir kutusu cok buyuk kalir, bu yuzden
     # cakisma testleri poligon uzerinden yapilir.
     courtyard_poly: list[tuple[float, float]] = field(default_factory=list)
+    # Courtyard'in yerel, dondurulmemis hali (yeniden konumlandirma icin)
+    courtyard_local: list[tuple[float, float]] = field(default_factory=list)
+
+    def place(self, x: float, y: float, rotation: float | None = None) -> None:
+        """Bileseni yeni konuma tasir; pad ve courtyard mutlak konumlarini
+        yeniden hesaplar. Yerlestirme motorunun tek yazma noktasidir."""
+        self.x = x
+        self.y = y
+        if rotation is not None:
+            self.rotation = rotation
+        for pad in self.pads:
+            rx, ry = _rotate(pad.dx, pad.dy, self.rotation)
+            pad.x, pad.y = x + rx, y + ry
+        self.courtyard_poly = [
+            (x + rx, y + ry)
+            for rx, ry in (_rotate(lx, ly, self.rotation) for lx, ly in self.courtyard_local)
+        ]
 
     @property
     def courtyard(self) -> tuple[float, float, float, float] | None:
@@ -160,8 +181,8 @@ def _local_points(node) -> list[tuple[float, float]]:
     return pts
 
 
-def _read_courtyard(node, fx: float, fy: float, frot: float) -> list[tuple[float, float]]:
-    """Footprint icindeki courtyard cizimlerinden mutlak poligon.
+def _read_courtyard_local(node) -> list[tuple[float, float]]:
+    """Footprint icindeki courtyard cizimlerinden YEREL poligon.
 
     Courtyard dosyada tek bir fp_poly olarak da, dort ayri fp_line olarak da
     saklanabilir; ikinci durumda nokta sirasi belirsizdir. Bu yuzden toplanan
@@ -180,9 +201,7 @@ def _read_courtyard(node, fx: float, fy: float, frot: float) -> list[tuple[float
             continue
         if value(item, "layer") not in COURTYARD_LAYERS:
             continue
-        for dx, dy in _local_points(item):
-            rx, ry = _rotate(dx, dy, frot)
-            pts.append((fx + rx, fy + ry))
+        pts.extend(_local_points(item))
     if len(pts) < 3:
         return []
     return geom.convex_hull(pts)
@@ -229,10 +248,16 @@ def _read_footprint(node) -> Component | None:
                 x=fx + rx,
                 y=fy + ry,
                 pintype=value(pnode, "pintype", default=""),
+                dx=dx,
+                dy=dy,
             )
         )
 
-    comp.courtyard_poly = _read_courtyard(node, fx, fy, frot)
+    comp.courtyard_local = _read_courtyard_local(node)
+    comp.courtyard_poly = [
+        (fx + rx, fy + ry)
+        for rx, ry in (_rotate(lx, ly, frot) for lx, ly in comp.courtyard_local)
+    ]
     return comp
 
 
