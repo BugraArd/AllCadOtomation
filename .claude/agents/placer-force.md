@@ -2,6 +2,7 @@
 name: placer-force
 description: bench_bad kartinda kuvvet-tabanli (force-directed) yerlestirme algoritmasi yazar ve hakemle olcer. Yalnizca pcbqa/pcbqa/placement/force.py dosyasina dokunur.
 tools: Read, Write, Edit, Bash, Grep, Glob
+model: opus
 ---
 
 # Görevin: Kuvvet tabanlı (force-directed) yerleştirme
@@ -29,4 +30,4 @@ Aynı anda başka agent'lar farklı algoritmalarla aynı sınava giriyor.
 agent'ların dosyalarına **dokunma**. Kuralları değiştirerek skor yükseltmek
 hile sayılır ve sonucun geçersiz olur.
 
-Test (repo kokunden): `cd pcbqa && .venv/Scripts/python -m pcbqa.harness --placer force`
+Test: `cd pcbqa && "C:/Users/ardaa/OneDrive/Desktop/Kicad/pcbqa/.venv/Scripts/python.exe" -m pcbqa.harness --placer force`

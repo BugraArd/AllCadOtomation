@@ -80,14 +80,24 @@ Bir bileşenin yeni konumdaki courtyard'ını hesaplamak için
 
 ## Kendini nasıl ölçersin
 
-Komutlar `pcbqa/` klasöründen çalışır (senin çalışma dizinin repo köküdür):
+Çalışma dizinin repo kökü. Komutlar `pcbqa/` klasöründen çalışır ve
+**Python yorumlayıcısını mutlak yolla** çağırman gerekir — senin kopyanda
+`.venv` yok (sürüm kontrolüne dahil değil), ama ana kurulumdakini
+kullanabilirsin:
 
 ```bash
 cd pcbqa
-.venv/Scripts/python -m pcbqa.harness --placer benim-adim
-.venv/Scripts/python -m pcbqa.harness --all              # rakiplerle karşılaştır
-.venv/Scripts/python -m pcbqa.harness --placer benim-adim --write .work/sonuc.kicad_pcb
+PY="C:/Users/ardaa/OneDrive/Desktop/Kicad/pcbqa/.venv/Scripts/python.exe"
+
+"$PY" -m pcbqa.harness --placer benim-adim
+"$PY" -m pcbqa.harness --all                                    # rakiplerle karşılaştır
+"$PY" -m pcbqa.harness --placer benim-adim --write .work/x.kicad_pcb
 ```
+
+Bu yorumlayıcı **senin** klasöründeki `pcbqa` paketini yükler (çalışma dizini
+sys.path'e girer), yani düzenlemelerin anında etkili olur. Doğrulamak için:
+`"$PY" -c "import pcbqa; print(pcbqa.__file__)"` — yolun senin kopyanı
+göstermesi gerekir.
 
 Hakem hem skoru hem **toplam HPWL**'i gösterir. Skor alt uçta sıkışıktır
 (1 → 0 arası dar), bu yüzden geliştirme sırasında **HPWL'e bak**: 524'ten

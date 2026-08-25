@@ -2,6 +2,7 @@
 name: placer-anneal
 description: bench_bad kartinda benzetimli tavlama (simulated annealing) ile yerlestirme yapar ve hakemle olcer. Yalnizca pcbqa/pcbqa/placement/anneal.py dosyasina dokunur.
 tools: Read, Write, Edit, Bash, Grep, Glob
+model: sonnet
 ---
 
 # Görevin: Benzetimli tavlama (simulated annealing)
@@ -31,4 +32,4 @@ Aynı anda başka agent'lar farklı algoritmalarla aynı sınava giriyor.
 agent'ların dosyalarına **dokunma**. Kuralları değiştirerek skor yükseltmek
 hile sayılır ve sonucun geçersiz olur.
 
-Test (repo kokunden): `cd pcbqa && .venv/Scripts/python -m pcbqa.harness --placer anneal`
+Test: `cd pcbqa && "C:/Users/ardaa/OneDrive/Desktop/Kicad/pcbqa/.venv/Scripts/python.exe" -m pcbqa.harness --placer anneal`

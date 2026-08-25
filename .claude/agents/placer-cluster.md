@@ -2,6 +2,7 @@
 name: placer-cluster
 description: bench_bad kartinda kumeleme tabanli (analitik/hiyerarsik) yerlestirme yapar ve hakemle olcer. Yalnizca pcbqa/pcbqa/placement/cluster.py dosyasina dokunur.
 tools: Read, Write, Edit, Bash, Grep, Glob
+model: opus
 ---
 
 # Görevin: Kümeleme tabanlı hiyerarşik yerleştirme
@@ -31,4 +32,4 @@ Aynı anda başka agent'lar farklı algoritmalarla aynı sınava giriyor.
 agent'ların dosyalarına **dokunma**. Kuralları değiştirerek skor yükseltmek
 hile sayılır ve sonucun geçersiz olur.
 
-Test (repo kokunden): `cd pcbqa && .venv/Scripts/python -m pcbqa.harness --placer cluster`
+Test: `cd pcbqa && "C:/Users/ardaa/OneDrive/Desktop/Kicad/pcbqa/.venv/Scripts/python.exe" -m pcbqa.harness --placer cluster`
