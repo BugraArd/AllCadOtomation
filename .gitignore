@@ -10,3 +10,6 @@ pcbqa/.work/
 *.kicad_prl
 *-backups/
 fp-info-cache
+
+# Agent calisma kopyalari (git worktree)
+.claude/worktrees/
