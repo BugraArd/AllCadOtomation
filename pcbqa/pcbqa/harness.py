@@ -240,8 +240,9 @@ def main(argv: list[str] | None = None) -> int:
     rules = load_rules(args.rules)
     design = load_design(args.board)
 
+    # Bos yol Path(".") olur ve exists() True doner; klasoru kart sanmayalim.
     target_score = None
-    if args.target and args.target.exists():
+    if args.target and str(args.target) not in ("", ".") and args.target.is_file():
         target_score = Score.of(load_design(args.target), rules)
 
     results: list[Result] = []

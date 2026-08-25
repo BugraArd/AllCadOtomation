@@ -11,12 +11,22 @@ Hakem `python -m pcbqa.harness --placer <ad>` ile calistirir.
 from __future__ import annotations
 
 from .base import Placement, PlacementContext, Placer, validate
+from .anneal import SimulatedAnnealing
 from .baseline import Identity, RandomShuffle
+from .cluster import ClusterPlacer
+from .codex import Codex
+from .force import ForcePlacer
 
 # ad -> yerlestirici fabrikasi
 PLACERS: dict[str, type] = {
+    # Referans alt sinirlar (hakem dogrulamasi)
     "identity": Identity,
     "random": RandomShuffle,
+    # Yarisan yerlestiriciler
+    "cluster": ClusterPlacer,
+    "force": ForcePlacer,
+    "anneal": SimulatedAnnealing,
+    "codex": Codex,
 }
 
 
