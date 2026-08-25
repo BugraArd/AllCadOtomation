@@ -53,6 +53,8 @@ class Report:
     metrics: Metrics
     findings: list[Finding]
     kicad_version: str = ""
+    # Asama 4a: sematik okunabildiyse (pcbqa.schematic.Schematic), yoksa None
+    schematic: object | None = None
 
     def count(self, severity: str) -> int:
         return sum(1 for f in self.findings if f.severity == severity)
@@ -164,6 +166,25 @@ class Renderer:
             self.lines.append(
                 self.c(f"  Sematikte olmayan: {', '.join(orphans[:12])}", _COLOR["warning"])
             )
+
+        # -------------------------------------------------------------- sematik
+        sch = report.schematic
+        if sch is not None:
+            self.heading("SEMATIK")
+            stats = sch.stats()
+            self.kv("Dosya / sayfa", f"{stats['dosya']} dosya, {stats['sayfa']} sayfa")
+            self.kv(
+                "Sembol",
+                f"{stats['gercek_bilesen']} bilesen + {stats['sanal_sembol']} sanal "
+                f"(#PWR/#FLG)",
+            )
+            self.kv("Baglanti ogeleri", f"{stats['tel']} tel, {stats['junction']} junction, "
+                                        f"{stats['no_connect']} no-connect, {stats['etiket']} etiket")
+            if stats["alt_sayfa"]:
+                names = ", ".join(sh.name for sh in sch.sheets[:6] if sh.name)
+                self.kv("Alt sayfalar", names or str(stats["alt_sayfa"]))
+            if sch.paper:
+                self.kv("Kagit", sch.paper)
 
         # ------------------------------------------------------------- bulgular
         self.heading("BULGULAR")

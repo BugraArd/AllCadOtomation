@@ -559,3 +559,112 @@ def run_rules(design: Design, rules: list[Rule]) -> list[Finding]:
     order = {s: i for i, s in enumerate(SEVERITIES)}
     findings.sort(key=lambda f: (order.get(f.severity, 9), f.rule_id))
     return findings
+
+
+# --------------------------------------------------------------------------
+# Sematik kontrolleri (Asama 4a)
+#
+# YAML kural motorundan ayridir: bunlar sematigin YAPISAL saglamligini
+# olcer, tasarimcinin kendi esiklerini degil. `Schematic` bizim kendi veri
+# modelimizdir - bu fonksiyon da KiCad'i bilmez.
+# --------------------------------------------------------------------------
+
+# Sematik izgarasi disindaki sembol, tel ucuyla ortusmeyebilir -> sessiz kopukluk
+SCH_GRID_MM = 1.27
+
+
+def _boxes_overlap(a, b, margin: float = 0.0) -> bool:
+    return not (
+        a[2] + margin <= b[0] or b[2] + margin <= a[0] or a[3] + margin <= b[1] or b[3] + margin <= a[1]
+    )
+
+
+def run_schematic_checks(schematic) -> list[Finding]:
+    """Sematigin yapisal saglamligini kontrol eder.
+
+    `schematic` bir `pcbqa.schematic.Schematic` ornegidir.
+    """
+    findings: list[Finding] = []
+
+    if schematic.stray_parens:
+        findings.append(
+            Finding(
+                rule_id="sematik-bozuk-dosya",
+                severity="error",
+                message=(
+                    f"sematik dosyasinda {schematic.stray_parens} bozuk parantez var; "
+                    "okuma toleransli yapildi ama dosya kusurlu"
+                ),
+                source="pcbqa-sch",
+                measured=float(schematic.stray_parens),
+                limit=0.0,
+            )
+        )
+
+    for sheet in schematic.sheets:
+        if sheet.missing:
+            findings.append(
+                Finding(
+                    rule_id="sematik-eksik-sayfa",
+                    severity="error",
+                    message=(
+                        f"'{sheet.name}' alt sayfasinin dosyasi bulunamadi: {sheet.filename}"
+                    ),
+                    source="pcbqa-sch",
+                )
+            )
+
+    off_grid = [s for s in schematic.real_symbols if not s.on_grid(SCH_GRID_MM)]
+    for sym in off_grid:
+        findings.append(
+            Finding(
+                rule_id="sematik-izgara-disi",
+                severity="warning",
+                message=(
+                    f"{sym.ref} {SCH_GRID_MM} mm izgarasinin disinda "
+                    f"({sym.x:g}, {sym.y:g}); tel uclari pine denk gelmeyebilir"
+                ),
+                source="pcbqa-sch",
+                refs=[sym.ref],
+            )
+        )
+
+    missing_fp = [
+        s for s in schematic.real_symbols if not s.footprint.strip() and not s.dnp
+    ]
+    for sym in missing_fp:
+        findings.append(
+            Finding(
+                rule_id="sematik-footprint-yok",
+                severity="warning",
+                message=f"{sym.ref} ({sym.value}) icin footprint atanmamis; PCB'ye aktarilamaz",
+                source="pcbqa-sch",
+                refs=[sym.ref],
+            )
+        )
+
+    # Ayni sayfada govdesi cakisan semboller
+    by_sheet: dict[str, list] = {}
+    for sym in schematic.real_symbols:
+        if sym.bbox:
+            by_sheet.setdefault(sym.sheet_path, []).append(sym)
+    for sheet_path, symbols in by_sheet.items():
+        for i, a in enumerate(symbols):
+            for b in symbols[i + 1 :]:
+                if _boxes_overlap(a.bbox, b.bbox):
+                    findings.append(
+                        Finding(
+                            rule_id="sematik-cakisan-sembol",
+                            severity="warning",
+                            message=(
+                                f"{a.ref} ve {b.ref} sembol govdeleri cakisiyor"
+                                f"{'' if sheet_path == '/' else f' (sayfa {sheet_path})'}"
+                            ),
+                            source="pcbqa-sch",
+                            refs=[a.ref, b.ref],
+                        )
+                    )
+
+    order = {s: i for i, s in enumerate(SEVERITIES)}
+    findings.sort(key=lambda f: (order.get(f.severity, 9), f.rule_id))
+    return findings

@@ -21,7 +21,8 @@ from .model import build_design
 from .netlist import netlist_from_board, read_netlist
 from .pcb import read_board
 from .report import Report, enable_ansi, render
-from .rules import Finding, RuleError, load_rules, run_rules
+from .rules import Finding, RuleError, load_rules, run_rules, run_schematic_checks
+from .schematic import read_schematic
 
 # KiCad'in severity adlarini kendi adlarimiza cevir
 _KICAD_SEVERITY = {
@@ -138,6 +139,23 @@ def analyze(args: argparse.Namespace, work: Path) -> Report:
         raise ProjectError(f"kural dosyasi bulunamadi: {rules_path}")
     findings = run_rules(design, load_rules(rules_path))
 
+    # 3b) Sematigin kendisi (Asama 4a). Okuma basarisiz olursa analiz
+    #     durmaz - sematik zorunlu degil, PCB analizi kendi basina anlamli.
+    schematic = None
+    if sch is not None:
+        try:
+            schematic = read_schematic(sch)
+            findings += run_schematic_checks(schematic)
+        except Exception as exc:  # bozuk/desteklenmeyen sematik analizi durdurmasin
+            findings.append(
+                Finding(
+                    rule_id="sematik-okunamadi",
+                    severity="info",
+                    message=f"sematik okunamadi ({type(exc).__name__}): {str(exc)[:120]}",
+                    source="pcbqa-sch",
+                )
+            )
+
     # 4) KiCad'in kendi kontrolleri
     if not args.no_kicad_checks:
         if sch is not None:
@@ -150,7 +168,11 @@ def analyze(args: argparse.Namespace, work: Path) -> Report:
     findings.sort(key=lambda f: (order.get(f.severity, 9), f.source, f.rule_id))
 
     return Report(
-        design=design, metrics=design.metrics(), findings=findings, kicad_version=version
+        design=design,
+        metrics=design.metrics(),
+        findings=findings,
+        kicad_version=version,
+        schematic=schematic,
     )
 
 

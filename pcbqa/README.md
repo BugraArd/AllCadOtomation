@@ -54,6 +54,75 @@ $env:PCBQA_KICAD_CLI = "C:\Program Files\KiCad\10.0\bin\kicad-cli.exe"
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
 
+## Aşama 4a/4b: şematik okuma ve netlist kalkanı
+
+KiCad 10'da IPC API'si yalnızca PCB editöründe var. Ama şematiği **okumak**
+için IPC'ye gerek yok: `.kicad_sch` da s-expression. `pcbqa.schematic` onu
+doğrudan okur — hiyerarşik alt sayfalar dahil.
+
+```python
+from pcbqa.schematic import read_schematic
+
+sch = read_schematic("proje/proje.kicad_sch")   # alt sayfalara kendi iner
+sch.stats()          # {'dosya': 2, 'sayfa': 2, 'sembol': 124, ...}
+r1 = sch.by_ref("R1")
+r1.pins              # sayfa koordinatına çözülmüş pinler
+r1.bbox              # gövde sınır kutusu
+```
+
+Analiz raporuna `SEMATIK` bölümü olarak da yansır (`python -m pcbqa <proje>`)
+ve dört yapısal kontrol ekler: eksik alt sayfa dosyası, ızgara dışı sembol,
+footprint'i atanmamış bileşen, gövdeleri çakışan semboller.
+
+### Pin konumu: deneysel olarak doğrulanmış dönüşüm
+
+Kütüphane sembolünde Y **yukarı**, sayfada Y **aşağı** bakar; sembol ayrıca
+döndürülmüş ve aynalanmış olabilir. Doğru dönüşüm tahminle değil, KiCad'in 19
+demo projesinin tamamında ölçülerek seçildi:
+
+| | örtüşme |
+|---|---|
+| `(px·cos − py·sin, −px·sin − py·cos)` | **%93.5** |
+| rakip hipotez | %37.8 |
+| ayna **rotasyondan sonra** | **%94.9** |
+| ayna rotasyondan önce | %27.0 |
+
+Okuyucu 19 projede, **17.088 pin** üzerinde doğrulandı: pinlerin **%98.7'si**
+bir çapaya oturuyor, projelerin çoğunda %100, bozuk parantez 0.
+
+> Çapa yalnızca tel ucu değildir. Bir pin junction'a, no-connect'e, etikete
+> veya **doğrudan başka bir sembolün pinine** de değebilir — güç sembolleri
+> (GND, VCC) çoğu zaman telsiz, doğrudan IC pinine yapışır. Dar bir ölçüt
+> bunları "kaçan pin" sanar.
+
+### Netlist değişmezliği kalkanı
+
+Şematikte bağlantı **geometriktir**: tel ucu pine değiyorsa bağlıdır. PCB'de
+durum farklı — orada net, pad'in içinde ismiyle yazılıdır. Sonuç: bir sembolü
+şematikte kaydırmak bağlantıyı **sessizce** koparır.
+
+Ölçüldü: `pic_programmer` üzerinde R1 kaydırıldığında pin 2 koptu ve netlist'te
+`unconnected-(R1-Pad2)` olarak belirdi. Hiçbir hata, hiçbir uyarı. **Tek ızgara
+adımı (1.27 mm) bile yetiyor.**
+
+```python
+from pcbqa.sch_verify import verify_unchanged
+
+diff = verify_unchanged(onceki_sch, sonraki_sch)
+if not diff.ok:
+    print(diff.describe())    # "BAGLANTI DEGISTI: 7 pin baska aga tasindi"
+    for satir in diff.details():
+        print(satir)
+```
+
+Doğru değişmez, ham XML değil **pinlerin ağlara bölünüşüdür**. Net kodları her
+ihracatta yeniden numaralanır ve otomatik net adları (`Net-(R1-Pad1)`)
+konuma göre değişir; bunlar gerçek bağlantı değişikliği değildir. Bölünme aynı
+kaldığı sürece devre elektriksel olarak aynıdır.
+
+Bu kalkan, şematiğe yazma (Aşama 4c/4d) için ön koşuldur: yazma öncesi/sonrası
+karşılaştırılır, `ok=False` ise yazma reddedilir.
+
 ## Aşama 3: otomatik yerleştirme (`auto`)
 
 `auto` üretim yerleştiricisidir. Üç katmandan oluşur:

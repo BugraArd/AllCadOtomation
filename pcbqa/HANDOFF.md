@@ -14,7 +14,9 @@ KiCad üzerinde bir otomasyon sistemi geliştiriyorum. Nihai hedef: **PCB ve
 sorusunu makineye sordurmak ve zamanla her şeyi kendi yerleştiren bir sisteme
 dönüştürmek istiyorum.
 
-Proje 4 aşamaya bölündü. **Aşama 0, 1, 2 ve 3 bitti.** Sırada Aşama 4 var.
+Proje 4 aşamaya bölündü. **Aşama 0-3 ve 4a/4b bitti.** Sırada şematiğe
+yazma (4c/4d) var. **KiCad 11 beklenmiyor** — şematik okuma KiCad 10 ile
+çalışıyor, yazmanın da çalıştığı doğrulandı (bkz. §10).
 
 | Aşama | Kapsam | Durum |
 |---|---|---|
@@ -22,7 +24,9 @@ Proje 4 aşamaya bölündü. **Aşama 0, 1, 2 ve 3 bitti.** Sırada Aşama 4 var
 | 1 | Kural motoru (YAML) + KiCad ERC/DRC entegrasyonu | ✅ Bitti |
 | 2 | Kazanan placement çıktısını çalışan KiCad PCB Editor'e IPC ile yaz | ✅ Bitti |
 | 3 | Tam otomatik PCB yerleştirme (`auto`) + gerileme koruması | ✅ Bitti |
-| 4 | KiCad 11 ile şematik API'si + headless | ⬜ Sırada (bkz. §10) |
+| 4a | Şematik okuma (hiyerarşik) + yapısal kontroller | ✅ Bitti |
+| 4b | Netlist değişmezliği kalkanı | ✅ Bitti |
+| 4c/4d | Atomik yazma + bağlantı koruyan taşıma | ⬜ Sırada (bkz. §10) |
 
 ---
 
@@ -90,6 +94,8 @@ pcbqa/
   model.py         ikisini birleştirir + ölçümler (HPWL, yoğunluk)
   rules.py         YAML kural motoru (7 kural tipi)
   kicadcli.py      kicad-cli sarmalayıcısı (netlist, ERC, DRC)
+  schematic.py     .kicad_sch okuyucu (hiyerarşik, pin/bbox geometrisi çözülmüş)
+  sch_verify.py    netlist değişmezliği kalkanı (yazma için ön koşul)
   ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement uygular
   ipc_apply.py     yarışmayı koşturur, kazananı seçer, IPC dry-run/apply yapar
   report.py        terminal raporu + skor
@@ -297,10 +303,16 @@ proje ayarlarından bağımsız yapar.
   kilitli bileşen sözleşmesi, `auto`nun iyi bir kartı bozmaması ve üç
   gerileme koruyucusunun ayrı ayrı doğrulanması. Toplam 15 test geçiyor.
 - Aşama 3 regresyon paketi: 19 KiCad demo kartında `auto` (bkz. §9).
+- Aşama 4a şematik okuyucu 19 demo projesinde doğrulandı: 17.088 pin,
+  %98.7 örtüşme, 0 bozuk parantez, 0 okunamayan proje (bkz. §10).
+- Aşama 4a/4b için 11 test daha (`tests/test_schematic.py`): dönüşüm
+  doğruluğu, hiyerarşi, sanal sembol ayrımı, kalkanın doğru değişmezi
+  kullanması. Toplam 45 test geçiyor.
 
 ## 8. Bilinen sınırlar
 
-- Şematik **konumları** okunmuyor (KiCad 10'da IPC şematik desteği yok).
+- ~~Şematik konumları okunmuyor~~ → Aşama 4a ile çözüldü: `schematic.py`
+  IPC'ye hiç dokunmadan `.kicad_sch`'i doğrudan okuyor.
 - Courtyard poligonu dışbükey kabukla alınıyor; dikdörtgenler için birebir,
   nadir içbükey (L/U) courtyard'larda fazladan bulgu üretebilir.
 - Dairesel courtyard'larda alan biraz küçük çıkabilir (`fp_circle`).
@@ -406,18 +418,91 @@ Kesme yok; sonuç doğru, süre uzun.
 
 ---
 
-## 10. SIRADAKİ ADIM — Aşama 4: şematik
+## 10. Aşama 4a/4b TAMAMLANDI — sıradaki: 4c/4d (yazma)
 
-Şematik yazma bugüne kadar "KiCad 11'i bekliyoruz" diye ertelenmişti (IPC'de
-şematik API'si yok). Konnect (AGPL, KiCad 10 MCP sunucusu) incelemesi bunun
-zorunlu olmadığını gösterdi: `.kicad_sch` dosyasını kendi S-expression
-motoruyla, atomik yazma + UUID koruma + round-trip testleriyle düzenliyor.
+### KiCad 11 beklenmiyor, çünkü gerek yok
 
-Bizde `sexpr.py` okuyucusu zaten var; eksik olan yazma tarafı.
+Bu proje "şematik API'si KiCad 11'e planlandı" diye 4. aşamayı erteliyordu.
+IPC'de gerçekten yok — ama `.kicad_sch` de s-expression, ve `sexpr.py` onu
+zaten okuyor. Yazmanın da mümkün olduğu ölçülerek doğrulandı:
 
-**Karar bekleyen:** Aşama 4 (a) KiCad 11'in şematik API'sini mi beklesin,
-(b) yoksa `.kicad_sch`'i doğrudan mı yazsın? (b) bugün mümkün ama şematik
-dosya biçiminin sürüm değişimlerini kendimiz takip etmek demek.
+- `pic_programmer.kicad_sch` parse → `dumps()` → yeniden parse: **ağaç birebir
+  aynı** (tırnaklı/tırnaksız atom ayrımı dahil), 0 bozuk parantez.
+- KiCad yeniden yazılan dosyayı sorunsuz açıyor ve **netlist birebir aynı**
+  çıkıyor.
 
-Konnect'in kendi kodu **AGPL-3.0** ve ticari lisans satılıyor — yaklaşımı
-örnek alınabilir, kodu kopyalanamaz. Projenin lisans temizliği (§1) korunmalı.
+### 4a — şematik okuma (`schematic.py`)
+
+Hiyerarşik: kök dosyadaki `sheet` düğümlerini `Sheetfile` üzerinden izleyip
+alt sayfalara iniyor, her öğeye sayfa yolunu (`/`, `/pic_sockets`) işliyor,
+döngülere karşı ziyaret edilen dosyaları takip ediyor. `vme-wren` demosunda
+**36 dosya, 1606 sembol** sorunsuz okunuyor.
+
+**En riskli parça pin geometrisiydi** — kütüphanede Y yukarı, sayfada Y aşağı,
+üstüne rotasyon ve ayna. Tahmin etmek yerine 19 demo projesinin tamamında
+ölçüp seçtim:
+
+| Hipotez | Örtüşme |
+|---|---|
+| `(px·cos − py·sin, −px·sin − py·cos)` | **%93.5** |
+| rakip | %37.8 |
+| ayna **rotasyondan sonra** | **%94.9** |
+| ayna rotasyondan önce | %27.0 |
+
+Doğrulama: 19 proje, **17.088 pin, %98.7 örtüşme** (çoğu projede %100),
+**0 bozuk parantez, 0 okunamayan proje**.
+
+> **Tekrar keşfetmeyin:** ilk ölçümüm %79 çıkmıştı ve okuyucuda hata var
+> sandım. Yoktu — çapa kümem darmış. Bir pin yalnızca tel ucuna değil;
+> junction'a, no-connect'e, etikete veya **doğrudan başka bir sembolün pinine**
+> de değebilir. Güç sembolleri (GND/VCC) çoğunlukla telsiz, doğrudan IC pinine
+> yapışır. Doğru ölçütle `pic_programmer`da oran %100.
+
+Rapora `SEMATIK` bölümü eklendi; `rules.run_schematic_checks` dört yapısal
+kontrol veriyor: eksik alt sayfa dosyası (hata), bozuk dosya (hata), ızgara
+dışı sembol (uyarı), footprint'i yok (uyarı), çakışan sembol gövdeleri (uyarı).
+
+`#` ile başlayan referanslar (`#PWR`, `#FLG`) sanal sayılır — footprint'leri
+olmaz, bileşen sayımına ve footprint kontrolüne girmezler.
+
+### 4b — netlist değişmezliği kalkanı (`sch_verify.py`)
+
+**Şematikte bağlantı geometriktir.** PCB'de net pad'in içinde isimle yazılıdır;
+şematikte tel ucu pine değiyorsa bağlıdır. Ölçüldü: `pic_programmer` üzerinde
+R1 kaydırılınca pin 2 koptu, `unconnected-(R1-Pad2)` oldu — hiçbir hata, hiçbir
+uyarı. **Tek ızgara adımı (1.27 mm) bile yetiyor.**
+
+Kalkan yazma öncesi/sonrası `kicad-cli sch export netlist` koşturup karşılaştırır.
+Doğru değişmez ham XML değil — **pinlerin ağlara bölünüşü**:
+
+```
+{ {(R1,1),(U1,3)},  {(R1,2),(C4,1)},  ... }
+```
+
+Net kodları her ihracatta yeniden numaralanır, otomatik net adları konuma göre
+değişir; bunlar gerçek bağlantı değişikliği değildir. Bölünme aynıysa devre
+elektriksel olarak aynıdır. Kalkan üç durumu doğru ayırt ediyor: yeniden
+yazma (geçer), 12.7 mm kayma (yakalar), 1.27 mm kayma (yakalar).
+
+Testler: `python -m unittest discover -s tests` → **45 test**, hepsi geçiyor.
+
+### SIRADAKİ — 4c/4d
+
+- **4c atomik yazma:** aynı dizine geçici dosya → `fsync` → `os.replace`.
+  UUID'ler asla yeniden üretilmez. Yazmadan önce git commit. Kalkan geçmezse
+  yazma yok. **KiCad kapalı olmalı** (IPC'de şematik yok); açık proje
+  `~<proje>.kicad_pro.lck` dosyasından anlaşılır.
+- **4d bağlantı koruyan taşıma:** sembol taşınırken pinlerine değen tel uçları
+  da taşınır (stub uzatma/kısaltma), 1.27 mm ızgaraya oturtulur, kalkandan
+  geçirilir. Pin geometrisi 4a'da çözüldüğü için zemin hazır.
+- **4e (sonraki tur):** Aşama 3 mimarisi doğrudan taşınır — şematik için bir
+  `evaluate` yazılır, `refine.polish` olduğu gibi çalışır.
+
+### Bilinen sınırlar (4a/4b)
+
+- `dumps()` dosyayı yeniden biçimlendiriyor; git diff'i şişiriyor. KiCad de her
+  kaydedişte aynısını yaptığı için kabul edildi, ama 4c'de cerrahi (bayt
+  düzeyi) düzenleme alternatifi yeniden değerlendirilebilir.
+- Şematik dosya biçimini (`version 20260101`) artık kendimiz takip ediyoruz.
+- Kalkan her çağrıda `kicad-cli` çalıştırır (~1-2 sn); yerleştirme döngüsünde
+  her adımda değil, yalnızca yazma öncesi kullanılmalı.
