@@ -61,7 +61,16 @@ def _ring(cx: float, cy: float, radius: float) -> Iterable[tuple[float, float]]:
 
 
 def _extent_of(ref: str, ctx: PlacementContext) -> float:
-    """Bilesenin kaba yaricapi (courtyard kutusunun yarisi)."""
+    """Bilesenin kaba yaricapi (courtyard kutusunun yarisi).
+
+    Baglam kendi `extent_of` yontemini sunuyorsa o kullanilir; boylece bu
+    cila motoru PCB disindaki alanlarda da (or. sematik, Asama 4e) courtyard
+    kavrami olmadan calisabilir.
+    """
+    own = getattr(ctx, "extent_of", None)
+    if callable(own):
+        return own(ref)
+
     comp = ctx.design.component(ref)
     poly = getattr(comp, "courtyard_local", None) if comp else None
     if not poly:
@@ -139,16 +148,24 @@ def _nudge_moves(
     ctx: PlacementContext,
     rng: random.Random,
 ) -> list[tuple[str, tuple[float, float, float]]]:
-    """Tek bilesen icin kucuk kaydirma ve 90 derece donme denemeleri."""
+    """Tek bilesen icin kucuk kaydirma ve 90 derece donme denemeleri.
+
+    Adim boyutlari alana gore degisir. PCB'de serbest mm adimlari makuldur;
+    SEMATIKTE ise konumlar 1.27 mm izgarasina oturmak ZORUNDADIR - izgara
+    disi bir adim kural ihlali uretir ve her deneme reddedilir. Baglam kendi
+    `nudge_steps` degerini sunuyorsa o kullanilir.
+    """
     x, y, rot = placement[ref]
     outline = ctx.outline()
+    steps = getattr(ctx, "nudge_steps", None) or _NUDGES
     moves = []
-    for step in _NUDGES:
+    for step in steps:
         for dx, dy in ((step, 0.0), (-step, 0.0), (0.0, step), (0.0, -step)):
             if _inside(outline, x + dx, y + dy):
                 moves.append((ref, (x + dx, y + dy, rot)))
-    for turn in (90.0, 180.0, 270.0):
-        moves.append((ref, (x, y, (rot + turn) % 360.0)))
+    if getattr(ctx, "allow_rotation", True):
+        for turn in (90.0, 180.0, 270.0):
+            moves.append((ref, (x, y, (rot + turn) % 360.0)))
     rng.shuffle(moves)
     return moves
 

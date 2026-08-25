@@ -123,6 +123,70 @@ kaldığı sürece devre elektriksel olarak aynıdır.
 Bu kalkan, şematiğe yazma (Aşama 4c/4d) için ön koşuldur: yazma öncesi/sonrası
 karşılaştırılır, `ok=False` ise yazma reddedilir.
 
+## Aşama 4e: şematik yerleştirme kalitesi
+
+Aşama 3'te PCB için kurulan mimari şematiğe olduğu gibi taşındı: yerleştirici
+vekil bir maliyet uydurmaz, **hakemin gerçek ölçütünü** optimize eder ve sonuç
+hiçbir zaman başlangıçtan kötü olamaz. `refine.polish` değiştirilmeden
+kullanılır; değişen tek şey değerlendiricidir.
+
+```powershell
+# Bir sayfayı iyileştir (dry-run), sonra uygula
+.\.venv\Scripts\python -m pcbqa.sch_apply --sch proje\proje.kicad_sch --budget 20
+.\.venv\Scripts\python -m pcbqa.sch_apply --sch proje\proje.kicad_sch --budget 20 --apply
+
+# Alt sayfa
+.\.venv\Scripts\python -m pcbqa.sch_apply --sch proje\proje.kicad_sch --sheet /guc --apply
+```
+
+### İki hızlı, bir yavaş ölçüt
+
+Kalkan her çağrıda `kicad-cli` çalıştırır (2-4 sn); yerel arama binlerce aday
+dener. Bu yüzden ölçüt ikiye ayrıldı:
+
+| | ne zaman | ne kadar sürer |
+|---|---|---|
+| Geometrik ölçüt (bellek-içi) | her adayda | **~0.4 ms** → 20 sn'de ~47.000 deneme |
+| Netlist kalkanı | yalnızca yazmadan önce, **bir kez** | 2-4 sn |
+
+Geometrik ölçüt bağlantı riskini de taşır: taşınan bir pin **kendisine ait
+olmayan** bir çapaya (başka bir telin ucu, başka bir sembolün pini) oturursa
+iki net birleşir. Bu, kalkanın yakaladığı hatanın ucuz vekili olduğu için arama
+zaten oraya gitmez; kalkan son söz olarak kalır.
+
+Ölçülen: `pic_programmer` kök sayfası 985.5 → 976.6 mm, skor 100'de sabit,
+0 hata. Daha dağınık sayfalarda kazanç çok daha büyük (`video/RAMS` %21,
+`vme-wren` kök sayfası %17).
+
+### Bus içeren sayfalar: varsayılan olarak kapalı
+
+Ucuz ölçüt bus bağlantılarını modelleyemiyor. `vme-wren/vme_p1_p2` sayfasında
+(137 bus, 262 bus girişi) optimizasyon "skor 100, 0 hata, tel %60 kısaldı"
+dedi; gerçek kalkan **257 pinin ağ değiştirdiğini** gösterdi ve yazma
+reddedildi. Sistem güvenliydi ama ölçüm yanıltıcıydı.
+
+Bu yüzden bus içeren sayfalarda optimizasyon kapalıdır. `allow_buses=True`
+ile açılabilir — kalkan yine son söz olarak çalışır.
+
+### Toplu uygulama
+
+`sch_move` tek sembol taşır ve her çağrıda kalkanı çalıştırır — 30 sembol için
+dakikalar. `sch_apply` tersini yapar: **tüm** taşımaları ağaç üzerinde uygular,
+kalkanı **bir kez** çalıştırır, dosyayı **bir kez** yazar.
+
+Bir nokta iki taşınan sembolün pinine denk gelip deltaları farklıysa, o noktayı
+nereye götüreceğimiz belirsizdir — çatışma sayılır ve uygulama reddedilir.
+
+### Sembol kimliği: UUID, referans değil
+
+Çok birimli bir bileşenin (ör. 74LS125'in dört kapısı) her birimi ayrı bir
+`symbol` düğümüdür ve **hepsi aynı referansı taşır**. Referansla anahtarlamak
+dördünü tek girdiye çökertip "U2 ve U2 çakışıyor" gibi hayali bulgular
+üretiyordu. Yerleştirme sözleşmesi bu yüzden `{sembol_uuid: (x, y)}`.
+
+Yalnızca **öteleme**. Rotasyon ve ayna desteklenmiyor: pin konumları dönünce
+tel uçları tek bir delta ile taşınamaz.
+
 ## Aşama 4c/4d: şematiğe yazma ve bağlantı koruyan taşıma
 
 Bir sembolü kaydırıp bırakmak, pinlerine değen tel uçlarını yerinde bırakır ve

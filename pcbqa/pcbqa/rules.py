@@ -573,9 +573,19 @@ def run_rules(design: Design, rules: list[Rule]) -> list[Finding]:
 SCH_GRID_MM = 1.27
 
 
+# Cakisma testinde kullanilan tolerans (mm). Sematikte semboller 1.27 mm
+# izgarasinda cogu zaman TAM kenar kenara durur; toleranssiz bir yuklem bu
+# durumu kayan nokta gurultusune birakir ve ayni yerlesim bir hesapta
+# "cakisiyor", digerinde "cakismiyor" cikar. Olculdu: 4e-14 mm'lik bir fark
+# jetson-agx-thor-baseboard/SoM_IO sayfasinda skoru 100'den 97.4'e dusuruyordu.
+OVERLAP_EPS = 1e-6
+
+
 def _boxes_overlap(a, b, margin: float = 0.0) -> bool:
+    """Iki sinir kutusu ust uste biniyor mu? Tam temas cakisma SAYILMAZ."""
+    gap = margin - OVERLAP_EPS
     return not (
-        a[2] + margin <= b[0] or b[2] + margin <= a[0] or a[3] + margin <= b[1] or b[3] + margin <= a[1]
+        a[2] + gap <= b[0] or b[2] + gap <= a[0] or a[3] + gap <= b[1] or b[3] + gap <= a[1]
     )
 
 

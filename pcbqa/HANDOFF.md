@@ -14,9 +14,9 @@ KiCad üzerinde bir otomasyon sistemi geliştiriyorum. Nihai hedef: **PCB ve
 sorusunu makineye sordurmak ve zamanla her şeyi kendi yerleştiren bir sisteme
 dönüştürmek istiyorum.
 
-Proje 4 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4d).**
+Proje 4 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4e).**
 **KiCad 11 beklenmedi** — şematik okuma da yazma da KiCad 10 ile çalışıyor
-(bkz. §10). Sırada şematik yerleştirme kalitesi var (4e).
+(bkz. §10).
 
 | Aşama | Kapsam | Durum |
 |---|---|---|
@@ -28,6 +28,7 @@ Proje 4 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4d).**
 | 4b | Netlist değişmezliği kalkanı | ✅ Bitti |
 | 4c | Atomik yazma + açık-proje koruması | ✅ Bitti |
 | 4d | Bağlantı koruyan sembol taşıma | ✅ Bitti |
+| 4e | Şematik yerleştirme kalitesi + toplu uygulama | ✅ Bitti |
 
 ---
 
@@ -99,6 +100,8 @@ pcbqa/
   sch_verify.py    netlist değişmezliği kalkanı (yazma için ön koşul)
   sch_write.py     atomik yazma + açık-proje (lck) koruması + yedek
   sch_move.py      bağlantı koruyan sembol taşıma + komut satırı
+  sch_place.py     şematik yerleştirme optimizasyonu (hızlı geometrik ölçüt)
+  sch_apply.py     toplu uygulama: tek doğrulama, tek yazma + komut satırı
   ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement uygular
   ipc_apply.py     yarışmayı koşturur, kazananı seçer, IPC dry-run/apply yapar
   report.py        terminal raporu + skor
@@ -555,12 +558,81 @@ Testler: `python -m unittest discover -s tests` → **64 test**, hepsi geciyor.
 - `dumps()` dosyayi yeniden bicimlendirir; git diff sisiyor. KiCad de her
   kaydediste ayni sey yaptigi icin kabul edildi.
 
-### SIRADAKİ — 4e: şematik yerleştirme kalitesi
+### 4e — şematik yerleştirme kalitesi (`sch_place.py`, `sch_apply.py`)
 
-Asama 3 mimarisi dogrudan tasinabilir: sematik icin bir `evaluate` yazilir
-(kural motoru + `run_schematic_checks` zaten var), `refine.polish` oldugu gibi
-calisir. Tek fark, hakem her adimda `kicad-cli` calistiramayacagi icin
-kalkanin yalnizca yazma oncesi devreye girmesi.
+Aşama 3 mimarisi olduğu gibi taşındı: `refine.polish` **değiştirilmeden**
+kullanılıyor, değişen tek şey değerlendirici. Monotonluk garantisi de oradan
+geliyor.
 
-Toplu tasima icin `sch_move` uzerine bir "plan listesi" arayuzu gerekir:
-tum tasimalari agac uzerinde uygula, tek seferde dogrula, tek seferde yaz.
+**İki hızlı, bir yavaş ölçüt.** Kalkan her çağrıda `kicad-cli` çalıştırır
+(2-4 sn); yerel arama binlerce aday dener. Bu yüzden arama sırasında
+bellek-içi geometrik ölçüt kullanılır (**~0.4 ms**, 20 sn'de ~47.000 deneme),
+netlist kalkanı yalnızca yazmadan önce **bir kez** koşar. Geometrik ölçüt
+bağlantı riskini de taşır: taşınan bir pin kendisine ait olmayan bir çapaya
+oturursa netler birleşir — kalkanın ucuz vekili.
+
+`refine.py`'de iki nokta gevşetildi (Aşama 3 davranışı değişmeden):
+`extent_of` ve `nudge_steps`. İkincisi şarttı — PCB'nin serbest mm adımları
+(±0.5, ±1, ±2, ±4) şematikte **her denemeyi ızgara dışı** bırakıp reddettiriyor,
+optimizasyon 0.7 sn'de sıfır taşımayla yakınsıyordu. Şematik adımları 1.27 mm
+katları olmak zorunda.
+
+**Sembol kimliği UUID'dir, referans değil.** Çok birimli bir bileşenin
+(74LS125'in dört kapısı) her birimi ayrı `symbol` düğümüdür ve hepsi aynı
+referansı taşır; referansla anahtarlamak dördünü tek girdiye çökertip
+"U2 ve U2 çakışıyor" gibi hayali bulgular üretiyordu.
+
+`sch_apply` toplu uygulayıcıdır: tüm taşımaları ağaçta uygular, kalkanı bir kez
+koşar, dosyayı bir kez yazar. Bir nokta iki taşınan sembolün pinine denk gelip
+deltaları farklıysa çatışma sayılır ve uygulama reddedilir.
+
+**Ölçümler:** `pic_programmer` kök sayfası 985.5 → 976.6 mm (skor 100 sabit,
+0 hata, netlist birebir aynı). Dağınık sayfalarda çok daha fazla:
+`video/RAMS` %21, `vme-wren` kök %17, `sonde xilinx` %8.
+
+### Yol boyunca bulunan gerçek hata (tekrar keşfetmeyin)
+
+Regresyon paketi tek bir sayfada monotonluk ihlali gösterdi:
+`jetson-agx-thor-baseboard /SoM_IO` skoru 100 → 97.4. `polish` yuvarlanmamış
+kayan noktalarla çalışıyor (308.60999999999996), sonuç dosyaya yazılırken 4
+haneye yuvarlanıyordu (308.61). Bu **4×10⁻¹⁴ mm**'lik fark, tam kenar kenara
+duran iki gövdenin çakışma testini ters çeviriyordu: `_boxes_overlap` toleranssızdı,
+yani kıl payı bir yüklem kayan nokta gürültüsüne bırakılmıştı. 1.27 mm
+ızgarasında bitişik semboller çok yaygın olduğu için bu er geç patlardı.
+
+İki yerden düzeltildi: `rules.OVERLAP_EPS` (tam temas çakışma sayılmaz) ve
+`SchematicArena.positions` artık yuvarlamayı **arama sırasında** yapıyor, yani
+aramanın gördüğü koordinatlarla dosyaya yazılan koordinatlar aynı.
+
+### Yol boyunca bulunan ikinci gerçek hata: SAHTE KAZANÇ
+
+Regresyon paketi `vme-wren/vme_p1_p2` sayfasında "skor 100, 0 hata, tel %60
+kısaldı" dedi. Şüphelenip gerçek kalkanla uçtan uca denedim: **257 pin ağ
+değiştirmişti** ve yazma reddedildi. Sistem güvenliydi (kalkan son söz), ama
+ucuz ölçüt YANILTICIYDI.
+
+Sebep: o sayfada **137 bus ve 262 bus girişi** var ve okuyucu `bus`/`bus_entry`
+düğümlerini hiç tanımıyordu. İki iş yapıldı:
+
+1. Okuyucu artık `bus` ve `bus_entry` düğümlerini okuyor; bunlar
+   **sürüklenemeyen çapa** sayılıyor (`sematik-bus-girisi-kopuyor` kuralı).
+2. **Mekanizma tam çözülmedi.** Bus girişi kuralı tek başına bu sayfayı
+   kurtarmadı. Yarım anlaşılmış bir sezgisel kural göndermek yerine
+   muhafazakâr davranıldı: **bus içeren sayfalarda optimizasyon varsayılan
+   olarak kapalı** (`allow_buses=True` ile açılır, kalkan yine son söz).
+
+Bu bilinçli bir borç. Çözmek için sıradaki adım: bus/bus_entry/label
+topolojisini gerçekten modelleyen bir bağlantı grafiği kurmak — o zaman ucuz
+ölçüt bus'lı sayfalarda da güvenilir olur.
+
+### Bilinen sınırlar (4e)
+
+- Yalnızca öteleme (4d ile aynı sınır).
+- Optimizasyon **tek sayfa** üzerinde çalışır; sayfalar arası denge yok.
+- Sayfa sınırı kontrolü kağıt boyutundan türetiliyor (`PAPER_SIZES`); listede
+  olmayan bir boyut A4 varsayılıyor.
+- Geometrik ölçüt tel **topolojisini** değiştirmez, yalnızca uçları sürükler.
+  Gerçek bir yeniden çizim (wire routing) kapsam dışı.
+- **Bus içeren sayfalar varsayılan olarak kapalı** (yukarıdaki nota bakın).
+  Demo projelerinin önemli bir kısmı bus kullanıyor, yani 4e şu an esas olarak
+  bus'sız sayfalarda iş görüyor.

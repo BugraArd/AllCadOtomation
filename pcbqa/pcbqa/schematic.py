@@ -212,6 +212,13 @@ class Schematic:
     junctions: list[SchPoint] = field(default_factory=list)
     no_connects: list[SchPoint] = field(default_factory=list)
     labels: list[SchLabel] = field(default_factory=list)
+    # Bus ve bus girisleri de baglanti ogesidir. Bunlar SURUKLENEMEZ: bir
+    # sembol pini dogrudan bus girisinde duruyorsa sembolu tasimak baglantiyi
+    # koparir (bus girisi yerinde kalir). Olculdu: vme-wren/vme_p1_p2
+    # sayfasinda 131 bus girisi var ve bunlari gormemek 257 pinin ag
+    # degistirmesine yol aciyordu.
+    buses: list[SchWire] = field(default_factory=list)
+    bus_entries: list[SchPoint] = field(default_factory=list)
     sheets: list[SchSheetRef] = field(default_factory=list)
     files: list[Path] = field(default_factory=list)
     # sayfa yolu -> o sayfanin bulundugu dosya. Duzenleme yaparken hangi
@@ -279,6 +286,8 @@ class Schematic:
             "junction": len(self.junctions),
             "no_connect": len(self.no_connects),
             "etiket": len(self.labels),
+            "bus": len(self.buses),
+            "bus_girisi": len(self.bus_entries),
             "alt_sayfa": len(self.sheets),
         }
 
@@ -513,6 +522,39 @@ def _read_file(path: Path, sheet_path: str, schematic: Schematic, visited: set[P
                         sheet_path=sheet_path,
                     )
                 )
+
+        elif tag == "bus":
+            pts = child(node, "pts")
+            xys = list(children(pts, "xy")) if pts else []
+            if len(xys) >= 2:
+                schematic.buses.append(
+                    SchWire(
+                        x1=_num(xys[0], 1),
+                        y1=_num(xys[0], 2),
+                        x2=_num(xys[-1], 1),
+                        y2=_num(xys[-1], 2),
+                        uuid=_atom(child(node, "uuid")),
+                        sheet_path=sheet_path,
+                    )
+                )
+
+        elif tag == "bus_entry":
+            at = child(node, "at")
+            if at:
+                schematic.bus_entries.append(
+                    SchPoint(x=_num(at, 1), y=_num(at, 2), kind="bus_entry", sheet_path=sheet_path)
+                )
+                # Girisin diger ucu (at + size) de bir baglanti noktasidir
+                size = child(node, "size")
+                if size:
+                    schematic.bus_entries.append(
+                        SchPoint(
+                            x=_num(at, 1) + _num(size, 1),
+                            y=_num(at, 2) + _num(size, 2),
+                            kind="bus_entry",
+                            sheet_path=sheet_path,
+                        )
+                    )
 
         elif tag in ("junction", "no_connect"):
             at = child(node, "at")
