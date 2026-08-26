@@ -35,6 +35,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 6/A | Geniş hamle repertuarı + model filtresi (yol haritası A1-A3) | ⚠️ Bitti, kazanç yok (§13) |
 | 6/C | Öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı | ✅ Bitti (§14) |
 | 6/E | Kabul kuralı: tavlama benzeri kaçış | ⚠️ Ölçüldü, kazanç yok (§15) |
+| 6/F | `polish`e yakınsama ölçütü (skor sabrı) | ✅ Bitti (§16) |
 
 ---
 
@@ -1241,3 +1242,82 @@ açılmadan ölçülemez durumda. Öncelik sırası bu yüzden değişti:
 2. Faz E'yi (kaçış) yeniden ölç — artık gerçekten çalışacağı için
 3. Faz B (veri popülasyonu: `synth.py`'yi parametrik yap)
 4. Faz D (öğrenilmiş hakem)
+
+---
+
+## 16. Faz F — `polish`'e yakınsama ölçütü
+
+§15'in bulgusu şuydu: `polish`'in aşamaları hiç bitmiyor, bu yüzden Faz A
+(geniş repertuar) ve Faz E (kaçış) ölçülemez durumda. Bu faz o kapıyı açıyor.
+
+### 16.1 Dört ölçüt denendi, üçü çalışmadı
+
+| ölçüt | sonuç |
+|---|---|
+| **a)** "Bir tur gez, hiçbiri iyileşmesin" (mevcut) | Hiç ateşlenmiyor: HPWL eşitlik bozucu olduğu için bir yerlerde her zaman birkaç mikron kazandıran bir kaydırma var |
+| **b)** "Yalnızca skor artışını say, hemen dur" | Faz A'da ölçüldü, **daha kötü**: 2 iyi / 3 kötü, `complex_hierarchy` −5.5. HPWL hamleleri boşa gitmiyor — **plato aşma mekanizması onlar** |
+| **c)** Azalan getiri (fazın kendi başındaki tipik getiriye oran) | Hiç ateşlenmedi. Ölçüldü: faz 2'de getiriler **azalmıyor**, baştan tekdüze önemsiz — `pic_programmer`da referans 1.2×10⁻⁴, kuyruk 2–7×10⁻⁵, hep referansın ~%30'u. Azalma yok ki azalan getiri ölçülsün |
+| **d)** **Skor sabrı** — seçilen | Çalışıyor: `pic_programmer`da faz 2, 525 değerlendirme sonra devrediyor |
+
+**Çalışan ölçüt (`_Convergence`):** kayıttaki **skor** son `patience`
+değerlendirmedir artmadıysa aşama devreder. Birim olarak "değerlendirme"
+seçildi çünkü bütçeyi gerçekten yiyen o; bileşen saymak kart büyüklüğüne göre
+anlamını değiştiriyor. (b)'den farkı sabrın **cömert** olması (varsayılan 400):
+HPWL hamlelerine plato aşmak için bol yer bırakıyor ama sonunda pes ediyor.
+
+### 16.2 Varsayılan davranış neden değişmiyor
+
+Kontrol `handoff` kapısının arkasında:
+
+```python
+handoff = wide_keep > 0 or accept is not None
+```
+
+Devredilecek bir aşama yoksa erken durmak bütçeyi boşa harcamak olurdu —
+mikron kazançları küçük ama sıfırdan büyük. Varsayılan yapılandırmada
+(`wide_keep=0`, `accept=None`) yakınsama hiç sorgulanmaz.
+
+### 16.3 Ölçüm: kapı açıldı, ama `auto` içinde işe yaramıyor
+
+**Çıplak `polish` ile, 20 sn tek koşu** (8 kart): yakınsama + geniş repertuar
+4 kartta kazandırıyor, hiçbirinde kaybettirmiyor — toplam skor 521.1 → **531.4**
+(`StickHub` +1.2, `pic_programmer` +2.9, `interf_u` +4.1, `complex_hier` +2.1).
+Kaçış aşaması eklemek bunu 530.2'ye **düşürüyor**.
+
+**19 kartlık pakette `auto` ile, bütçe 15 sn**: tablo tersine dönüyor —
+2 iyi / 4 kötü, toplam 1632.0 → 1624.5.
+
+⚠️ **Buradaki fark benim ölçüm hatamdı ve kaydedilmeye değer:** ilk
+karşılaştırmayı çıplak `polish` üzerinde yapıp `auto`ya genelledim. `auto` ise
+kaba yerleşim + **iki ayrı cila koşusu** + `keep_best` demek; her `polish`
+çağrısına toplam bütçenin ancak üçte biri düşüyor (15 sn → ~5 sn → ~800
+değerlendirme). O pencerede skor sabri ya **çok erken** ateşleniyor (400
+değerlendirme, faz 2'nin ortası) ya da hiç ateşlenmiyor. Yani ölçüt doğru,
+ama `auto`'nun bütçe bölüşümü ona yer bırakmıyor.
+
+Bu yüzden geniş repertuar **varsayılan olarak kapalı kalıyor**; yakınsama
+ölçütü de onunla birlikte uykuda.
+
+### 16.4 Durum
+
+- `_Convergence` kurulu, testli, belgeli. Faz A ve Faz E artık **ölçülebilir**
+  — ikisi de bu ölçüt olmadan çalıştırılamıyordu.
+- Tek koşuluk ölçümlerde `complex_hierarchy`, `interf_u`,
+  `multichannel_mixer-unrouted` gibi kartların **koşudan koşuya oynaklığı
+  yüksek** (aynı kod, aynı tohum: `interf_u` 20–30 arasında geziniyor). Duvar
+  saati bütçesi ve makine yükü belirleyici. Küçük farkları tek koşuya bakarak
+  yorumlamayın; bu bölümdeki ±2 puanlık farklar gürültü bandının içinde.
+
+### 16.5 Sıradaki adım
+
+Yakınsama ölçütünün işe yarayabilmesi için **tek bir cila koşusuna yeterli
+bütçe** gerekiyor. İki yol var:
+
+1. **`auto`'nun bütçe bölüşümünü gözden geçirmek.** Dört aday (mevcut, kaba,
+   cilalı-kaba, cilalı-mevcut) bütçeyi dörde bölüyor. Bu bölüşüm Aşama 3'te
+   ölçülmüştü ama o zaman devredilecek bir aşama yoktu; şimdi var.
+2. **Uzun bütçeli tek koşu kipini ölçmek** (`polish` doğrudan, 20 sn+).
+   Ölçümler orada tutarlı biçimde olumlu.
+
+`patience` bir parametre (`polish(..., patience=N)`); süpürülmesi gereken
+sonraki ayar o.

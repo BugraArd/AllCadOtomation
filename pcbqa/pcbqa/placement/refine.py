@@ -221,6 +221,73 @@ def _nudge_moves(
 
 
 
+# --------------------------------------------------------------- yakinsama
+
+# SKOR sabreti: kayittaki skor son bu kadar DEGERLENDIRMEDIR artmadiysa asama
+# devreder. Birim olarak "degerlendirme" secildi cunku butceyi gercekten yiyen
+# sey o; bilesen turu saymak kart buyuklugune gore anlamini degistiriyor.
+SCORE_PATIENCE = 400
+
+
+class _Convergence:
+    """Bir asamanin ne zaman devredecegini soyler.
+
+    ## Neden basit bir "iyilesme yok" sayaci yetmiyor
+
+    `polish`in asamalari pratikte HIC BITMIYORDU. Durma sarti "bir tur gez,
+    hicbiri iyilesmesin"; ama HPWL sozluksel anahtarda esitlik bozucu oldugu
+    icin bir yerlerde her zaman birkac mikron kazandiran bir kaydirma
+    bulunuyor ve sayac sifirlaniyor. Bu tek olgu iki fikri oldurdu: genis
+    repertuar (3. asamaya hic sira gelmedi) ve tavlama kacisi (artan butce
+    hic olusmadi).
+
+    ## Neden "yalnizca skoru say, hemen dur" da yetmiyor
+
+    Denendi (Faz A) ve DAHA KOTU cikti: 19 kartlik pakette 2 iyi, 3 kotu,
+    complex_hierarchy -5.5. Sebep ogretici - sadece HPWL kisaltan hamleler
+    bosa gitmiyor, PLATO ASMA mekanizmasi onlar. Bilesenleri yavas yavas
+    yeniden konumlandiriyorlar ve skor kazanci ancak birkac adim sonra
+    ulasilabilir hale geliyor.
+
+    ## Neden "azalan getiri" de yetmedi
+
+    Ucuncu deneme, getiriyi asamanin kendi basindaki tipik getiriye orandi.
+    O da ateslenmedi ve sebebi olculdu: faz 2'de getiriler AZALMIYOR, bastan
+    itibaren tekduze onemsiz. pic_programmer'da referans 1.2e-4, kuyruk
+    2-7e-5 - yani hep referansin ~%30'u, hicbir zaman %2'nin altina inmiyor.
+    Azalma yok ki azalan getiri olculsun.
+
+    ## Gecerli olcut: SKOR SABRI
+
+    Ikisinin arasi: skor artisini bekle ama HEMEN degil, comertce. Sayac
+    degerlendirme cinsinden tutulur ve yalnizca kayittaki SKOR arttiginda
+    sifirlanir. HPWL hamleleri sayaci sifirlamaz - ama sabir penceresi
+    icinde plato asmalarina bol bol yer birakir.
+    """
+
+    def __init__(self, patience: int = SCORE_PATIENCE) -> None:
+        self.patience = patience
+        self.reset()
+
+    def reset(self) -> None:
+        """Her asama kendi sayacini tutar."""
+        self.evals = 0
+        self.since_score = 0
+        self.score_gains = 0
+
+    def on_evaluation(self) -> None:
+        self.evals += 1
+        self.since_score += 1
+
+    def on_score_gain(self) -> None:
+        self.since_score = 0
+        self.score_gains += 1
+
+    @property
+    def converged(self) -> bool:
+        return self.since_score >= self.patience
+
+
 class Metropolis:
     """TAVLAMA BENZERI KABUL - yerel en iyiden kacmak icin.
 
@@ -314,6 +381,7 @@ def polish(
     verbose: bool = False,
     wide_keep: int | None = None,
     accept: "Acceptance | None" = None,
+    patience: int = SCORE_PATIENCE,
 ) -> Placement:
     """Baslangic yerlesimini hakem olcutuyle iyilestirir.
 
@@ -325,6 +393,13 @@ def polish(
     verilirse, tepe tirmanisi tukenip butce ARTARSA arama kotulesen hamleleri
     de sinirli olasilikla kabul edip gezinir. Dondurulen sonuc her durumda
     GORULEN EN IYIDIR, yani monotonluk garantisi bozulmaz.
+
+    ## Yakinsama
+
+    Bir asama, kayittaki SKOR son `patience` degerlendirmedir artmadiysa
+    devreder (`_Convergence`). Bu kontrol YALNIZCA devredilecek bir asama
+    varsa (genis repertuar veya kacis) calisir; yoksa erken durmak butceyi
+    bosa harcamak olurdu ve varsayilan davranis degismemeli.
 
     `wide_keep`: genis repertuar asamasinda (3) bilesen basina kac aday
     gercek hakeme gonderilir. 0 verilirse o asama hic calismaz - sematik
@@ -378,6 +453,12 @@ def polish(
     best, best_eval = dict(current), current_eval
 
     started_at = time.perf_counter()
+    # Yakinsama YALNIZCA devredilecek bir asama varsa anlamlidir. Hicbiri
+    # yoksa erken durmak butceyi bosa harcamak olur - mikron kazanclari
+    # kucuk ama sifirdan buyuk. Bu sayede varsayilan yapilandirmada davranis
+    # bugunkuyle BIREBIR ayni kalir.
+    handoff = wide_keep > 0 or accept is not None
+    converge = _Convergence(patience)
     # Kabul yuklemi asamaya gore degisir: 1-3 her zaman TEPE TIRMANISI,
     # yalnizca 4. asama gezinir (bkz. asagisi).
     active_accept: "Acceptance | None" = None
@@ -417,6 +498,7 @@ def polish(
                 return False
             cand = _with_all(current, compound)
             ev = ctx.evaluate(cand)
+            converge.on_evaluation()
             if ev is None:
                 continue
             taken = (
@@ -429,6 +511,11 @@ def polish(
             current, current_eval = cand, ev
             # Kayit yalnizca GERCEKTEN daha iyi oldugunda guncellenir.
             if ev.better_than(best_eval):
+                # Sabir sayaci KAYIT uzerinden isler: sorulan sey "butce hala
+                # skor satin aliyor mu". Gezinen durumun dalgalanmasi bu
+                # soruyu bulandirir.
+                if ev.score > best_eval.score + 1e-9:
+                    converge.on_score_gain()
                 best, best_eval = cand, ev
             else:
                 # TASMA: gezinme en iyiden cok uzaklastiysa geri cek. Klasik
@@ -449,8 +536,11 @@ def polish(
     # bastan baslamak, kucuk kazanclar veren tek bir bulgunun butun butceyi
     # yemesine yol aciyordu - bu yuzden iyilesme olsa da sonraki bulguya
     # gecilir; liste ancak tur sonunda tazelenir.
+    converge.reset()
     improved = True
     while improved and time.perf_counter() < deadline:
+        if handoff and converge.converged:
+            break
         improved = False
         findings = list(current_eval.findings)
         errors = [f for f in findings if getattr(f, "severity", "") == "error"]
@@ -466,9 +556,16 @@ def polish(
     # 2) Genel ince ayar: kalan butceyi bilesenleri tek tek kaydirmaya harca.
     movable = [r for r in ctx.movable() if r in current]
     rng.shuffle(movable)
+    converge.reset()
     idx = 0
     stagnant = 0
     while time.perf_counter() < deadline and movable and stagnant < len(movable):
+        if handoff and converge.converged:
+            # Getiri anlamsizlasti; kalan butce sonraki asamalarda daha iyi
+            # degerlendirilir. `handoff` yoksa burasi hic calismaz.
+            if verbose:
+                print(f"    [2. asama yakinsadi: {converge.evals} degerlendirme sonra]")
+            break
         ref = movable[idx % len(movable)]
         idx += 1
         if try_moves(_as_compounds(_nudge_moves(ref, current, ctx, rng)), rank=True):
@@ -491,9 +588,14 @@ def polish(
     if wide_keep > 0:
         repertoire = Repertoire(ctx, rng)
         rng.shuffle(movable)
+        converge.reset()
         idx = 0
         stagnant = 0
         while time.perf_counter() < deadline and movable and stagnant < len(movable):
+            if accept is not None and converge.converged:
+                if verbose:
+                    print(f"    [3. asama yakinsadi: {converge.evals} degerlendirme sonra]")
+                break
             ref = movable[idx % len(movable)]
             idx += 1
             hit = False
@@ -535,6 +637,7 @@ def polish(
     if accept is not None and time.perf_counter() < full_deadline:
         active_accept = accept
         deadline = full_deadline
+        converge.reset()
         movable = [r for r in ctx.movable() if r in current]
         rng.shuffle(movable)
         idx = 0
