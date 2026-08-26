@@ -36,6 +36,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 6/C | Öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı | ✅ Bitti (§14) |
 | 6/E | Kabul kuralı: tavlama benzeri kaçış | ⚠️ Ölçüldü, kazanç yok (§15) |
 | 6/F | `polish`e yakınsama ölçütü (skor sabrı) | ✅ Bitti (§16) |
+| 6/G | `auto` bütçe bölüşümü: sert tavan + artık devri + 75/25 | ✅ Bitti (§17) |
 
 ---
 
@@ -1308,7 +1309,7 @@ Bu yüzden geniş repertuar **varsayılan olarak kapalı kalıyor**; yakınsama
   saati bütçesi ve makine yükü belirleyici. Küçük farkları tek koşuya bakarak
   yorumlamayın; bu bölümdeki ±2 puanlık farklar gürültü bandının içinde.
 
-### 16.5 Sıradaki adım
+### 16.5 Sıradaki adım — 1. madde YAPILDI, bkz. §17
 
 Yakınsama ölçütünün işe yarayabilmesi için **tek bir cila koşusuna yeterli
 bütçe** gerekiyor. İki yol var:
@@ -1321,3 +1322,93 @@ bütçe** gerekiyor. İki yol var:
 
 `patience` bir parametre (`polish(..., patience=N)`); süpürülmesi gereken
 sonraki ayar o.
+
+---
+
+## 17. Faz G — `auto`'nun bütçe bölüşümü (2026-08-27)
+
+§16.5'in 1. maddesi. Soru şuydu: dört aday bütçeyi nasıl paylaşıyor ve bu
+paylaşım ölçülmüş mü? Cevap: paylaşım Aşama 3'ten kalmaydı ve **üç ayrı
+yerde sızdırıyordu**.
+
+### 17.1 Ölçüm — bütçe gerçekte nereye gidiyor
+
+19 kart, bütçe 15 sn, tohum 0. Her faz sarmalanıp payı/harcaması/değerlendirme
+sayısı kaydedildi (baz koşu iki kez tekrarlandı, totaller birebir aynı çıktı).
+
+| kart | n | toplam/15s | kaba (pay 6.75) | cila-kaba | cila-mevcut | ms/değerlendirme |
+|---|---|---|---|---|---|---|
+| pic_programmer | 63 | 15.1 | 6.1 | 5.3 (351 d) | 3.6 (242 d) | 15 |
+| video | 189 | 16.2 | 8.3 | 4.1 (33 d) | 2.8 (23 d) | 124 |
+| ecc83-pp | 15 | **9.7** | 6.0 | 1.3 (506 d) | 2.5 (1099 d) | 2.5 |
+| jetson | 1125 | **82.1** | **77.9** | 0.5 (1 d) | 0.4 (1 d) | 465 |
+| vme-wren | 1508 | **167.7** | **141.2** | 3.1 (1 d) | 1.9 (1 d) | 3118 |
+
+Bulgular:
+
+1. **Kaba fazın sert tavanı yoktu.** `cluster` son tarihe yalnızca deneme
+   sonunda ve `(it & 255)` aralıklarıyla bakıyordu; açgözlü rötuş turu ise
+   tur BAŞINDA. jetson'da tek bir `_attempt` 40 sn sürüyor (payı 5.9 sn).
+   Sonuç: 15 sn'lik iş 82–168 sn, cila fazlarına **1 değerlendirme** kalıyor
+   ve o kartlarda kaba aday zaten mevcuttan kötü (jetson 89.4 < 93.3).
+2. **Seçim maliyeti bütçe dışıydı.** `keep_best` dört adayı yeniden
+   puanlıyordu; vme-wren'de 21,5 sn (bütçenin kendisi 15 sn).
+3. **Paylar saniye cinsinden, asıl kaynak değerlendirme.** Maliyet 0,4 ms ile
+   3118 ms arasında — ~8000×. Aynı %60'lık pay bir kartta 807, başkasında 33
+   değerlendirme demek. §16.3'ün teşhisi böylece sayısallaştı: 400
+   değerlendirmelik skor sabri 19 kartın 16'sında **ateşlenemiyor**.
+4. **Artık devredilmiyordu.** 60/40 önden hesaplanıyordu; birinci cila erken
+   tükenince (ecc83: payının dörtte biri) kalan zaman kimseye geçmiyordu.
+5. **60/40 ölçüldü ve suboptimaldi.** Cila(mevcut) dalı DOYUYOR: payını
+   %40'tan %100'e çıkarmak 17 kartın yalnızca 3'ünde bir şey değiştiriyor
+   (toplam +23). Kaba dalı ise hâlâ tırmanıyor.
+6. **Kaba payının kendisi (0,45) doğru.** Kaba fazı kaldırmak toplamı
+   **60,4 puan düşürüyor** (complex_hierarchy −24,0, mixer-unrouted −15,6,
+   video −11,8, sonde −7,7); 0,30'a çekmek gürültü bandında (+4,9, tamamı iki
+   oynak karttan). Ham `kaba` adayı hiçbir kartta tek başına kazanmıyor —
+   değeri yalnızca cilaya tohum olmak.
+
+### 17.2 Ne değişti
+
+- `cluster.py`: son tarih payı aşamıyor (`min(pay, max(2, pay*0.88))`);
+  tavlama kontrolleri 256 → 16 iterasyon; açgözlü rötuşta **her bileşende**
+  saat okunuyor.
+- `refine.py`: `polish` → `polish_scored` (sonucun `Evaluation`'ını da
+  döndürür, `start_eval` ile başlangıcı yeniden puanlamaz). Eski `polish`
+  ince bir sarmalayıcı — `sch_place`, `ml.collect` ve testler etkilenmedi.
+  `keep_best(..., known=...)` bilinen puanları kabul eder.
+- `auto.py`: `POLISH_SPLIT = 0.75` (eskiden gömülü 0,60); ikinci cilanın payı
+  **duvar saatinden** yeniden hesaplanır; `keep_best` bütçe dışında hiç
+  değerlendirme yapmaz. `COARSE_SHARE` 0,45'te kaldı (bkz. 17.1/6).
+- `learned.py`: aynı politikayı `auto`'dan içe aktarır. İki kolun tek farkı
+  SIRALAYICI olmalı; bölüşüm de ayrışırsa §13'teki karşılaştırma anlamını
+  yitirir.
+
+### 17.3 Ölçüm — önce/sonra (`--suite`, 19 kart, 15 sn, tohum 0)
+
+| kart | önce | HEAD | yeni | fark | süre HEAD → yeni |
+|---|---|---|---|---|---|
+| video | 29 | 41.1 | **52.4** | +11.3 | 15.7 → 15.0 |
+| interf_u | 5 | 17.2 | **27.8** | +10.6 | 15.1 → 15.0 |
+| multichannel_mixer | 98 | 100.0 | 98.3 | −1.7 | 15.1 → 15.0 |
+| jetson | 93 | 93.3 | 93.3 | +0.0 | **79.8 → 15.1** |
+| vme-wren | 92 | 92.4 | 92.4 | +0.0 | **163.4 → 15.6** |
+| diğer 14 kart | | | | +0.0 | ~15 → ~15 |
+| **TOPLAM** | | **1616.2** | **1636.4** | **+20.2** | 463 sn → **248 sn** |
+
+- **Bütçe aşımı 215,8 sn → 0,9 sn.** Yumuşak bütçe sözleşmesi geri geldi.
+- Hiçbir kartta gerileme yok (iki koşuda da çıkış kodu 0); 134 birim testi
+  geçiyor.
+
+`multichannel_mixer` −1,7 dürüst notu: bu kart eşiğin üstünde. Aynı kodla,
+aynı tohumla 98,3 ile 100,0 arasında gidip geliyor (yeni kodda
+`POLISH_SPLIT=0.60` → 98,3, `0.75` → 100,0; pakette 0,75 ile 98,3). Sistematik
+kayıp değil, §16.4'teki oynaklık. Kalan +21,9 puan iki karttan geliyor ve
+ikisi de tekrarlanabilir.
+
+### 17.4 Açık kalan
+
+**Payları değerlendirme cinsinden ifade etmek** (17.1/3). Zemin artık hazır:
+kaba faz taşmadığı için cila dilimleri öngörülebilir. `patience` süpürmesi
+(§16.5) ancak bundan sonra anlamlı — bugün hâlâ kartın büyüklüğüne göre
+tamamen farklı sayıda değerlendirme görüyor.

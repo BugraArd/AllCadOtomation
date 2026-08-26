@@ -151,7 +151,12 @@ class _Engine:
     def __init__(self, ctx: PlacementContext) -> None:
         self.ctx = ctx
         self.design = ctx.design
-        self.deadline = time.perf_counter() + max(2.0, ctx.time_budget_s * 0.88)
+        # Pay ne olursa olsun ASILMAZ: 2 sn'lik taban kucuk butcelerde
+        # (ornegin `auto`nun 0.45'lik payi 2 sn'nin altina dustugunde) kaba
+        # fazin kendi payini asmasina yol aciyordu.
+        self.deadline = time.perf_counter() + min(
+            ctx.time_budget_s, max(2.0, ctx.time_budget_s * 0.88)
+        )
         self.outline = ctx.outline()
 
         self._build_parts()
@@ -819,7 +824,7 @@ class _Engine:
         t0, t1 = 14.0, 0.05
         iters = 6000 if nc > 1 else 0
         for it in range(iters):
-            if (it & 255) == 0 and time.perf_counter() > self.deadline:
+            if (it & 15) == 0 and time.perf_counter() > self.deadline:
                 break
             T = t0 * (t1 / t0) ** (it / iters)
             ci = rng.randrange(nc)
@@ -855,7 +860,7 @@ class _Engine:
         t0, t1 = 6.0, 0.02
         iters = 18000
         for it in range(iters):
-            if (it & 255) == 0 and time.perf_counter() > self.deadline:
+            if (it & 15) == 0 and time.perf_counter() > self.deadline:
                 break
             T = t0 * (t1 / t0) ** (it / iters)
             m = rng.random()
@@ -910,6 +915,15 @@ class _Engine:
                 if time.perf_counter() > self.deadline:
                     break
                 for i in free:
+                    # Son tarihe HER BILESENDE bakilir. Tur basinda bakmak
+                    # yetmiyordu: 1125 bilesenli kartta tek bir gecis 12 x n
+                    # `_cost` cagrisi demek ve olculdu - 5.9 sn'lik pay 40 sn'ye
+                    # cikiyordu (jetson). Saat okumasi bir bilesenin 12
+                    # `_cost` cagrisinin yaninda olculemeyecek kadar ucuz.
+                    # Ic donguden cikinca disardaki `while` ve `for step`
+                    # kendi kontrolleriyle hemen kapanir.
+                    if time.perf_counter() > self.deadline:
+                        break
                     for dx, dy in ((step, 0), (-step, 0), (0, step), (0, -step),
                                    (step, step), (-step, -step), (step, -step), (-step, step)):
                         ox, oy = cx[i], cy[i]

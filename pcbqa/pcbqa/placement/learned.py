@@ -23,11 +23,14 @@ from pathlib import Path
 from .base import Compound, Evaluation, Placement, PlacementContext
 from .cluster import ClusterPlacer
 from . import refine
+# Butce politikasi `auto` ile ORTAK tutulur: `learned`in tek farki hamle
+# SIRALAYICISI olmali. Bolusum de ayrilirsa iki kolun karsilastirmasi
+# anlamini yitirir (olcum notlari icin bkz. `auto.py`).
+from .auto import COARSE_SHARE, POLISH_SPLIT
 
 # Egitilmis modelin varsayilan yeri. `python -m pcbqa.ml.train --out ...`
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "models" / "move-v2.json"
 
-COARSE_SHARE = 0.45
 # Oznitelik cikarimi da zaman yiyor; cok kisa listelerde siralamanin getirisi
 # maliyetini karsilamaz.
 MIN_MOVES_TO_RANK = 4
@@ -113,7 +116,9 @@ class Learned:
 
     def run(self, ctx: PlacementContext) -> Placement:
         started = time.perf_counter()
+        deadline = started + ctx.time_budget_s
         current = ctx.current()
+        current_eval = ctx.evaluate(current)
 
         try:
             self.ranker = make_ranker(ctx, self.model_path, self.top_k)
@@ -140,10 +145,19 @@ class Learned:
             coarse.update(ClusterPlacer().run(child(coarse_budget)))
         except Exception:
             coarse = dict(current)
+        coarse_eval = ctx.evaluate(coarse)
 
-        remaining = max(0.0, ctx.time_budget_s - (time.perf_counter() - started))
-        polished_coarse = refine.polish(coarse, child(remaining * 0.6), budget_s=remaining * 0.6)
-        polished_current = refine.polish(current, child(remaining * 0.4), budget_s=remaining * 0.4)
+        # Cila paylari: ilki sabit oran, ikincisi duvar saatinden - birinci
+        # cila erken tukenirse artik ikinciye gecsin (bkz. auto.py).
+        remaining = max(0.0, deadline - time.perf_counter())
+        first = remaining * POLISH_SPLIT
+        polished_coarse, polished_coarse_eval = refine.polish_scored(
+            coarse, child(first), budget_s=first, start_eval=coarse_eval
+        )
+        remaining = max(0.0, deadline - time.perf_counter())
+        polished_current, polished_current_eval = refine.polish_scored(
+            current, child(remaining), budget_s=remaining, start_eval=current_eval
+        )
 
         _, best, _ = refine.keep_best(
             {
@@ -153,5 +167,11 @@ class Learned:
                 "cilali-mevcut": polished_current,
             },
             ctx,
+            known={
+                "mevcut": current_eval,
+                "kaba": coarse_eval,
+                "cilali-kaba": polished_coarse_eval,
+                "cilali-mevcut": polished_current_eval,
+            },
         )
         return best

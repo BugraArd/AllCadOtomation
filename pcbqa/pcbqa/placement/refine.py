@@ -373,7 +373,7 @@ class Metropolis:
         return False
 
 
-def polish(
+def polish_scored(
     start: Placement,
     ctx: PlacementContext,
     budget_s: float | None = None,
@@ -382,8 +382,16 @@ def polish(
     wide_keep: int | None = None,
     accept: "Acceptance | None" = None,
     patience: int = SCORE_PATIENCE,
-) -> Placement:
-    """Baslangic yerlesimini hakem olcutuyle iyilestirir.
+    start_eval: "Evaluation | None" = None,
+) -> tuple[Placement, "Evaluation | None"]:
+    """`polish` ile ayni arama; sonucun DEGERLENDIRMESINI de dondurur.
+
+    Cagiran taraf sonucu zaten puanlayacaksa bunu kullanin - aksi halde ayni
+    yerlesim iki kez degerlendirilir ve buyuk kartlarda bir degerlendirme
+    saniyeler surer (vme-wren'de ~3 sn). `start_eval` verilirse baslangic da
+    yeniden puanlanmaz.
+
+    Baslangic yerlesimini hakem olcutuyle iyilestirir.
 
     Hicbir zaman baslangictan kotu bir sonuc dondurmez. `ctx.evaluate`
     yoksa (eski cagri yolu) girdiyi oldugu gibi geri verir.
@@ -407,7 +415,7 @@ def polish(
     baglaminda 0 gecer. Varsayilan `WIDE_KEEP`.
     """
     if ctx.evaluator is None:
-        return dict(start)
+        return dict(start), None
 
     deadline = time.perf_counter() + (budget_s if budget_s is not None else ctx.time_budget_s)
     full_deadline = deadline  # asamalar arasinda `deadline` daraltilip geri acilir
@@ -447,9 +455,9 @@ def polish(
     # ayni; tavlamada `current` kotulesebilir, `best` asla. `polish` her
     # zaman `best`i dondurur - monotonluk garantisi buradan geliyor.
     current = dict(start)
-    current_eval = ctx.evaluate(current)
+    current_eval = start_eval if start_eval is not None else ctx.evaluate(current)
     if current_eval is None:
-        return current
+        return current, None
     best, best_eval = dict(current), current_eval
 
     started_at = time.perf_counter()
@@ -650,7 +658,17 @@ def polish(
                     f"(en iyi {best_eval.score:.1f})"
                 )
 
-    return best
+    return best, best_eval
+
+
+def polish(start: Placement, ctx: PlacementContext, budget_s: float | None = None,
+           **kw: Any) -> Placement:
+    """`polish_scored`in yalnizca yerlesimi donduren sarmalayicisi.
+
+    Eski cagri yolu; sozlesme degismedi - sonuc hicbir zaman baslangictan
+    kotu degildir.
+    """
+    return polish_scored(start, ctx, budget_s, **kw)[0]
 
 
 # --------------------------------------------------------------- disa acilan
@@ -669,15 +687,22 @@ as_compounds = _as_compounds
 def keep_best(
     candidates: dict[str, Placement],
     ctx: PlacementContext,
+    known: dict[str, "Evaluation | None"] | None = None,
 ) -> tuple[str, Placement, Evaluation | None]:
     """Adaylar arasindan hakem olcutune gore en iyisini secer.
 
     `candidates` icine kartin mevcut halini de koyun ki sonuc asla
     baslangictan kotu olmasin.
+
+    `known`: adi gecen adaylarin ONCEDEN hesaplanmis degerlendirmeleri. Secim
+    asamasi BUTCE DISINDA kalir (bu kod calistiginda sure dolmustur), yani
+    burada yapilan her degerlendirme dogrudan asimdir: vme-wren'de dort aday
+    21,5 sn tutuyordu. Aramanin zaten bildigi puanlari buradan gecirin.
     """
+    known = known or {}
     best_name, best_pl, best_ev = "", {}, None
     for name, pl in candidates.items():
-        ev = ctx.evaluate(pl)
+        ev = known[name] if name in known else ctx.evaluate(pl)
         if ev is None:
             if not best_name:
                 best_name, best_pl = name, pl
