@@ -40,7 +40,7 @@ import uuid as uuidlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import symlib
+from . import symlib, sch_wire
 from .schematic import GRID_MM, Schematic, place_point, read_schematic
 from .sch_verify import (
     ConnectivityDiff,
@@ -103,6 +103,9 @@ class AddPlan:
     value: str = ""
     footprint: str = ""
     library_merged: bool = False
+    multi_unit: bool = False
+    # (ref, pin, hedef, "etiket" | "tel") - kurulacak baglantilar
+    connections: list[tuple[str, str, str, str]] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -116,11 +119,17 @@ class AddPlan:
             lines.append(f"  deger: {self.value}")
         if self.footprint:
             lines.append(f"  footprint: {self.footprint}")
-        lines.append("  kutuphane tanimi: " + ("dosyaya eklenecek" if self.library_merged
-                                               else "zaten var, dokunulmuyor"))
+        if not self.problems:
+            # Engel varsa agac hic duzenlenmedi, yani bu soru daha
+            # cevaplanmadi - "zaten var" demek yaniltici olurdu.
+            lines.append("  kutuphane tanimi: " + ("dosyaya eklenecek" if self.library_merged
+                                                   else "zaten var, dokunulmuyor"))
         for s in self.symbols:
-            lines.append(f"  {s.ref:<6} @ ({s.x:g}, {s.y:g})"
+            label = s.ref + (chr(64 + s.unit) if self.multi_unit else "")
+            lines.append(f"  {label:<7} @ ({s.x:g}, {s.y:g})"
                          + (f" {s.rotation:g}deg" if s.rotation else ""))
+        for ref, pin, target, how in self.connections:
+            lines.append(f"  baglanti: {ref}.{pin} -> {target} ({how})")
         for note in self.notes:
             lines.append(f"  not: {note}")
         for problem in self.problems:
@@ -264,6 +273,8 @@ def plan_add(
     step: float = PLACE_STEP,
     rotation: float = 0.0,
     reference_prefix: str | None = None,
+    unit: int | None = None,
+    check_footprint: bool = True,
     kicad_cli: str | None = None,
 ) -> tuple[AddPlan, symlib.LibSymbol]:
     """Ne yapilacagini hesaplar; DOSYAYA DOKUNMAZ."""
@@ -280,10 +291,12 @@ def plan_add(
     symbol = symlib.get_symbol(lib_id, project_dir=project_dir, kicad_cli=kicad_cli)
 
     prefix = reference_prefix or symbol.reference_prefix
-    refs = next_references(schematic, prefix, count)
+    assignments = allocate_units(symbol, count, unit)
+    refs = next_references(schematic, prefix, len({i for i, _ in assignments}))
+    placements = [(refs[slot], unit_no) for slot, unit_no in assignments]
 
-    # Govde boyutu: pinlerin ve gorsel kutunun kapladigi alan
-    size = _symbol_size(symbol)
+    # Govde boyutu: yalnizca YERLESTIRILEN birimin pinleri sayilir
+    size = _symbol_size(symbol, placements[0][1])
     notes: list[str] = []
     if at is not None:
         positions = [(_snap(at[0] + i * step), _snap(at[1])) for i in range(count)]
@@ -302,24 +315,79 @@ def plan_add(
         lib_id=lib_id,
         file=target,
         sheet_path=sheet_path,
-        symbols=[NewSymbol(ref=r, x=p[0], y=p[1], rotation=rotation)
-                 for r, p in zip(refs, positions)],
+        symbols=[NewSymbol(ref=r, x=p[0], y=p[1], rotation=rotation, unit=u)
+                 for (r, u), p in zip(placements, positions)],
         value=value if value is not None else symbol.properties.get("Value", symbol.name),
         footprint=footprint if footprint is not None else symbol.properties.get("Footprint", ""),
+        multi_unit=symbol.unit_count > 1,
         notes=notes,
     )
 
     if symbol.unit_count > 1:
+        used = ", ".join(f"{r}{chr(64 + u)}" for r, u in placements[:6])
         plan.notes.append(
-            f"{symbol.name} {symbol.unit_count} birimli; her ornek 1. birimle eklenir"
+            f"{symbol.name} {symbol.unit_count} birimli; birimler: {used}"
+            + (" ..." if len(placements) > 6 else "")
         )
+        # Bir referansin birimleri eksik kalirsa KiCad'in ERC'si "missing_unit"
+        # uyarisi verir - olculdu. Engel degil, ama sessiz kalmamali.
+        eksik = {
+            ref: sorted(set(range(1, symbol.unit_count + 1))
+                        - {u for r, u in placements if r == ref})
+            for ref in {r for r, _ in placements}
+        }
+        eksik = {r: u for r, u in eksik.items() if u}
+        if eksik:
+            detay = "; ".join(
+                f"{r}: {', '.join(chr(64 + u) for u in units)}"
+                for r, units in sorted(eksik.items())
+            )
+            plan.notes.append(
+                f"yerlestirilmeyen birimler var ({detay}) - KiCad ERC'si "
+                "bunu 'missing_unit' diye bildirir"
+            )
+
+    if plan.footprint and check_footprint:
+        try:
+            path = symlib.footprint_path(plan.footprint, project_dir, kicad_cli)
+            plan.notes.append(f"footprint dogrulandi: {path.name}")
+        except symlib.SymLibError as exc:
+            plan.problems.append(str(exc))
+
     return plan, symbol
 
 
-def _symbol_size(symbol: symlib.LibSymbol) -> tuple[float, float]:
+def allocate_units(
+    symbol: symlib.LibSymbol,
+    count: int,
+    unit: int | None = None,
+) -> list[tuple[int, int]]:
+    """(referans yuvasi, birim) ciftleri.
+
+    Cok birimli sembollerde (74LS125 -> 4 kapi + guc birimi) KiCad'in
+    kurali su: BIR referans butun birimleri tasir - U3A, U3B, U3C, U3D.
+    Bu yuzden `--count 6` demek "6 kapi" demektir ve bu iki referansa
+    dagitilir: U3'un 5 birimi, sonra U4'un 1 birimi.
+
+    `unit` acikca verilirse her ornek O birimi kullanir ve her biri kendi
+    referansini alir - "yalnizca 3. kapidan 4 tane" demek budur.
+    """
+    if unit is not None:
+        if unit < 1 or unit > max(1, symbol.unit_count):
+            raise SchAddError(
+                f"{symbol.name} birim araligi 1..{symbol.unit_count}; {unit} verildi"
+            )
+        return [(i, unit) for i in range(count)]
+
+    per_ref = max(1, symbol.unit_count)
+    return [(i // per_ref, (i % per_ref) + 1) for i in range(count)]
+
+
+def _symbol_size(symbol: symlib.LibSymbol, unit: int = 1) -> tuple[float, float]:
     """Sembolun kapladigi kaba alan (pinler dahil)."""
-    xs = [p.x for p in symbol.pins]
-    ys = [p.y for p in symbol.pins]
+    pins = [p for p in symbol.pins if p.unit in (0, unit)] or symbol.pins
+    xs = [p.x for p in pins]
+    ys = [p.y for p in pins]
     if not xs or not ys:
         return (5.08, 5.08)
     return (max(max(xs) - min(xs), 5.08), max(max(ys) - min(ys), 5.08))
@@ -453,6 +521,12 @@ def build_symbol_node(
     seen: set[str] = set()
     for prop in children(symbol.node, "property"):
         name = str(prop[1]).strip('"')
+        if name.startswith("ki_"):
+            # `ki_keywords`, `ki_fp_filters` KUTUPHANE tanimina aittir; KiCad
+            # bunlari sembol ORNEGINE yazmaz. Yazarsak kartin sematik parite
+            # kontrolu "ayak izinde eksik sembol alani 'ki_keywords'" diye
+            # uyariyor - olculdu, uc bilesende uc uyari.
+            continue
         seen.add(name)
         node.append(_property_node(prop, name, overrides.get(name, str(prop[2]).strip('"')),
                                    new.x, new.y, new.rotation))
@@ -471,17 +545,118 @@ def build_symbol_node(
     return node
 
 
-def edit_tree(root, schematic: Schematic, plan: AddPlan, symbol: symlib.LibSymbol) -> None:
+def new_pin_points(symbol: symlib.LibSymbol, new: NewSymbol) -> dict[str, tuple]:
+    """Eklenecek sembolun pin numarasi -> sayfa koordinati."""
+    return {
+        pin.number: sch_wire.pin_position(new.x, new.y, new.rotation, None, pin.x, pin.y)
+        for pin in symbol.pins
+        if pin.unit in (0, new.unit)
+    }
+
+
+def _pin_rotation(symbol: symlib.LibSymbol, new: NewSymbol, number: str) -> float:
+    for pin in symbol.pins:
+        if pin.number == number and pin.unit in (0, new.unit):
+            return (pin.rotation + new.rotation) % 360.0
+    return 0.0
+
+
+def build_connections(
+    root,
+    schematic: Schematic,
+    plan: AddPlan,
+    symbol: symlib.LibSymbol,
+    connections: list[sch_wire.Connection],
+) -> list[list]:
+    """Baglanti dugumleri (tel + etiket + junction) uretir.
+
+    Iki yol var ve ikisi de KiCad'in kendi kurallariyla calisir:
+
+      * hedef bir AG ADI ise pinin tam ustune yerel etiket konur;
+      * hedef bir PIN ise (`R1.2`) araya dik bir yol cizilir. Yol
+        bulunamazsa (arada baska pinler var) baglanti ETIKETE dusurulur -
+        ad uydurmak yerine hedef pinin bugunku agina baglanmak dogru olmaz,
+        bu yuzden bu durumda engel uretilir ve kullaniciya soylenir.
+    """
+    nodes: list[list] = []
+    for new in plan.symbols:
+        points = new_pin_points(symbol, new)
+        for conn in connections:
+            if conn.pin not in points:
+                plan.problems.append(
+                    f"{symbol.name} sembolunde {conn.pin!r} pini yok "
+                    f"(birim {new.unit}: {', '.join(sorted(points))})"
+                )
+                continue
+            start = points[conn.pin]
+
+            if not conn.is_pin_target:
+                rotation = sch_wire.label_rotation(
+                    _pin_rotation(symbol, new, conn.pin)
+                )
+                nodes.append(sch_wire.label_node(start[0], start[1], conn.target, rotation))
+                plan.connections.append((new.ref, conn.pin, conn.target, "etiket"))
+                continue
+
+            ref, number = conn.target_pin
+            try:
+                end = sch_wire.existing_pin_point(schematic, ref, number, plan.sheet_path)
+            except KeyError as exc:
+                plan.problems.append(str(exc))
+                continue
+
+            path = sch_wire.route(start, end, schematic, plan.sheet_path)
+            if path is None:
+                plan.problems.append(
+                    f"{new.ref}.{conn.pin} -> {conn.target}: arada baska pinler/tel "
+                    "uclari var, temiz bir yol cizilemedi (etiketle baglayin)"
+                )
+                continue
+            nodes.extend(sch_wire.wire_nodes(path))
+            for jx, jy in sch_wire.junctions_needed(path, schematic, plan.sheet_path):
+                nodes.append(sch_wire.junction_node(jx, jy))
+            plan.connections.append((new.ref, conn.pin, conn.target, "tel"))
+    return nodes
+
+
+def edit_tree(root, schematic: Schematic, plan: AddPlan, symbol: symlib.LibSymbol,
+              connections: list[sch_wire.Connection] | None = None) -> None:
     """Plani agaca uygular (dosyaya yazmaz)."""
     plan.library_merged = merge_lib_symbol(root, symbol)
     for new in plan.symbols:
         root.append(build_symbol_node(root, schematic, symbol, new,
                                       plan.value, plan.footprint))
+    for node in build_connections(root, schematic, plan, symbol, connections or []):
+        root.append(node)
 
 
 # --------------------------------------------------------------------------
 # Uygulama
 # --------------------------------------------------------------------------
+
+
+def _expected_joins(
+    plan: AddPlan,
+    connections: list[sch_wire.Connection],
+    before,
+) -> dict[tuple[str, str], set[tuple[str, str]]]:
+    """Kalkana "bu pin SU pinle ayni aga girmeli" listesi.
+
+    Ag adiyla baglanirken beklenen kume, o agin BUGUNKU pinleridir. Ag
+    hicbir yerde yoksa (yeni ad) kume bostur; o zaman kalkan yalnizca
+    "eski hicbir pine degmesin" kuralini uygular.
+    """
+    out: dict[tuple[str, str], set[tuple[str, str]]] = {}
+    for new in plan.symbols:
+        for conn in connections:
+            key = (new.ref, conn.pin)
+            if conn.is_pin_target:
+                out[key] = {conn.target_pin}
+            else:
+                pins = sch_wire.pins_on_net(before.net_of, conn.target)
+                if pins:
+                    out[key] = set(pins)
+    return out
 
 
 def _sandbox_copy(schematic: Schematic, tmp: Path) -> Path:
@@ -504,6 +679,9 @@ def add_symbols(
     rotation: float = 0.0,
     step: float = PLACE_STEP,
     reference_prefix: str | None = None,
+    unit: int | None = None,
+    connect: list[str] | None = None,
+    check_footprint: bool = True,
     apply: bool = False,
     verify: bool = True,
     force: bool = False,
@@ -522,17 +700,25 @@ def add_symbols(
         schematic, lib_id, count,
         value=value, footprint=footprint, sheet_path=sheet_path, at=at,
         step=step, rotation=rotation, reference_prefix=reference_prefix,
-        kicad_cli=kicad_cli,
+        unit=unit, check_footprint=check_footprint, kicad_cli=kicad_cli,
     )
     if not plan.ok and not force:
         return AddResult(plan=plan, applied=False)
+
+    try:
+        wanted = [sch_wire.Connection.parse(text) for text in (connect or [])]
+    except ValueError as exc:
+        raise SchAddError(str(exc)) from exc
 
     root, stray = parse_with_stats(plan.file.read_text(encoding="utf-8"))
     if stray:
         raise SchAddError(
             f"{plan.file.name} bozuk gorunuyor ({stray} kacak parantez); yazma yapilmadi"
         )
-    edit_tree(root, schematic, plan, symbol)
+    edit_tree(root, schematic, plan, symbol, wanted)
+    if plan.problems and not force:
+        # Baglanti kurulamadiysa yarim is yazmayiz.
+        return AddResult(plan=plan, applied=False)
     new_text = dumps(root) + "\n"
 
     diff: ConnectivityDiff | None = None
@@ -551,7 +737,10 @@ def add_symbols(
                 after = connectivity_of(after_root, kicad_cli)
             except SchVerifyError as exc:
                 raise SchAddError(f"kalkan calistirilamadi: {exc}") from exc
-            diff = compare_additive(before, after, {s.ref for s in plan.symbols})
+            diff = compare_additive(
+                before, after, {s.ref for s in plan.symbols},
+                expected_joins=_expected_joins(plan, wanted, before),
+            )
 
         if not diff.ok and not force:
             return AddResult(plan=plan, diff=diff, applied=False)
@@ -583,6 +772,13 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--rotation", type=float, default=0.0, help="Donme acisi")
     ap.add_argument("--step", type=float, default=PLACE_STEP, help="Semboller arasi aralik (mm)")
     ap.add_argument("--prefix", default=None, help="Referans on eki (varsayilan kutuphaneden)")
+    ap.add_argument("--unit", type=int, default=None,
+                    help="Cok birimli sembolde hangi birim (varsayilan: sirayla doldur)")
+    ap.add_argument("--no-check-footprint", action="store_true",
+                    help="Footprint kimligini dogrulama")
+    ap.add_argument("--connect", action="append", default=None, metavar="PIN=HEDEF",
+                    help="Pini bagla. HEDEF bir ag adi (1=VCC) ya da pin (2=R1.1). "
+                         "Birden fazla kez verilebilir.")
     ap.add_argument("--apply", action="store_true", help="Dosyaya gercekten yaz")
     ap.add_argument("--no-verify", action="store_true", help="Netlist kalkanini atla (onerilmez)")
     ap.add_argument("--no-backup", action="store_true", help="Yedek alma")
@@ -612,7 +808,8 @@ def main(argv: list[str] | None = None) -> int:
             args.sch, args.lib_id, args.count,
             value=args.value, footprint=args.footprint, sheet_path=args.sheet,
             at=at, rotation=args.rotation, step=args.step,
-            reference_prefix=args.prefix,
+            reference_prefix=args.prefix, unit=args.unit, connect=args.connect,
+            check_footprint=not args.no_check_footprint,
             apply=args.apply, verify=not args.no_verify, force=args.force,
             backup=not args.no_backup, allow_open_project=args.allow_open_project,
             kicad_cli=args.kicad_cli,

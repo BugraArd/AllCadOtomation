@@ -237,6 +237,7 @@ def compare_additive(
     after: Connectivity,
     expected_added: set[str],
     *,
+    expected_joins: dict[PinKey, set[PinKey]] | None = None,
     allow_connections: bool = False,
 ) -> ConnectivityDiff:
     """EKLEME icin kalkan: mevcut devre aynen dursun, yalnizca yenisi eklensin.
@@ -252,8 +253,11 @@ def compare_additive(
          (N1 = {R1.1, U1.3} -> {R1.1, U1.3, R2.1}), yani sessiz baglanti
          kalkandan geciyordu. Kullanici "bos yere 5 direnc koy" derken
          devreye baglanmasini istemiyor; istiyorsa `allow_connections`.
-      3. Hicbir bilesen kaybolmamali, hicbir pin kaybolmamali.
-      4. Eklenen bilesenler tam olarak BEKLENENLER olmali.
+      3. `expected_joins` verilmisse, orada adi gecen yeni pin GERCEKTEN
+         hedefiyle ayni aga girmis olmali. Tel cizip baglanmadigini fark
+         etmemek, hic baglamamaktan daha kotudur.
+      4. Hicbir bilesen kaybolmamali, hicbir pin kaybolmamali.
+      5. Eklenen bilesenler tam olarak BEKLENENLER olmali.
 
     Yeni bilesenlerin kendi pinleri serbesttir (bagli degillerse
     `unconnected-(R5-Pad1)` gibi tek pinlik aglar olurlar - normaldir).
@@ -281,26 +285,40 @@ def compare_additive(
         if before_groups.get(pin) != after_groups.get(pin)
     ]
 
-    # (2) Yeni pinlerden hangileri ESKI bir pinle ayni aga dustu?
+    # (2) Yeni pinler dogru yere baglandi mi?
+    #
+    # Beklenen baglanti VARSA: pin gercekten o pin(ler)le ayni aga girmis
+    # olmali - yoksa tel/etiket tutmamis demektir ve bunu sessizce
+    # gecirmek en kotusu olur (kullanici bagladigini sanir).
+    # Beklenen baglanti YOKSA: yeni pin eski hicbir pinle ayni aga
+    # girmemeli - sessiz baglanti budur.
+    expected_joins = expected_joins or {}
+    group_after = {pin: net for net in after.partition for pin in net}
     joined: list[tuple[PinKey, str, str, int, int]] = []
+    missing: list[tuple[PinKey, str, str, int, int]] = []
     if not allow_connections:
-        for net in after.partition:
-            old_here = [pin for pin in net if pin in old_pins]
-            new_here = [pin for pin in net if pin not in old_pins]
-            if old_here and new_here:
-                name = after.net_of.get(new_here[0], "")
-                joined.extend(
-                    (pin, "", name, 0, len(net)) for pin in sorted(new_here)
-                )
+        for pin in set(after.net_of) - old_pins:
+            net = group_after.get(pin) or frozenset({pin})
+            wanted = expected_joins.get(pin)
+            if wanted:
+                if not wanted.issubset(net):
+                    eksik = sorted(wanted - net)
+                    missing.append(
+                        (pin, ".".join(eksik[0]) if eksik else "",
+                         after.net_of.get(pin, ""), len(wanted), len(net))
+                    )
+            elif any(other in old_pins for other in net):
+                joined.append((pin, "", after.net_of.get(pin, ""), 0, len(net)))
 
     ok = (
         not lost
         and not removed
         and not regrouped
         and not joined
+        and not missing
         and set(added) == set(expected_added)
     )
-    regrouped = regrouped + joined
+    regrouped = regrouped + joined + missing
     return ConnectivityDiff(
         ok=ok,
         lost_pins=lost,

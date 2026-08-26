@@ -261,15 +261,20 @@ def _field(node, name: str) -> str:
     return str(sub[1]).strip('"')
 
 
-def lib_tables(project_dir: Path | None = None) -> list[Path]:
-    """Okunacak tablolar: once proje, sonra genel."""
+def lib_tables(project_dir: Path | None = None,
+               filename: str = "sym-lib-table") -> list[Path]:
+    """Okunacak tablolar: once proje, sonra genel.
+
+    `filename` ile footprint tablosu da okunur (`fp-lib-table`) - iki dosya
+    ayni s-expr bicimini paylasir.
+    """
     tables: list[Path] = []
     if project_dir is not None:
-        local = Path(project_dir) / "sym-lib-table"
+        local = Path(project_dir) / filename
         if local.is_file():
             tables.append(local)
     for cfg in kicad_config_dirs():
-        table = cfg / "sym-lib-table"
+        table = cfg / filename
         if table.is_file():
             tables.append(table)
             break
@@ -310,6 +315,60 @@ def _flatten(table: Path, env: dict[str, str], seen: set[Path]) -> list[LibEntry
         else:
             out.append(entry)
     return out
+
+
+def footprint_libraries(project_dir: Path | None = None,
+                        kicad_cli: str | None = None) -> dict[str, Path]:
+    """Takma ad -> `.pretty` klasoru. Sembol tarafiyla ayni cozumleme."""
+    env = environment(project_dir, kicad_cli)
+    result: dict[str, Path] = {}
+    for table in reversed(lib_tables(project_dir, "fp-lib-table")):
+        for entry in _flatten(table, env, seen=set()):
+            result[entry.nickname] = Path(expand(entry.uri, env))
+    return result
+
+
+def footprint_path(
+    fp_id: str,
+    project_dir: Path | None = None,
+    kicad_cli: str | None = None,
+) -> Path:
+    """`Resistor_SMD:R_0805_2012Metric` -> .kicad_mod dosyasi.
+
+    Bulunamazsa `SymLibError` atar - sebebi adiyla soyler. Footprint kimligi
+    yanlis yazilmis bir sembol, karta gecerken sessizce "footprint yok"
+    olarak dusuyordu; kontrol bu yuzden var.
+    """
+    if ":" not in fp_id:
+        raise SymLibError(f"footprint kimligi 'Kutuphane:Ad' olmali: {fp_id!r}")
+    nickname, name = fp_id.split(":", 1)
+
+    index = footprint_libraries(project_dir, kicad_cli)
+    folder = index.get(nickname)
+    if folder is None:
+        near = ", ".join(sorted(n for n in index
+                                if n.lower().startswith(nickname[:3].lower()))[:6])
+        raise SymLibError(
+            f"footprint kutuphanesi bulunamadi: {nickname!r}"
+            + (f" (benzerleri: {near})" if near else "")
+        )
+    path = folder / f"{name}.kicad_mod"
+    if not path.is_file():
+        available = sorted(p.stem for p in folder.glob(f"{name[:4]}*.kicad_mod"))[:6]             if folder.is_dir() else []
+        raise SymLibError(
+            f"footprint bulunamadi: {name!r} ({folder})"
+            + (f" (benzerleri: {', '.join(available)})" if available else "")
+        )
+    return path
+
+
+def footprint_exists(fp_id: str, project_dir: Path | None = None,
+                     kicad_cli: str | None = None) -> bool:
+    try:
+        footprint_path(fp_id, project_dir, kicad_cli)
+        return True
+    except SymLibError:
+        return False
 
 
 # --------------------------------------------------------------------------

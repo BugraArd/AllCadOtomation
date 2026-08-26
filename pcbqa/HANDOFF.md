@@ -32,6 +32,8 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 4d | Bağlantı koruyan sembol taşıma | ✅ Bitti |
 | 4e | Şematik yerleştirme kalitesi + toplu uygulama | ✅ Bitti |
 | 4f | Kütüphaneden sembol okuma + şematiğe **ekleme** | ✅ Bitti (§18) |
+| 4f+ | Bağlama (tel/etiket), çok birim, footprint doğrulama | ✅ Bitti (§19) |
+| 4g | Şematikten karta yansıtma (`pcb_sync`) | ✅ Bitti (§19) |
 | 5 | Makine öğrenimi altyapısı (veri, model, ölçüm, güvenli bağlantı) | ✅ Bitti |
 | 6/A | Geniş hamle repertuarı + model filtresi (yol haritası A1-A3) | ⚠️ Bitti, kazanç yok (§13) |
 | 6/C | Öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı | ✅ Bitti (§14) |
@@ -1520,3 +1522,100 @@ uygulanmalı.
 - Footprint kimliği doğrulanmıyor (kütüphanede var mı diye bakılmıyor).
 - PCB tarafına yansıtma yok: yeni bileşen karta `Update PCB from Schematic`
   ile gider.
+
+---
+
+## 19. Aşama 4f/4g — §18.6'daki dört sınırın kaldırılması (2026-08-27)
+
+§18 "ekleyebiliyor ama bağlayamıyor" durumundaydı. Dört sınırın dördü de
+kapatıldı.
+
+### 19.1 Bağlama (`sch_wire.py` + `--connect`)
+
+İki yol, ikisi de KiCad'in kendi geometrik bağlantı kuralıyla:
+
+- **`--connect 1=VCC`** — pinin tam üstüne yerel etiket konur. Ad eşleşmesi
+  mesafeden bağımsız çalışır; uzaktaki bir ağa bağlanmanın en sağlam yolu.
+- **`--connect 2=R1.1`** — iki pin arasına L biçimli dik yol çizilir. İki aday
+  (önce yatay / önce dikey) arasından, **üzerinden başka bir pin ya da tel ucu
+  geçmeyeni** seçilir: KiCad'de bir telin ortasına değen uç o telle bağlanır,
+  yani yanlış aday sessiz bağlantı üretir. Kesişme (X) sorun değildir —
+  junction olmadan kesişen teller bağlanmaz. Temiz aday yoksa iş yapılmaz ve
+  engel bildirilir (yarım bağlantı yazmaktansa hiç yazmamak).
+- Yolun ucu mevcut bir telin **ortasına** düşüyorsa junction eklenir.
+
+### 19.2 Kalkan: "bağlandı mı" da denetleniyor
+
+`compare_additive` artık `expected_joins` alıyor: hangi yeni pinin hangi
+mevcut pinle **aynı ağa girmesi gerektiği**. Üç şey birden kontrol ediliyor:
+
+1. beklenen bağlantı gerçekten kuruldu mu (kurulmadıysa reddedilir —
+   *tel çizip bağlanmadığını fark etmemek, hiç bağlamamaktan kötüdür*),
+2. beklenmeyen bir bağlantı doğdu mu (sessiz bağlantı),
+3. mevcut devrenin bölünüşü değişti mi.
+
+### 19.3 Çok birimli semboller
+
+`allocate_units`: bir referans bütün birimleri taşır (U7A, U7B...), yani
+`--count 6` = "6 kapı" ve bu iki referansa dağılır. `--unit 3` verilirse her
+örnek 3. birimi alır ve kendi referansını. Birimler eksik kalırsa plan
+uyarıyor — KiCad ERC'si bunu `missing_unit` diye bildiriyor.
+
+### 19.4 Footprint doğrulama
+
+`symlib` artık `fp-lib-table`'ı da okuyor (bu makinede 155 kütüphane).
+`--footprint` kimliği `.pretty` klasöründe aranıyor; yoksa plan engel üretiyor
+ve benzer adları öneriyor. `--no-check-footprint` ile atlanabilir.
+
+### 19.5 `pcb_sync.py` — şematikten karta yansıtma
+
+`kicad-cli pcb` alt komutları drc/export/import/render/upgrade ile sınırlı;
+"Update PCB from Schematic" **yalnızca GUI'de var**. Bu yüzden kendimiz
+yapıyoruz: netlist'ten bileşen ve ağ bilgisi, kütüphaneden `.kicad_mod`, karta
+`(path)` bağıyla + pad ağlarıyla ekleme. Eşleme **referansla değil UUID
+yoluyla**. Var olan bileşenlere dokunulmuyor; yeniler kartın sağına diziliyor
+(düzgün yerleştirme `auto`nun işi).
+
+### 19.6 Uçtan uca doğrulama (KiCad'in kendi araçlarıyla)
+
+`pic_programmer` kopyası: 5 direnç (VCC/GND'ye etiketle bağlı) + 2 kapı
+74LS125, sonra karta yansıtma:
+
+| kontrol | sonuç |
+|---|---|
+| `sch erc` | 0 ihlal (bağlı dirençler); bağlanmamış kapılar için beklenen uyarılar |
+| `pcb drc` | **0 ihlal** |
+| `pcb drc --schematic-parity` | **0 fark** |
+| bağlanmamış bakır | 10 (5 direnç × 2 pad — yol henüz çizilmedi, beklenen) |
+| pad ağları | 6/6 bileşen geri okundu, şematikle birebir |
+| birim testi | 214 test (61 yeni) geçiyor |
+
+### 19.7 Uçtan uca kontrolde bulunan iki gerçek hata
+
+Bu iki hatayı **birim testleri değil, KiCad'in kendi parite kontrolü** ortaya
+çıkardı — bu yüzden kaydedilmeye değer:
+
+1. **Çok birimli parça karta iki kez gidiyordu.** U7A ve U7B şematikte iki
+   ayrı sembol düğümü ama kartta **tek fiziksel paket**. Yansıtma referansa
+   göre gruplanmıyordu. Düzeltildi; ayrıca `(units (unit (name "A") (pins ...)))`
+   eşlemesi de yazılıyor.
+
+2. **`unconnected-(U7-Pad1)` adlarını "yer tutucu" sanıp elemek yanlıştı.**
+   Sezgi "boş pad'in ağı olmaz" diyordu; KiCad'in kendisi örnek kartta bu
+   adlardan **77 tane** yazıyor. Elediğimizde parite "Ped, şematik tarafından
+   verilen ağdan yoksun" diye altı uyarı verdi. Netlist ne diyorsa o yazılır.
+
+Ayrıca `ki_keywords`/`ki_fp_filters` gibi alanlar sembol **örneğine**
+yazılmamalı (kütüphane tanımına aittir) ama `Description`/`Datasheet`
+footprint'e **taşınmalı** — ikisi de parite uyarısıyla bulundu.
+
+### 19.8 Kalan sınırlar
+
+- Bağlama yalnızca **eklenen** semboller için (`sch_add --connect`). İki mevcut
+  pini birbirine bağlayan bağımsız bir komut yok.
+- Kartta **yol (track) çizilmiyor**: pad'ler doğru ağda ama bakır bağlantı
+  yok. Otomatik yönlendirme kapsam dışı.
+- Yansıtma yalnızca **ekler**: şematikten silinen bileşen karttan silinmez,
+  footprint değişikliği karta yansımaz.
+- `sch_move` hâlâ "önce" ölçümünü kullanıcının klasöründe alıyor (§18.5'teki
+  kilit sorunu); `sch_add`/`pcb_sync` iki kum havuzu kullanıyor.
