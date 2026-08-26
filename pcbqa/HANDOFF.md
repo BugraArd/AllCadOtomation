@@ -34,6 +34,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 5 | Makine öğrenimi altyapısı (veri, model, ölçüm, güvenli bağlantı) | ✅ Bitti |
 | 6/A | Geniş hamle repertuarı + model filtresi (yol haritası A1-A3) | ⚠️ Bitti, kazanç yok (§13) |
 | 6/C | Öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı | ✅ Bitti (§14) |
+| 6/E | Kabul kuralı: tavlama benzeri kaçış | ⚠️ Ölçüldü, kazanç yok (§15) |
 
 ---
 
@@ -1122,3 +1123,121 @@ Buradan iki dürüst çıkış var:
 Faz D (öğrenilmiş hakem) hâlâ en iddialı yol ama (1) olmadan onun da aynı
 tavana daha hızlı varmaktan başka bir şey yapmayacağı artık ölçülmüş
 görünüyor.
+
+---
+
+## 15. Faz E — kabul kuralı: tepe tırmanışından tavlamaya (ÖLÇÜLDÜ, OLUMSUZ)
+
+Üç fazın ortak sonucu şuydu: model sıralamayı iyileştiriyor ama `auto`'nun
+vardığı yer değişmiyor, çünkü **`auto`'nun bulduğu yerel en iyi arama
+sırasından bağımsız.** Bu fazın hipotezi: sorun sıra değil **kabul kuralı**.
+
+Sonuç: hipotez ölçüldü ve **doğrulanmadı** — ama başarısızlığın sebebi, bu
+projede iki ayrı fikri arka arkaya öldüren tek bir yapısal soruna işaret
+ediyor. Asıl kayıt bu.
+
+### 15.1 Hipotez
+
+`refine.py:312` aramanın tamamını belirliyordu:
+
+```python
+if ev.better_than(current_eval):   # yalnizca KESIN iyilesme
+```
+
+Tepe tırmanışı, hiçbir **tek** hamlenin iyileştiremediği noktada durur. Ama o
+nokta kartın ulaşılabilir en iyisi değil. Klasik tuzak: `C1`'i `U2.14`'ün
+yanına götürmek gerekiyor ama orada `R5` var. `C1`'i taşımak çakışma üretir
+(reddedilir), `R5`'i çekmek `R5`'in kendi kuralını bozar (reddedilir). İki
+adımlık dizinin **sonu** iyi, **ilk adımı** kötü — tepe tırmanışı ilk adımı
+asla atmaz.
+
+### 15.2 Ne inşa edildi
+
+- `Evaluation.gain_over(other)` — sözlüksel sıralamayı tek sayıya indirir.
+  `key` karşılaştırmaya yeter ama `exp(−|Δ|/T)` skaler ister.
+  **`ml/collect.label_of` artık bunu çağırıyor**: eğitim etiketi ile tavlama
+  enerjisinin ayrışmaması önemli, ikisi de aynı büyüklük.
+- `refine.Metropolis` — kötüleşen hamleyi `exp(−|Δ|/T)` ile kabul eder.
+  Sıcaklık **kendini ölçer**: ilk 25 reddin medyanı × `heat`. Sabit bir T
+  kartlar arası anlamsız olurdu (skor cezası bileşen sayısına bölünüyor).
+- `polish(accept=...)` — **gezinen durum ile kayıt ayrıldı**: `current`
+  kötüleşebilir, `best` asla. `polish` her zaman `best`'i döndürür, yani
+  Aşama 3'ün monotonluk garantisi olduğu gibi duruyor (teste bağlandı:
+  kasten "her kötüleşmeyi kabul et" ayarıyla bile çıktı başlangıçtan kötü
+  değil).
+
+### 15.3 Ölçüm — üç deneme
+
+**(a) Kabul kuralını baştan gevşet** (medyan sıcaklık, tasma yok):
+
+| kart | tepe | tavlama |
+|---|---|---|
+| tinytapeout | 80.3 | **81.2** |
+| video | 29.3 / 25e | **31.2 / 23e** |
+| kit-dev | 89.4 | 89.4 |
+| pic_programmer | 93.8 | 90.9 |
+| **interf_u** | 25.7 | **6.1** ⟵ çöküş |
+
+`interf_u`'da kötü hamlelerin **%38'i** kabul edilmiş: arama tırmanmak yerine
+gezinmiş ve iyi bölgeye hiç ulaşamamış.
+
+**(b) Soğuk başlangıç (heat=0.15) + tasma (leash=2.0)** — felaket önlendi:
+
+| kart | tepe | tavlama |
+|---|---|---|
+| kit-dev | 89.4 | **91.6** |
+| interf_u | 25.7 | 21.9 |
+| pic_programmer | 93.8 | 90.9 |
+| tinytapeout | 80.3 | 79.4 |
+
+Hâlâ net negatif. Desen her iki ölçümde de aynı: **tavlama, tırmanışın
+gerçekten tıkandığı kartlarda kazandırıyor, hâlâ verimli olduğu kartlarda
+kaybettiriyor.** Faz A'daki kuralın aynısı — üretken aşamadan zaman çalma.
+
+**(c) Kaçış aşaması: yalnızca ARTAN bütçe** (4. aşama, `accept` verilirse):
+
+7 kartın 7'sinde **hiç ateşlenmedi** (kabul/görülen = 0/0). Çünkü artan bütçe
+diye bir şey yok.
+
+### 15.4 Asıl bulgu: `polish` "yakınsadım" diyemiyor
+
+(c)'nin hiç çalışmaması tesadüf değil. 1. ve 2. aşamanın durma şartı "bir tur
+gez, hiçbiri iyileşmesin" — ama HPWL sözlüksel anahtarda eşitlik bozucu
+olduğu için **bir yerlerde her zaman birkaç mikron kazandıran bir kaydırma
+bulunuyor.** Aşamalar bu yüzden pratikte hiç bitmiyor.
+
+Bu tek olgu artık **iki ayrı fikri** öldürdü:
+
+| fikir | nasıl öldü |
+|---|---|
+| Faz A: geniş repertuar (takas/küme) | 3. aşamaya hiç sıra gelmedi; pay kesince de üretken aşamadan çalmış olduk |
+| Faz E: kaçış aşaması | Artan bütçe hiç oluşmadı |
+
+Ve "yalnızca skor artışını say" şeklindeki bariz çözüm Faz A'da ölçüldü,
+**daha kötü** çıktı: sadece HPWL kısaltan hamleler boşa gitmiyor, plato aşma
+mekanizması onlar.
+
+Yani eksik olan şey, ikisinin arasında bir yerde: **azalan getiri testi.**
+2. aşama, HPWL iyileşme *oranı* anlamsızlaşınca durmalı; sıfırlanınca değil.
+Şu an "0.001 mm de bir iyileşmedir" diyor ve bu yüzden hiçbir zaman
+devretmiyor.
+
+### 15.5 Durum ve öneri
+
+Kod depoda ve **varsayılan olarak kapalı**: `accept=None` bugünkü davranışın
+birebir aynısı, gerileme riski sıfır. Ölçüm altyapısı (`gain_over`,
+`Metropolis`, gezinen/kayıt ayrımı, kaçış aşaması) kurulu ve testli; hipotez
+yeniden denenmek istendiğinde sıfırdan yazılmayacak.
+
+**Sıradaki doğru iş, ML değil:** `polish`'e bir yakınsama ölçütü koymak.
+
+    2. asama, son N denemede elde edilen toplam `gain_over` iyilesmesi
+    baslangictaki tipik iyilesmenin %X'inin altina duserse dursun.
+
+Bu tek değişiklik hem Faz A'nın hem Faz E'nin önünü açıyor; ikisi de o kapı
+açılmadan ölçülemez durumda. Öncelik sırası bu yüzden değişti:
+
+1. **Yakınsama ölçütü** (yukarıdaki) — her şeyin ön koşulu
+2. Faz E'yi (kaçış) yeniden ölç — artık gerçekten çalışacağı için
+3. Faz B (veri popülasyonu: `synth.py`'yi parametrik yap)
+4. Faz D (öğrenilmiş hakem)

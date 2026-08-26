@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 import random
 import time
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from .base import Compound, Evaluation, Move, Placement, PlacementContext
 from .repertoire import Repertoire
@@ -32,6 +32,8 @@ _RADIUS_FRACTIONS = (0.35, 0.55, 0.75)
 _ANGLE_STEPS = 8
 # Ince ayar hamlelerinde denenen kaydirmalar (mm)
 _NUDGES = (0.5, 1.0, 2.0, 4.0)
+Acceptance = Callable[["Evaluation", "Evaluation", float, random.Random], bool]
+
 # Genis repertuar asamasinda bilesen basina kac aday gercek hakeme gider.
 # Aday uretimi ucuz, DEGERLENDIRME pahali (2-6 ms); butceyi bu sayi belirler.
 WIDE_KEEP = 12
@@ -218,6 +220,92 @@ def _nudge_moves(
     return moves
 
 
+
+class Metropolis:
+    """TAVLAMA BENZERI KABUL - yerel en iyiden kacmak icin.
+
+    `polish` bugun yalnizca iyilestiren hamleyi kabul ediyor (tepe tirmanisi),
+    o yuzden hicbir TEK hamlenin iyilestiremedigi noktada duruyor. Ama o nokta
+    kartin ulasilabilir en iyisi degil; yalnizca "tek hamlelik komsulugunda
+    daha iyisi olmayan" bir nokta.
+
+    Somut tuzak: C1'i U2.14'un yanina goturmek gerekiyor ama orada R5 duruyor.
+    C1'i tasimak cakisma uretir (reddedilir); R5'i cekmek R5'in kendi kuralini
+    bozar (reddedilir). Iki adimlik dizinin SONU iyi, ILK ADIMI kotu - tepe
+    tirmanisi ilk adimi asla atmaz.
+
+    Metropolis kurali kotulestiren hamleyi de exp(-|delta| / T) olasiligiyla
+    kabul eder; T butce boyunca duser (basta cesur, sonda muhafazakar).
+
+    ## Sicaklik neden kendini olcuyor
+
+    Sabit bir T yazmak kartlar arasi anlamsiz olurdu: skor cezasi bilesen
+    sayisina bolunuyor, yani tipik bir reddin buyuklugu karttan karta degisir.
+    Bunun yerine ilk `warmup` reddin medyani T0 kabul edilir - o zaman
+    baslangicta tipik bir kotulesme ~%37 olasilikla kabul edilir. Buyu sabiti
+    yok, olcum var.
+
+    ## Monotonluk garantisi neden bozulmuyor
+
+    Bu sinif YALNIZCA `polish`in gezinen durumunu etkiler. `polish` gezinen
+    durumu degil GORULEN EN IYIYI dondurur, ve baslangic da o kaydin ilk
+    adayidir. Yani cikti hala baslangictan kotu olamaz - Asama 3'un garantisi
+    oldugu gibi durur.
+    """
+
+    def __init__(
+        self,
+        cooling: float = 100.0,
+        warmup: int = 25,
+        heat: float = 0.15,
+        leash: float | None = None,
+    ) -> None:
+        self.cooling = cooling
+        self.warmup = warmup
+        # T0 = medyan reddin `heat` kati. 1.0 (medyan) OLCULDU ve cok sicak
+        # cikti: interf_u'da kotu hamlelerin %38'i kabul edildi, arama
+        # tirmanmak yerine gezindi ve skor 25.7 -> 6.1'e coktu.
+        self.heat = heat
+        # "Tasma": mevcut durum en iyiden bu kadar geri kalirsa arama en
+        # iyiye geri atlar. Klasik tavlamada bu yok cunku orada milyonlarca
+        # adim var; burada butce ~birkac bin degerlendirme, o yuzden basibos
+        # gezinmenin geri donusu yok.
+        self.leash = leash
+        self.t0: float | None = None
+        self._losses: list[float] = []
+        self.taken_worse = 0
+        self.seen_worse = 0
+        self.restarts = 0
+
+    def __call__(
+        self,
+        candidate: Evaluation,
+        current: Evaluation,
+        progress: float,
+        rng: random.Random,
+    ) -> bool:
+        gain = candidate.gain_over(current)
+        if gain > 0.0:
+            return True
+        loss = -gain
+        if loss <= 1e-12:
+            return False  # tam esit: gezinmenin anlami yok, degerlendirme israfi
+        self.seen_worse += 1
+        if self.t0 is None:
+            self._losses.append(loss)
+            if len(self._losses) < self.warmup:
+                return False
+            ordered = sorted(self._losses)
+            self.t0 = max(ordered[len(ordered) // 2] * self.heat, 1e-6)
+        temperature = self.t0 * (1.0 / self.cooling) ** max(0.0, min(1.0, progress))
+        if temperature <= 1e-12:
+            return False
+        if rng.random() < math.exp(-loss / temperature):
+            self.taken_worse += 1
+            return True
+        return False
+
+
 def polish(
     start: Placement,
     ctx: PlacementContext,
@@ -225,11 +313,18 @@ def polish(
     *,
     verbose: bool = False,
     wide_keep: int | None = None,
+    accept: "Acceptance | None" = None,
 ) -> Placement:
     """Baslangic yerlesimini hakem olcutuyle iyilestirir.
 
     Hicbir zaman baslangictan kotu bir sonuc dondurmez. `ctx.evaluate`
     yoksa (eski cagri yolu) girdiyi oldugu gibi geri verir.
+
+    `accept`: KACIS asamasinin kabul yuklemi. None ise (varsayilan) o asama
+    hic calismaz ve davranis bugunkuyle birebir aynidir. `Metropolis()`
+    verilirse, tepe tirmanisi tukenip butce ARTARSA arama kotulesen hamleleri
+    de sinirli olasilikla kabul edip gezinir. Dondurulen sonuc her durumda
+    GORULEN EN IYIDIR, yani monotonluk garantisi bozulmaz.
 
     `wide_keep`: genis repertuar asamasinda (3) bilesen basina kac aday
     gercek hakeme gonderilir. 0 verilirse o asama hic calismaz - sematik
@@ -273,10 +368,23 @@ def polish(
     # yani orada kaybedilecek bir bilgi yok.
     ranker = getattr(ctx, "move_ranker", None)
 
-    best = dict(start)
-    best_eval = ctx.evaluate(best)
-    if best_eval is None:
-        return best
+    # GEZINEN durum ile KAYIT ayri tutulur. Tepe tirmanisinda ikisi hep
+    # ayni; tavlamada `current` kotulesebilir, `best` asla. `polish` her
+    # zaman `best`i dondurur - monotonluk garantisi buradan geliyor.
+    current = dict(start)
+    current_eval = ctx.evaluate(current)
+    if current_eval is None:
+        return current
+    best, best_eval = dict(current), current_eval
+
+    started_at = time.perf_counter()
+    # Kabul yuklemi asamaya gore degisir: 1-3 her zaman TEPE TIRMANISI,
+    # yalnizca 4. asama gezinir (bkz. asagisi).
+    active_accept: "Acceptance | None" = None
+
+    def progress() -> float:
+        span = full_deadline - started_at
+        return (time.perf_counter() - started_at) / span if span > 1e-9 else 1.0
 
     def try_moves(moves, rank: bool = False, keep: int | None = None) -> bool:
         """Ilk iyilestiren BIRLESIK hamleyi kabul eder (first-improvement).
@@ -291,13 +399,13 @@ def polish(
         `learned` ayni sayida gercek degerlendirme yapar ve aradaki fark
         yalnizca SECIMDEN gelir.
         """
-        nonlocal best, best_eval
+        nonlocal current, current_eval, best, best_eval
         moves = list(moves)
         if not moves:
             return False
         if rank and ranker is not None:
             try:
-                moves = list(ranker(best, best_eval, moves))
+                moves = list(ranker(current, current_eval, moves))
             except Exception:
                 pass  # siralayici patlarsa arama kendi sirasiyla devam eder
         if keep is not None and len(moves) > keep:
@@ -307,11 +415,32 @@ def polish(
         for compound in moves:
             if time.perf_counter() > deadline:
                 return False
-            cand = _with_all(best, compound)
+            cand = _with_all(current, compound)
             ev = ctx.evaluate(cand)
-            if ev is not None and ev.better_than(best_eval):
+            if ev is None:
+                continue
+            taken = (
+                ev.better_than(current_eval)
+                if active_accept is None
+                else active_accept(ev, current_eval, progress(), rng)
+            )
+            if not taken:
+                continue
+            current, current_eval = cand, ev
+            # Kayit yalnizca GERCEKTEN daha iyi oldugunda guncellenir.
+            if ev.better_than(best_eval):
                 best, best_eval = cand, ev
-                return True
+            else:
+                # TASMA: gezinme en iyiden cok uzaklastiysa geri cek. Klasik
+                # tavlamada boyle bir sey yok - orada milyonlarca adim var ve
+                # arama geri donebilir. Burada butce birkac bin degerlendirme,
+                # yani basibos gezinmenin geri donusu YOK: olculdu, interf_u
+                # 25.7 -> 6.1'e coktu.
+                leash = getattr(active_accept, "leash", None)
+                if leash is not None and best_eval.gain_over(current_eval) > leash:
+                    current, current_eval = dict(best), best_eval
+                    active_accept.restarts = getattr(active_accept, "restarts", 0) + 1
+            return True
         return False
 
     # 1) Bulgu gudumlu onarim: hakemin saydigi hatalara dogrudan nisan al.
@@ -323,29 +452,29 @@ def polish(
     improved = True
     while improved and time.perf_counter() < deadline:
         improved = False
-        findings = list(best_eval.findings)
+        findings = list(current_eval.findings)
         errors = [f for f in findings if getattr(f, "severity", "") == "error"]
         warnings = [f for f in findings if getattr(f, "severity", "") == "warning"]
         for finding in errors + warnings:
             if time.perf_counter() > deadline:
                 break
-            if try_moves(_as_compounds(_finding_moves(finding, best, ctx))):
+            if try_moves(_as_compounds(_finding_moves(finding, current, ctx))):
                 improved = True
                 if verbose:
-                    print(f"    onarim: {getattr(finding, 'rule_id', '?')} -> {best_eval.score:.1f}")
+                    print(f"    onarim: {getattr(finding, 'rule_id', '?')} -> {current_eval.score:.1f} (en iyi {best_eval.score:.1f})")
 
     # 2) Genel ince ayar: kalan butceyi bilesenleri tek tek kaydirmaya harca.
-    movable = [r for r in ctx.movable() if r in best]
+    movable = [r for r in ctx.movable() if r in current]
     rng.shuffle(movable)
     idx = 0
     stagnant = 0
     while time.perf_counter() < deadline and movable and stagnant < len(movable):
         ref = movable[idx % len(movable)]
         idx += 1
-        if try_moves(_as_compounds(_nudge_moves(ref, best, ctx, rng)), rank=True):
+        if try_moves(_as_compounds(_nudge_moves(ref, current, ctx, rng)), rank=True):
             stagnant = 0
             if verbose:
-                print(f"    ince ayar: {ref} -> {best_eval.score:.1f}")
+                print(f"    ince ayar: {ref} -> {current_eval.score:.1f} (en iyi {best_eval.score:.1f})")
         else:
             stagnant += 1
 
@@ -371,16 +500,52 @@ def polish(
             # Partiler ZENGINDEN FAKIRE sirali (bkz. `wide_batches`); her biri
             # kendi `keep` butcesiyle denenir, boylece fakir bir uretici zengin
             # olani sulandiramaz.
-            for label, moves in repertoire.wide_batches(ref, best):
+            for label, moves in repertoire.wide_batches(ref, current):
                 if try_moves(moves, rank=True, keep=wide_keep):
                     hit = True
                     if verbose:
-                        print(f"    genis/{label}: {ref} -> {best_eval.score:.1f}")
+                        print(f"    genis/{label}: {ref} -> {current_eval.score:.1f} (en iyi {best_eval.score:.1f})")
                     break
             if hit:
                 stagnant = 0
             else:
                 stagnant += 1
+
+    # 4) KACIS (istege bagli): tepe tirmanisi tukendiyse ve butce kaldiysa,
+    # kabul kuralini gevseterek yerel en iyiden cikmayi dene.
+    #
+    # ## Neden yalnizca ARTAN butceyle
+    #
+    # Ilk deneme kabul kuralini bastan gevsetmekti: 6 kartta 2 iyi, 2 kotu ve
+    # bir felaket (interf_u 25.7 -> 6.1). Sebep butce: klasik tavlama 10^5-10^6
+    # adim ister, burada bir degerlendirme 2-6 ms, yani 20 saniyede ancak
+    # birkac bin adim var. Gezinmek icin harcanan her degerlendirme,
+    # tirmanmaktan calinmis oluyor - ve tirmanis hala urettigi surece bu
+    # kotu bir takas.
+    #
+    # Sogutulmus baslangic (heat=0.15) + tasma felaketi onledi ama tabloyu
+    # cevirmedi: kit-dev +2.2, digerlerinde es veya geri.
+    #
+    # Desen her iki olcumde de ayni: tavlama, tirmanisin GERCEKTEN TIKANDIGI
+    # kartlarda kazandiriyor, hala verimli oldugu kartlarda kaybettiriyor.
+    # Bu, Faz A'da ogrenilen kuralin aynisi - uretken asamadan zaman calma.
+    # Bu yuzden kacis asamasi yalnizca ARTAN butceyi kullanir; tirmanis
+    # butun butceyi yediyse hic calismaz ve davranis bugunkuyle birebir ayni
+    # kalir.
+    if accept is not None and time.perf_counter() < full_deadline:
+        active_accept = accept
+        deadline = full_deadline
+        movable = [r for r in ctx.movable() if r in current]
+        rng.shuffle(movable)
+        idx = 0
+        while time.perf_counter() < deadline and movable:
+            ref = movable[idx % len(movable)]
+            idx += 1
+            if try_moves(_as_compounds(_nudge_moves(ref, current, ctx, rng))) and verbose:
+                print(
+                    f"    kacis: {ref} -> {current_eval.score:.1f} "
+                    f"(en iyi {best_eval.score:.1f})"
+                )
 
     return best
 

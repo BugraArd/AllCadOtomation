@@ -54,16 +54,18 @@ from ..rules import load_rules
 from .dataset import Dataset, Sample
 from .features import FEATURE_NAMES, FEATURE_VERSION, MoveFeaturizer
 
-# Skorun yuvarlama adimi 0.1; esitlik bozucu bundan kucuk olmali.
+# Geriye uyumluluk icin duruyor; asil tanim `placement.base.HPWL_TIEBREAK`.
 LABEL_HPWL_EPS = 0.05
 
 
 def label_of(before, after) -> float:
-    """Iki degerlendirme arasindaki farki tek sayiya indirir (bkz. modul basi)."""
-    d_score = after.score - before.score
-    base = max(1.0, before.total_hpwl_mm)
-    ratio = (before.total_hpwl_mm - after.total_hpwl_mm) / base
-    return d_score + LABEL_HPWL_EPS * max(-1.0, min(1.0, ratio))
+    """Iki degerlendirme arasindaki farki tek sayiya indirir (bkz. modul basi).
+
+    Skalerlestirme `Evaluation.gain_over`da yasiyor - hakemin siralamasinin
+    bir ozelligi, ML'in degil. Tavlama kabulu de (`refine.Metropolis`) ayni
+    sayiyi kullaniyor; ikisinin ayrismamasi onemli.
+    """
+    return after.gain_over(before)
 
 
 def perturb(placement: Placement, ctx: PlacementContext, rng: random.Random,

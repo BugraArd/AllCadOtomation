@@ -42,6 +42,11 @@ from typing import Any, Callable, Protocol, runtime_checkable
 
 from ..model import Design
 
+# Skoru esit olan iki yerlesimi HPWL ile ayirirken kullanilan agirlik.
+# Skorun yuvarlama adimi 0.1; bu deger ondan kucuk olmak ZORUNDA, yoksa
+# HPWL skoru ezer ve sozluksel sira bozulur.
+HPWL_TIEBREAK = 0.05
+
 # ref -> (x_mm, y_mm, rotation_derece)
 Placement = dict[str, tuple[float, float, float]]
 
@@ -83,6 +88,26 @@ class Evaluation:
 
     def better_than(self, other: "Evaluation | None") -> bool:
         return other is None or self.key > other.key
+
+    def gain_over(self, other: "Evaluation | None") -> float:
+        """Sozluksel siralamayi TEK SAYIYA indirir: pozitif = bu daha iyi.
+
+        `key` sozluksel oldugu icin karsilastirmaya yeter ama "ne kadar iyi"
+        sorusuna cevap vermez. Tavlama benzeri kabul (`refine.Metropolis`)
+        exp(-|delta|/T) hesaplayabilmek icin skaler bir buyukluge ihtiyac
+        duyar; egitim etiketi de (`ml/collect.label_of`) ayni sayidir.
+
+        Hata ve uyari zaten skorun icinde; geriye skor ile HPWL kaliyor.
+        Skor 0.1 adimlarla yuvarlandigi icin HPWL'i 0.05 agirlikli bir
+        ESITLIK BOZUCU olarak eklemek sozluksel sirayi birebir korur:
+        skor farki varsa o belirler, yoksa HPWL soz sahibi olur.
+        """
+        if other is None:
+            return self.score
+        d_score = self.score - other.score
+        base = max(1.0, other.total_hpwl_mm)
+        ratio = (other.total_hpwl_mm - self.total_hpwl_mm) / base
+        return d_score + HPWL_TIEBREAK * max(-1.0, min(1.0, ratio))
 
 
 @dataclass

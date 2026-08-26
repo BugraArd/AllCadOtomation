@@ -139,3 +139,67 @@ class RegressionGuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MetropolisTests(unittest.TestCase):
+    """Faz E: gevsetilmis kabul kurali monotonluk garantisini bozmamali.
+
+    Tavlama benzeri kabul `polish`in GEZINEN durumunu etkiler; dondurulen
+    sonuc her zaman gorulen en iyidir. Bu ayrim bozulursa Asama 3'ten beri
+    duran "hicbir karti kotulestirme" garantisi de bozulur.
+    """
+
+    def hot(self):
+        from pcbqa.placement.refine import Metropolis
+
+        # warmup=1, heat=1e6 -> pratikte her kotulesmeyi kabul eder
+        return Metropolis(cooling=1.0, warmup=1, heat=1e6)
+
+    def test_improving_move_is_always_accepted(self):
+        from pcbqa.placement.refine import Metropolis
+        import random as _random
+
+        acc = Metropolis()
+        better = Evaluation(score=90.0, errors=0, warnings=0, total_hpwl_mm=100.0)
+        worse = Evaluation(score=80.0, errors=1, warnings=0, total_hpwl_mm=200.0)
+        self.assertTrue(acc(better, worse, 0.5, _random.Random(0)))
+
+    def test_cold_end_refuses_worsening_moves(self):
+        from pcbqa.placement.refine import Metropolis
+        import random as _random
+
+        acc = Metropolis(cooling=1e9, warmup=1)
+        good = Evaluation(score=90.0, errors=0, warnings=0, total_hpwl_mm=100.0)
+        bad = Evaluation(score=70.0, errors=2, warnings=0, total_hpwl_mm=300.0)
+        rng = _random.Random(0)
+        acc(bad, good, 0.0, rng)  # warmup
+        self.assertFalse(acc(bad, good, 1.0, rng), "sonda sicaklik ~0 olmali")
+
+    def test_wandering_acceptance_still_never_returns_worse(self):
+        _, _, ctx = context_for("bench_bad.kicad_pcb")
+        start = ctx.current()
+        before = ctx.evaluate(start)
+        after = ctx.evaluate(polish(start, ctx, budget_s=BUDGET, accept=self.hot()))
+        self.assertGreaterEqual(after.key, before.key)
+
+    def test_a_good_board_is_not_damaged_by_wandering(self):
+        _, _, ctx = context_for("bench_good.kicad_pcb")
+        start = ctx.current()
+        before = ctx.evaluate(start)
+        after = ctx.evaluate(polish(start, ctx, budget_s=BUDGET, accept=self.hot()))
+        self.assertGreaterEqual(after.key, before.key)
+
+    def test_gain_over_agrees_with_better_than(self):
+        """Skaler fark ile sozluksel siralama ayni seyi soylemeli."""
+        cases = [
+            (Evaluation(50.1, 0, 0, 2000.0), Evaluation(50.0, 0, 0, 1000.0)),
+            (Evaluation(50.0, 0, 0, 900.0), Evaluation(50.0, 0, 0, 1000.0)),
+            (Evaluation(49.9, 0, 0, 10.0), Evaluation(50.0, 0, 0, 1000.0)),
+            (Evaluation(50.0, 0, 0, 1100.0), Evaluation(50.0, 0, 0, 1000.0)),
+        ]
+        for cand, base in cases:
+            self.assertEqual(
+                cand.gain_over(base) > 0.0,
+                cand.better_than(base),
+                f"{cand} vs {base}",
+            )
