@@ -151,14 +151,20 @@ yapmadı.
 
 ### Öznitelikler neden yerel
 
-51 öznitelik var ve hepsi tek bir bileşenin **kendi netleri ve yakın
+75 öznitelik var (şema v3) ve hepsi tek bir bileşenin **kendi netleri ve yakın
 komşularıyla** hesaplanıyor; maliyet kartın büyüklüğüne değil bileşenin
 derecesine bağlı. Ölçüldü:
 
 | kart | bileşen | öznitelik | tam değerlendirme | oran |
 |---|---|---|---|---|
 | bench_bad | 18 | 32 µs | 2.09 ms | 65x |
-| pic_programmer | 63 | 72 µs | 6.12 ms | 85x |
+| pic_programmer | 63 | 72 µs (v1) · 134 µs (v3) | 6.12 ms | 85x · 45x |
+
+Şema v3 bulgunun **kendisini** de taşıyor: kural tipi, `(ölçülen − limit)/limit`
+boşluğu ve — `proximity` için — hamleden sonraki ölçümün **birebir yeniden
+hesabı**. `proximity` pin-pin mesafesi ölçtüğü için bileşen merkezi yaklaşımı
+tam da kuralın karar verdiği eşiğin çevresinde yanılıyordu (SOIC-20'de bir pin
+merkeze 5 mm uzakta olabilir). Ayrıntı: HANDOFF §14.
 
 Yerel hesabın sessizce yanlış olmaması kritik — model o zaman sağlam veriyle
 eğitildiğini sanır. Bu yüzden `d_hpwl` özniteliği testlerde **tam yeniden

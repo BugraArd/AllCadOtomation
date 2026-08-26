@@ -38,14 +38,25 @@ class Finding:
     refs: list[str] = field(default_factory=list)
     measured: float | None = None
     limit: float | None = None
+    # Kural TIPI (`proximity`, `courtyard_overlap`...). `rule_id` kullanicinin
+    # verdigi addir ve projeden projeye degisir; tip sabittir. `run_rules`
+    # merkezi olarak doldurur, tek tek kontroller ugrasmaz.
+    rule_type: str = ""
+    # Bulguyu ureten PINLER ("U2.14", "C1.1") - `refs` ile ayni sirada.
+    # `proximity` pin-pin mesafesi olcer; yalnizca referanslari bilmek olcumu
+    # yeniden hesaplamaya yetmez, cunku SOIC-20'de bir pin merkeze 5 mm
+    # uzakta olabilir - kuralin siniriyla ayni mertebede.
+    pins: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "rule_id": self.rule_id,
+            "rule_type": self.rule_type,
             "severity": self.severity,
             "message": self.message,
             "source": self.source,
             "refs": self.refs,
+            "pins": self.pins,
             "measured": self.measured,
             "limit": self.limit,
         }
@@ -223,6 +234,7 @@ def _check_proximity(design: Design, rule: Rule) -> list[Finding]:
                             f"{dist:.1f} mm uzakta (hedef <= {max_mm:g} mm), net {net_name}"
                         ),
                         refs=[target.ref, partner.ref],
+                        pins=[f"{target.ref}.{target.pin}", f"{partner.ref}.{partner.pin}"],
                         measured=round(dist, 2),
                         limit=max_mm,
                     )
@@ -544,6 +556,8 @@ def run_rules(design: Design, rules: list[Rule]) -> list[Finding]:
 
     for rule in rules:
         produced = CHECKS[rule.type](design, rule)
+        for finding in produced:
+            finding.rule_type = rule.type
         if len(produced) > rule.max_findings:
             extra = len(produced) - rule.max_findings
             produced = produced[: rule.max_findings]

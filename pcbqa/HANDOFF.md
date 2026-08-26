@@ -33,6 +33,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 4e | Şematik yerleştirme kalitesi + toplu uygulama | ✅ Bitti |
 | 5 | Makine öğrenimi altyapısı (veri, model, ölçüm, güvenli bağlantı) | ✅ Bitti |
 | 6/A | Geniş hamle repertuarı + model filtresi (yol haritası A1-A3) | ⚠️ Bitti, kazanç yok (§13) |
+| 6/C | Öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı | ✅ Bitti (§14) |
 
 ---
 
@@ -120,7 +121,7 @@ pcbqa/
     force.py / anneal.py / codex.py   yarışan diğer motorlar
     baseline.py    identity / random (hakem doğrulaması)
   ml/              Aşama 5 — makine öğrenimi altyapısı
-    features.py    DONMUŞ öznitelik şeması (v1, 51 öznitelik)
+    features.py    DONMUŞ öznitelik şeması (v3, 75 öznitelik)
     collect.py     gerçek hakemle etiketlenmiş veri kümesi (CLI)
     dataset.py     JSONL + KART BAZLI bölme
     metrics.py     regresyon + sıralama metrikleri
@@ -982,3 +983,142 @@ ikili doğruluk 0.694, taban 1.00x/0.500.
   bağlamı) Faz D'den ve A'nın devamından önce gelmeli**: skor bulgulardan
   geliyorsa, modelin bulguları görmesi gerekir. Şu anki öznitelikler bulguyu
   yalnızca "bu bileşen bir bulguda geçiyor mu" düzeyinde görüyor.
+
+---
+
+## 14. Faz C — öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı
+
+Faz A'nın dersi şuydu: **tavanı belirleyen repertuar darlığı değil, skorun
+kural bulgularından gelmesi.** Faz C bunun doğrudan sonucu — model bulguları
+görmüyorsa, skoru neyin artıracağını da göremez.
+
+### 14.1 Kök sebep: merkez yaklaşımı tam da kuralın karar verdiği yerde yanlış
+
+`proximity` kuralı (kural setinin en yaygın tipi) **pin-pin** mesafesi ölçer:
+
+```python
+dist = target.distance_to(partner)   # ikisi de PinRef, pad konumları çözülmüş
+```
+
+v1/v2 öznitelikleri ise bileşen **merkezleri** arasındaki mesafeyi kullanıyordu.
+SOIC-20'de bir pin merkeze ~5 mm uzakta olabilir — kuralın limitiyle (6-10 mm)
+**aynı mertebede**. Yani vekil, kuralın karar verdiği eşiğin tam çevresinde
+sistematik olarak yanılıyordu.
+
+### 14.2 Ne eklendi
+
+**`rules.Finding` iki yeni alan** (ikisi de varsayılanlı, geriye uyumlu):
+
+- `rule_type` — `proximity`, `courtyard_overlap`... `rule_id` kullanıcının
+  verdiği addır ve projeden projeye değişir; **tip sabittir**. `run_rules`
+  merkezî olarak dolduruyor, 18 kurulum noktası değişmedi.
+- `pins` — bulguyu üreten pin kimlikleri (`["U2.14", "C1.1"]`), `refs` ile
+  aynı sırada. Bu olmadan ölçümü hamleden sonra yeniden hesaplamak mümkün
+  değil: yalnızca referansı bilmek pinin nerede olduğunu söylemez.
+
+**`features.py` v3** (59 → 75 öznitelik):
+
+| blok | ne verir |
+|---|---|
+| `pin_span` | Merkezden en uzak pine mesafe — merkez tabanlı özniteliklerin **ne kadar yanılabileceği** |
+| `pin_partner_min_*` | Pinlerin net ortaklarının pinlerine gerçek en kısa mesafesi |
+| `rule_*` (8 adet) | Açık bulgunun **tipi** — `proximity` "yaklaştır", `courtyard_overlap` "uzaklaştır" demek; model bunu göremezse iki zıt isteği aynı sinyal sanar |
+| `finding_slack_before/after` | `(ölçülen − limit) / limit`; **`proximity` için hamleden sonra birebir yeniden hesaplanır** |
+| `finding_closed` | Hamle bulguyu kapatıyor mu (0/1) |
+| `move_toward_finding` | Hamle vektörü ile karşı pine yön vektörünün kosinüsü |
+
+Doğrulama (`bench_bad`, `U1.20 → C2.1`, ölçülen 16.5 / limit 6.0):
+
+| hamle | slack önce → sonra | yön |
+|---|---|---|
+| yerinde dur | 1.75 → 1.75 | 0.00 |
+| partnerin üzerine git | 1.75 → **0.08** | +0.99 |
+| 30 mm uzağa | 1.75 → 4.00 | −0.66 |
+
+Testler yerel yeniden hesabı **kural motorunun kendi ölçümüyle** karşılaştırıyor.
+
+### 14.3 Yol boyunca bulunan gerçek hata: yuvarlanmış "önce", tam "sonra"
+
+İlk sürümde `finding_slack_before` bulgunun sakladığı `measured` değerinden
+geliyordu — ama `rules.py` onu `round(dist, 2)` ile saklıyor. Tam hesaplanan
+"sonra" ile yuvarlanmış "önce"yi karşılaştırmak, farka **~1.3×10⁻⁴'lük
+sistematik bir yanlılık** sokuyordu ve model esas olarak farka bakıyor.
+Çözüm: `proximity` için "önce" de yeniden hesaplanıyor, ikisi aynı zeminde.
+
+Aynı sınıftan bir hata Aşama 4e'de de çıkmıştı (yuvarlanmamış kayan noktalar
+`_boxes_overlap`'i ters çeviriyordu). **Bu projede tekrar eden bir tuzak:
+aynı büyüklüğün iki farklı hassasiyetteki hâlini karşılaştırmayın.**
+
+### 14.4 Ölçüm — v3 yardımcı oluyor, ama mütevazı
+
+Kart bazlı 5 katlı çapraz doğrulama, aynı protokol, aynı kartlar:
+
+| veri | model | ikili doğruluk | skor hızlanması |
+|---|---|---|---|
+| v2 | mean (taban) | 0.500 | 1.00x |
+| v2 | ridge:sign | 0.670 | 1.29x |
+| v2 | gbt:sign | 0.674 | 1.26x |
+| **v3** | **ridge:sign** | **0.681** | **1.38x** |
+| v3 | gbt:sign | 0.672 | 1.32x |
+
+Eleme eğrisi belirgin biçimde iyileşti — %95 `hit` için gereken K **8 → 4**:
+
+| K | v2 hit | v3 hit |
+|---|---|---|
+| 4 | %92.1 | **%95.2** |
+| 8 | %96.8 | %95.2 |
+| 12 | %96.8 | %97.6 |
+| 24 | %100 | %100 |
+
+Yani model aynı güvenle **yarı yarıya daha az aday** ile çalışabiliyor. Bu, Faz
+A'nın tıkandığı yer için doğrudan anlamlı (havuz K'dan çok daha büyük
+olduğunda filtreleme kazanmaya başlar).
+
+Yeni öznitelikler gerçekten kullanılıyor: `finding_closed` GBT'nin en çok
+böldüğü 5. öznitelik, `rule_courtyard_overlap` 6.
+
+### 14.5 Uçtan uca: yine fark yok
+
+Modelin hiç görmediği dört kartta (eğitimden çıkarılarak), 15 sn:
+
+| kart | önce | `auto` | `learned` v3 |
+|---|---|---|---|
+| pic_programmer | 45 | 93.8 / 1379 mm | 93.8 / **1365 mm** |
+| complex_hierarchy | 54 | 97.1 / 1536 mm | 97.1 / **1520 mm** |
+| interf_u | 5 | 30.1 | 30.1 |
+| video | 29 | 37.8 | 37.8 |
+
+Skorlar aynı, tel uzunluğu iki kartta kıl payı daha iyi. **Aşama 5'ten beri
+değişmeyen tablo:** model sıralamayı ölçülebilir biçimde iyileştiriyor, ama
+`auto` bu bütçelerde zaten doyuma ulaştığı için kaliteye yansımıyor.
+
+### 14.6 Maliyet
+
+Öznitelik çıkarımı 72 µs → **134 µs** (pin-pin taraması yüzünden, yaklaşık iki
+kat). Tam değerlendirme `pic_programmer`da 6.1 ms, yani oran 85x'ten ~45x'e
+düştü. Hâlâ geniş bir marj, ama şema büyümeye devam ederse bu oran izlenmeli —
+sıralamanın anlamı ucuz olmasından geliyor.
+
+### 14.7 Değerlendirme ve sıradaki adım
+
+Faz C hedefini tuttu: model artık bulguyu görüyor ve bunu kullanıyor; sıralama
+ve özellikle **eleme** kalitesi ölçülebilir biçimde arttı. Ama uçtan uca kazanç
+üç fazdır gelmiyor ve sebebi artık iyice belirginleşti:
+
+> `auto`'nun bulduğu yerel en iyi, **arama sırasından bağımsız**. Modeli
+> hızlandırmak ya da eleme kalitesini artırmak oraya daha çabuk götürüyor,
+> daha iyi bir yere değil.
+
+Buradan iki dürüst çıkış var:
+
+1. **Kabul kuralını değiştirmek** (tepe tırmanışından çıkmak): tavlama benzeri
+   bir kabul, kötüleştiren hamleleri de sınırlı ölçüde alır ve yerel en
+   iyiden kaçar. Model o zaman "hangi kötüleşmeyi göze alalım" sorusunu
+   cevaplar — bu, sıralamadan nitel olarak farklı ve gerçekten tavanı
+   ilgilendiren bir iş. Gerileme koruması yine son sözü söyler.
+2. **Faz B (veri popülasyonu)**: 21 demo kartı hâlâ tek veri kaynağı ve
+   `synth.py` parametrik hâle getirilirse yüzlerce kart üretebilir.
+
+Faz D (öğrenilmiş hakem) hâlâ en iddialı yol ama (1) olmadan onun da aynı
+tavana daha hızlı varmaktan başka bir şey yapmayacağı artık ölçülmüş
+görünüyor.

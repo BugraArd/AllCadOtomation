@@ -172,6 +172,90 @@ class FeatureCorrectnessTests(unittest.TestCase):
         self.assertAlmostEqual(f["d_hpwl"], f["d_hpwl_all"], places=9)
         self.assertAlmostEqual(f["move_dist"], f["move_dist_max"], places=9)
 
+    def test_proximity_finding_is_recomputed_exactly(self):
+        """v3'un cekirdegi: acik bir `proximity` bulgusu hamleden sonra
+        BIREBIR yeniden hesaplanmali - tahminle degil.
+
+        Bulgu artik pin kimliklerini tasiyor ve pinler bilesenle katı olarak
+        hareket ediyor, yani yeni mesafe tam olarak bilinebilir. Merkez
+        yaklasimi burada yaniliyordu: SOIC-20'de bir pin merkeze 5 mm uzakta
+        olabilir, kuralin limitiyle ayni mertebede.
+        """
+        design, rules, ctx = bench_context()
+        placement = ctx.current()
+        ev = ctx.evaluate(placement)
+        fz = MoveFeaturizer(design, ctx.locked)
+        fz.refresh(placement, ev)
+
+        finding = next(
+            f for f in ev.findings if f.rule_type == "proximity" and len(f.pins) == 2
+        )
+        mover, partner = finding.refs[0], finding.refs[1]
+        px, py, _ = placement[partner]
+        x, y, rot = placement[mover]
+
+        # Yerinde durmak olcumu degistirmemeli
+        stay = named(fz.features(mover, (x, y, rot)))
+        self.assertAlmostEqual(stay["finding_slack_before"], stay["finding_slack_after"], places=6)
+        self.assertEqual(stay["rule_proximity"], 1.0)
+
+        # Partnerin uzerine gitmek olcumu kucultmeli ve yon +1'e yaklasmali
+        close = named(fz.features(mover, (px, py, rot)))
+        self.assertLess(close["finding_slack_after"], close["finding_slack_before"])
+        self.assertGreater(close["move_toward_finding"], 0.9)
+
+        # Uzaklasmak buyutmeli ve yon negatif olmali
+        away = named(fz.features(mover, (x + 30.0, y, rot)))
+        self.assertGreater(away["finding_slack_after"], away["finding_slack_before"])
+        self.assertLess(away["move_toward_finding"], 0.0)
+
+    def test_slack_after_matches_the_real_rule_engine(self):
+        """Yerel yeniden hesap ile kural motorunun kendi olcumu ortusmeli."""
+        from pcbqa.rules import run_rules
+
+        design, rules, ctx = bench_context()
+        placement = ctx.current()
+        ev = ctx.evaluate(placement)
+        fz = MoveFeaturizer(design, ctx.locked)
+        fz.refresh(placement, ev)
+
+        finding = next(
+            f for f in ev.findings if f.rule_type == "proximity" and len(f.pins) == 2
+        )
+        mover = finding.refs[0]
+        x, y, rot = placement[mover]
+        target = (x + 4.0, y - 2.0, rot)
+        predicted_slack = named(fz.features(mover, target))["finding_slack_after"]
+
+        moved = apply_placement(design, refine.with_moves(placement, ((mover, target),)))
+        same = [
+            f
+            for f in run_rules(moved, rules)
+            if f.rule_type == "proximity" and f.pins == finding.pins
+        ]
+        if not same:
+            self.skipTest("hamle bulguyu tamamen kapatti; slack karsilastirilamaz")
+        actual_slack = (same[0].measured - same[0].limit) / abs(same[0].limit)
+        # Kural motoru `measured`i 2 haneye yuvarliyor; yerel hesap tam.
+        # Tolerans o yuvarlamayi karsilamali, daha dari degil.
+        self.assertAlmostEqual(predicted_slack, actual_slack, places=2)
+
+    def test_pin_span_exposes_center_approximation_error(self):
+        design, _, ctx = bench_context()
+        fz = MoveFeaturizer(design, ctx.locked)
+        placement = ctx.current()
+        fz.refresh(placement, ctx.evaluate(placement))
+        spans = {
+            ref: named(fz.features(ref, placement[ref]))["pin_span"]
+            for ref in ctx.movable()
+        }
+        self.assertTrue(all(v >= 0.0 for v in spans.values()))
+        # Buyuk bir IC'nin pin yayilimi kucuk bir pasifinkinden buyuk olmali
+        ics = [r for r in spans if design.kind_of(r) == "ic"]
+        caps = [r for r in spans if design.kind_of(r) == "capacitor"]
+        if ics and caps:
+            self.assertGreater(max(spans[r] for r in ics), max(spans[r] for r in caps))
+
     def test_kind_one_hot_has_exactly_one_bit(self):
         design, _, ctx = bench_context()
         fz = MoveFeaturizer(design, ctx.locked)
@@ -411,7 +495,7 @@ class AdversarialRankerTests(unittest.TestCase):
         self.assertGreaterEqual(ctx.evaluate(result).key, before.key)
 
     def test_shipped_model_matches_the_frozen_schema(self):
-        path = Path(__file__).resolve().parent.parent / "pcbqa" / "ml" / "models" / "move-v2.json"
+        path = Path(__file__).resolve().parent.parent / "pcbqa" / "ml" / "models" / "move-v3.json"
         if not path.exists():
             self.skipTest("depoda egitilmis model yok")
         model = load_model(path)

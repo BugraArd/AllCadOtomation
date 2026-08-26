@@ -1,9 +1,9 @@
 """DONMUS OZNITELIK SEMASI - bir aday hamleyi sayilara cevirir.
 
 Bu dosya `placement/base.py` ile ayni statude: **geri uyumsuz degistirmeyin.**
-(v2, Asama 6: birlesik hamleler - takas/kume tasima - eklendi. Tek bilesenli
-hamlelerde ilk 51 deger v1 ile birebir ayni anlami tasir; sonuna 8 oznitelik
-eklendi, yani v1 modelleri yeniden egitilmeli.)
+(v2, Asama 6: birlesik hamleler - takas/kume tasima. v3, Faz C: PIN duzeyi
+geometri + BULGU baglami. Her surumde yeni adlar SONA eklendi, eski degerlerin
+anlami degismedi; yine de eski model dosyalari yeniden egitilmeli.)
 Egitilmis model dosyalari oznitelik ADLARINI ve SIRASINI icinde saklar; sema
 degisirse eski modeller sessizce yanlis sayilari okur. Yeni oznitelik eklemek
 icin `FEATURE_VERSION`'i artirin ve yeni adi listenin SONUNA koyun -
@@ -42,7 +42,7 @@ from .. import geom
 from ..model import Design
 
 # Sema surumu. Oznitelik listesi her degistiginde artar.
-FEATURE_VERSION = 2
+FEATURE_VERSION = 3
 
 # Bilesen turleri - `model.ref_kind` ile ayni kume, sabit sirali.
 KINDS: tuple[str, ...] = (
@@ -59,6 +59,25 @@ KINDS: tuple[str, ...] = (
     "testpoint",
     "other",
 )
+
+# Kural tipleri - `rules.CHECKS` ile ayni kume, sabit sirali. Bulgunun TIPI
+# hamlenin ne yapmasi gerektigini belirler: `proximity` yaklastir demek,
+# `courtyard_overlap` uzaklastir demek. Model bunu goremezse iki zit istegi
+# ayni sinyal sanir.
+RULE_TYPES: tuple[str, ...] = (
+    "proximity",
+    "courtyard_overlap",
+    "edge_clearance",
+    "net_length",
+    "length_match",
+    "require_on_net",
+    "same_net",
+    "other",
+)
+
+# `pin_partner_min` hesabinda atlanan net buyuklugu. GND/VCC gibi raylarda
+# "en yakin pin" her zaman birkac mm oteded ir ve hicbir sey ayirt etmez.
+PIN_NET_MAX_PINS = 40
 
 # Komsu aramasinin yaricapi (mm) ve izgara hucre boyu.
 NEIGHBOR_RADIUS_MM = 15.0
@@ -136,6 +155,26 @@ FEATURE_NAMES: tuple[str, ...] = (
     "d_hpwl_all_norm",
     "d_overlaps_all",
     "clearance_after_min",
+    # --- PIN DUZEYI GEOMETRI (sema v3, Faz C)
+    #
+    # `proximity` kurallari PIN-PIN mesafesi olcer, bilesen merkezleri arasi
+    # degil. SOIC-20'de bir pin merkeze 5 mm uzakta olabilir - kuralin
+    # siniriyla (10 mm) ayni mertebede. Merkez yaklasimi tam da kuralin karar
+    # verdigi yerde yaniliyordu.
+    "pin_span",
+    "pin_partner_min_before",
+    "pin_partner_min_after",
+    "d_pin_partner_min",
+    # --- BULGU BAGLAMI (sema v3, Faz C)
+    #
+    # Skor kural bulgularindan geliyor; v1/v2 ise bulguyu yalnizca "bu bilesen
+    # bir bulguda geciyor mu" duzeyinde goruyordu. Asagidakiler bulgunun
+    # TIPINI, YONUNU ve hamlenin onu KAPATIP KAPATMADIGINI tasir.
+    *(f"rule_{t}" for t in RULE_TYPES),
+    "finding_slack_before",
+    "finding_slack_after",
+    "finding_closed",
+    "move_toward_finding",
 )
 
 FEATURE_COUNT = len(FEATURE_NAMES)
@@ -228,6 +267,13 @@ class MoveFeaturizer:
                 area=area,
             )
 
+        # "REF.PAD" -> yerel pad ofseti. Bulgudaki pin kimliklerini konuma
+        # cevirmek icin; net tablosu pad NUMARASINI tasimiyor.
+        self._pad_offset: dict[str, tuple[float, float]] = {}
+        for comp in design.board.components:
+            for pad in comp.pads:
+                self._pad_offset.setdefault(f"{comp.ref}.{pad.number}", (pad.dx, pad.dy))
+
         # net -> [(ref, pad_dx, pad_dy)]; pad konumlari YERLESIMDEN turetilir,
         # boylece arama sirasindaki yerlesimle (design'inkiyle degil) calisiriz.
         nets_of: dict[str, set[str]] = {ref: set() for ref in self._static}
@@ -279,6 +325,8 @@ class MoveFeaturizer:
         self._grid: dict[tuple[int, int], list[str]] = {}
         self._pin_xy: dict[str, list[tuple[str, float, float]]] = {}
         self._finding: dict[str, tuple[float, float]] = {}
+        # ref -> (kural_tipi, olculen, limit, kendi_pini, karsi_pin)
+        self._finding_ctx: dict[str, tuple[str, float | None, float | None, str, str]] = {}
         self._eval_block = [1.0, 0.0, 0.0]
         self._ready = False
 
@@ -324,6 +372,7 @@ class MoveFeaturizer:
             self._pin_xy[name] = resolved
 
         self._finding = {}
+        self._finding_ctx = {}
         if evaluation is not None:
             for finding in getattr(evaluation, "findings", ()) or ():
                 severity = 1.0 if getattr(finding, "severity", "") == "error" else 0.0
@@ -332,10 +381,26 @@ class MoveFeaturizer:
                 ratio = 0.0
                 if isinstance(measured, (int, float)) and isinstance(limit, (int, float)) and limit:
                     ratio = max(-4.0, min(4.0, float(measured) / float(limit)))
-                for ref in getattr(finding, "refs", ()) or ():
+                refs = list(getattr(finding, "refs", ()) or ())
+                pins = list(getattr(finding, "pins", ()) or ())
+                rule_type = str(getattr(finding, "rule_type", "") or "other")
+                for i, ref in enumerate(refs):
                     prev = self._finding.get(ref)
                     if prev is None or severity > prev[0]:
                         self._finding[ref] = (severity, ratio)
+                        # Kendi pini ve karsi pin (varsa) - olcumu hamleden
+                        # sonra YENIDEN hesaplayabilmek icin.
+                        own = pins[i] if i < len(pins) else ""
+                        other = ""
+                        if len(pins) == len(refs) and len(pins) > 1:
+                            other = pins[1 - i] if len(pins) == 2 else ""
+                        self._finding_ctx[ref] = (
+                            rule_type,
+                            measured if isinstance(measured, (int, float)) else None,
+                            limit if isinstance(limit, (int, float)) else None,
+                            own,
+                            other,
+                        )
             score = float(getattr(evaluation, "score", 100.0))
             self._eval_block = [
                 score / 100.0,
@@ -530,6 +595,119 @@ class MoveFeaturizer:
                 clearance = min(clearance, geom.distance(poly, other_poly))
         return float(overlaps), min(clearance, FAR_MM), float(len(candidates))
 
+    # ------------------------------------------------- pin duzeyi (sema v3)
+
+    def _pin_pos(
+        self, key: str, moved: dict[str, tuple[float, float, float]] | None = None
+    ) -> tuple[float, float] | None:
+        """"REF.PAD" kimligini mutlak konuma cevirir (tasinanlar YENI yerinde)."""
+        offset = self._pad_offset.get(key)
+        if offset is None:
+            return None
+        ref = key.rsplit(".", 1)[0]
+        base = (moved or {}).get(ref) or self._pos.get(ref)
+        if base is None:
+            return None
+        rx, ry = _rotate(offset[0], offset[1], base[2])
+        return base[0] + rx, base[1] + ry
+
+    def _pin_span(self, ref: str) -> float:
+        """Bilesenin merkezinden en uzak pinine mesafe.
+
+        Merkez tabanli ozniteliklerin ne kadar yanilabilecegini soyler: bu
+        deger kuralin limitiyle ayni mertebedeyse merkez yaklasimi anlamsizdir.
+        """
+        best = 0.0
+        for pad_key, (dx, dy) in self._pad_offset.items():
+            if pad_key.rsplit(".", 1)[0] == ref:
+                best = max(best, math.hypot(dx, dy))
+        return best
+
+    def _pin_partner_min(
+        self,
+        ref: str,
+        moved: dict[str, tuple[float, float, float]] | None = None,
+    ) -> float:
+        """Bu bilesenin PINLERI ile net ortaklarinin PINLERI arasi en kisa mesafe.
+
+        `proximity` kurallarinin gercekten olctugu buyukluk. Buyuk raylar
+        atlanir (bkz. PIN_NET_MAX_PINS): orada en yakin pin her zaman birkac
+        mm otededir ve hicbir sey ayirt etmez.
+        """
+        best = FAR_MM
+        for name in self._static[ref].nets:
+            entries = self._net_pins[name]
+            if len(entries) > PIN_NET_MAX_PINS:
+                continue
+            mine: list[tuple[float, float]] = []
+            theirs: list[tuple[float, float]] = []
+            for i, (pin_ref, px, py) in enumerate(self._pin_xy[name]):
+                target = (moved or {}).get(pin_ref)
+                if target is not None:
+                    rx, ry = _rotate(entries[i][1], entries[i][2], target[2])
+                    px, py = target[0] + rx, target[1] + ry
+                (mine if pin_ref == ref else theirs).append((px, py))
+            for ax, ay in mine:
+                for bx, by in theirs:
+                    d = math.hypot(ax - bx, ay - by)
+                    if d < best:
+                        best = d
+        return min(best, FAR_MM)
+
+    def _finding_block(
+        self, ref: str, moved: dict[str, tuple[float, float, float]]
+    ) -> list[float]:
+        """Bulgunun tipi, yonu ve hamlenin onu kapatip kapatmadigi.
+
+        `proximity` icin olcum hamleden sonra BIREBIR yeniden hesaplanir -
+        bulgu artik pin kimliklerini tasiyor, pinler bilesenle birlikte katı
+        olarak hareket ediyor. Diger tipler icin tahmin yapilmaz; slack
+        degismemis sayilir (yalanci bir sinyal uretmektense sessiz kalmak).
+        """
+        hot = [0.0] * len(RULE_TYPES)
+        ctx = self._finding_ctx.get(ref)
+        if ctx is None:
+            hot[RULE_TYPES.index("other")] = 0.0
+            return hot + [0.0, 0.0, 0.0, 0.0]
+
+        rule_type, measured, limit, own_pin, other_pin = ctx
+        idx = RULE_TYPES.index(rule_type) if rule_type in RULE_TYPES else RULE_TYPES.index("other")
+        hot[idx] = 1.0
+
+        if not isinstance(limit, (int, float)) or not limit:
+            return hot + [0.0, 0.0, 0.0, 0.0]
+        slack_before = (float(measured) - limit) / abs(limit) if measured is not None else 0.0
+        slack_before = max(-4.0, min(4.0, slack_before))
+
+        slack_after = slack_before
+        toward = 0.0
+        if rule_type == "proximity" and own_pin and other_pin:
+            a0 = self._pin_pos(own_pin)
+            b0 = self._pin_pos(other_pin)
+            a1 = self._pin_pos(own_pin, moved)
+            b1 = self._pin_pos(other_pin, moved)
+            if a0 and b0 and a1 and b1:
+                # ONCE de yeniden hesaplanir. `Finding.measured` 2 haneye
+                # yuvarli; yuvarli bir "once" ile tam bir "sonra"yi
+                # karsilastirmak farka ~1e-4'luk sistematik bir yanlilik
+                # sokar ve model asil olarak FARKA bakiyor.
+                before = math.hypot(a0[0] - b0[0], a0[1] - b0[1])
+                after = math.hypot(a1[0] - b1[0], a1[1] - b1[1])
+                slack_before = max(-4.0, min(4.0, (before - limit) / abs(limit)))
+                slack_after = max(-4.0, min(4.0, (after - limit) / abs(limit)))
+                # Hamle bulgunun karsi pinine dogru mu? Onarim hamleleri icin
+                # en karar verdirici tek skaler bu.
+                mx, my = a1[0] - a0[0], a1[1] - a0[1]
+                tx, ty = b0[0] - a0[0], b0[1] - a0[1]
+                nm, nt = math.hypot(mx, my), math.hypot(tx, ty)
+                if nm > 1e-9 and nt > 1e-9:
+                    toward = (mx * tx + my * ty) / (nm * nt)
+
+        # Bulgu iki yonde de ihlal edilebilir; "kapandi" ikisinde de
+        # slack'in isaret degistirmesi demek.
+        closed = 1.0 if (slack_before > 0 and slack_after <= 0) else 0.0
+        return hot + [slack_before, slack_after, closed, toward]
+
     # ------------------------------------------------------------------ oznitelik
 
     def features(self, ref: str, xyr: tuple[float, float, float]) -> list[float]:
@@ -580,6 +758,8 @@ class MoveFeaturizer:
 
         pmin_b, pmean_b = self._partner_distances(primary, x0, y0)
         pmin_a, pmean_a = self._partner_distances(primary, x1, y1, moved)
+        pin_min_b = self._pin_partner_min(primary)
+        pin_min_a = self._pin_partner_min(primary, moved)
 
         dist = math.hypot(x1 - x0, y1 - y0)
         edge_b = self._edge_distance(x0, y0)
@@ -660,6 +840,13 @@ class MoveFeaturizer:
             (all_after - all_before) / self._diag,
             d_overlaps_all,
             clearance_min,
+            # --- pin duzeyi (sema v3)
+            self._pin_span(primary),
+            pin_min_b,
+            pin_min_a,
+            pin_min_a - pin_min_b,
+            # --- bulgu baglami (sema v3)
+            *self._finding_block(primary, moved),
         ]
         if len(vec) != FEATURE_COUNT:  # sema ile kod ayrisirsa hemen patla
             raise AssertionError(
