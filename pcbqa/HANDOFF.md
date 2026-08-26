@@ -31,6 +31,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 4c | Atomik yazma + açık-proje koruması | ✅ Bitti |
 | 4d | Bağlantı koruyan sembol taşıma | ✅ Bitti |
 | 4e | Şematik yerleştirme kalitesi + toplu uygulama | ✅ Bitti |
+| 4f | Kütüphaneden sembol okuma + şematiğe **ekleme** | ✅ Bitti (§18) |
 | 5 | Makine öğrenimi altyapısı (veri, model, ölçüm, güvenli bağlantı) | ✅ Bitti |
 | 6/A | Geniş hamle repertuarı + model filtresi (yol haritası A1-A3) | ⚠️ Bitti, kazanç yok (§13) |
 | 6/C | Öznitelik şeması v3: pin düzeyi geometri + bulgu bağlamı | ✅ Bitti (§14) |
@@ -1412,3 +1413,110 @@ ikisi de tekrarlanabilir.
 kaba faz taşmadığı için cila dilimleri öngörülebilir. `patience` süpürmesi
 (§16.5) ancak bundan sonra anlamlı — bugün hâlâ kartın büyüklüğüne göre
 tamamen farklı sayıda değerlendirme görüyor.
+
+---
+
+## 18. Aşama 4f — kütüphaneden sembol okuma ve şematiğe ekleme (2026-08-27)
+
+Soru şuydu: "şematiğe 5 adet direnç ekle" desem yapabiliyor mu? **Hayır** —
+4a–4e var olan sembolleri okuyup taşıyabiliyordu, ama:
+
+- harici `.kicad_sym` kütüphaneleri hiç okunmuyordu (yalnızca dosyanın kendi
+  `lib_symbols` bölümü),
+- yeni sembol ekleyecek bir yol yoktu,
+- netlist kalkanı "hiçbir şey değişmesin" diyordu, yani ekleme yapısal olarak
+  her zaman reddedilirdi.
+
+Üçü de kapatıldı.
+
+### 18.1 `symlib.py` — kütüphane okuma
+
+`Device:R` gibi bir kimliği KiCad'in kendi zinciriyle çözer:
+
+    proje/sym-lib-table  ->  %APPDATA%/kicad/<sürüm>/sym-lib-table
+                             (type "Table") satırları izlenir
+
+URI'lerdeki `${KICAD10_SYMBOL_DIR}` değişkenleri `os.environ` ->
+`kicad_common.json` -> kurulumdan türetilen varsayılan sırasıyla çözülür.
+Tablo eski sürüm adını taşıyorsa (`KICAD9_...`) aynı türden değişkene
+**düşürülür** — KiCad güncellemesinden sonra sık görülen durum.
+
+Bu makinede 223 kütüphane çözülüyor. `(extends "...")` taşıyan türevler ana
+sembolle birleştirilir (özellikler türevin, pin/grafik üstünündür).
+
+### 18.2 `sch_add.py` — ekleme
+
+Üç iş bir arada: kütüphaneden **oku**, tanımı dosyanın `lib_symbols`
+bölümüne **birleştir** (yoksa; KiCad dosyayı kendi kendine yeter tutar),
+sayfaya örnek **ekle**.
+
+- **Referans**: tüm şematikteki en küçük boş numara (`R1` ve `R3` doluysa
+  sıradaki `R2`) — KiCad'in annotation aracıyla aynı davranış.
+- **Konum**: sayfada boş hücre taraması (mevcut gövdeler + teller +
+  2.54 mm tampon), 1.27 mm ızgarasına oturmuş. `--at` verilirse o kullanılır
+  ama yine ızgaraya oturtulur ve **bu bir not olarak bildirilir** — ızgara
+  dışı sembolün pinleri tellere denk gelmez.
+- **`instances` bloğu**: KiCad 10'da referans sembolün içinde değil bu
+  blokta durur. Blok aynı dosyadaki mevcut bir sembolden kopyalanır; böylece
+  hiyerarşide birden çok kez örneklenen sayfalarda her örnek doğru referansı
+  alır. Eksik olsa Eeschema sembolü `R?` gösterirdi.
+- **Güvenlik**: `sch_move` ile aynı boru hattı — varsayılan DRY-RUN, kum
+  havuzunda kalkan, yedek, kilit kontrolü, atomik yazma. UUID yalnızca yeni
+  düğümler için üretilir.
+
+```powershell
+.\.venv\Scripts\python -m pcbqa.sch_add --sch proje\x.kicad_sch `
+    --lib-id Device:R --count 5 --value 10k `
+    --footprint "Resistor_SMD:R_0805_2012Metric" --apply
+```
+
+### 18.3 Kalkanın ekleme sürümü ve orada bulunan gerçek açık
+
+`compare_additive` (bkz. `sch_verify.py`) dört şey ister: (1) var olan
+pinlerin bölünüşü aynı kalmalı, (2) **yeni pinler var olan bir ağa
+katılmamalı**, (3) hiçbir bileşen/pin kaybolmamalı, (4) eklenenler tam olarak
+beklenenler olmalı.
+
+⚠️ **(2) maddesi ölçümle eklendi ve kaydedilmeye değer.** İlk sürümde yalnızca
+(1) vardı ve testte açık verdi: yeni sembol var olan bir tele değdiğinde eski
+pinlerin **birbirine göre** bölünüşü değişmiyor —
+
+    N1 = {R1.1, U1.3}  ->  N1 = {R1.1, U1.3, R2.1}
+
+— yani sessiz bağlantı kalkandan geçiyordu. Tam da yakalaması gereken şey.
+Bilinçli bağlamak isteyen `allow_connections=True` der.
+
+Canlı doğrulama (`pic_programmer` kopyası): R22 kasıtlı olarak J1 pin 1'in
+noktasına konduğunda kalkan reddetti (`R22.2 -> /PC-CLOCK-OUT`), dosyaya
+yazılmadı, çıkış kodu 1.
+
+### 18.4 Doğrulama
+
+`pic_programmer` kopyasına 5 direnç (`Device:R`, 10k, 0805):
+
+| kontrol | sonuç |
+|---|---|
+| pcbqa geri okuma | R22–R26, `Device:R`, 10k, 2 pin, ızgarada |
+| KiCad netlist | 63 → 68 bileşen, `R?` yok, yeni pinler serbest |
+| KiCad ERC | önce 0 ihlal → sonra 10 ihlal, **hepsi** `pin_not_connected` (5 × 2 pin) |
+| mevcut devre | 111 ağın bölünüşü değişmedi |
+| birim testi | 33 yeni test (toplam 167) geçiyor |
+
+### 18.5 Yol boyunca bulunan gerçek hata
+
+`kicad-cli` bir projeyi açtığında `~<proje>.kicad_pro.lck` bırakıyor ve
+**temizlemiyor**. Kalkan "önce" ölçümünü kullanıcının klasöründe alırsa,
+hemen ardından gelen yazma kendi bıraktığımız kilidi görüp *"proje KiCad'de
+açık"* diye reddediyor. Çözüm: kalkan artık **iki** kum havuzu kopyası
+kullanır (önce/sonra); kullanıcının klasöründe hiç `kicad-cli`
+çalıştırılmaz. `sch_move` hâlâ eski yolu kullanıyor — aynı düzeltme oraya da
+uygulanmalı.
+
+### 18.6 Bilinen sınırlar
+
+- Sembol **tellere bağlanmıyor**: eklenen parçalar serbest durur. Bağlama
+  (tel çekme, etiket koyma) bir sonraki adım.
+- Çok birimli semboller (74LS125 gibi) her zaman 1. birimle eklenir.
+- Footprint kimliği doğrulanmıyor (kütüphanede var mı diye bakılmıyor).
+- PCB tarafına yansıtma yok: yeni bileşen karta `Update PCB from Schematic`
+  ile gider.

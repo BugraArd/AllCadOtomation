@@ -232,6 +232,85 @@ def compare(before: Connectivity, after: Connectivity) -> ConnectivityDiff:
     )
 
 
+def compare_additive(
+    before: Connectivity,
+    after: Connectivity,
+    expected_added: set[str],
+    *,
+    allow_connections: bool = False,
+) -> ConnectivityDiff:
+    """EKLEME icin kalkan: mevcut devre aynen dursun, yalnizca yenisi eklensin.
+
+    `compare` "hicbir sey degismesin" der; ekleme yaparken bu her zaman
+    ihlal edilir (yeni bilesenin pinleri yeni aglar acar). Buradaki degismez
+    daha dar ama dogru olani:
+
+      1. ONCEDEN VAR OLAN pinlerin birbirine gore bolunusu AYNI kalmali.
+      2. YENI pinler var olan bir aga KATILMAMALI. Bu kural olcumle
+         eklendi: (1) tek basina yetmiyor - yeni sembol var olan bir tele
+         degdiginde eski pinlerin BIRBIRINE gore bolunusu degismez
+         (N1 = {R1.1, U1.3} -> {R1.1, U1.3, R2.1}), yani sessiz baglanti
+         kalkandan geciyordu. Kullanici "bos yere 5 direnc koy" derken
+         devreye baglanmasini istemiyor; istiyorsa `allow_connections`.
+      3. Hicbir bilesen kaybolmamali, hicbir pin kaybolmamali.
+      4. Eklenen bilesenler tam olarak BEKLENENLER olmali.
+
+    Yeni bilesenlerin kendi pinleri serbesttir (bagli degillerse
+    `unconnected-(R5-Pad1)` gibi tek pinlik aglar olurlar - normaldir).
+    """
+    old_pins = set(before.net_of) or {pin for net in before.partition for pin in net}
+    lost = sorted(old_pins - set(after.net_of))
+    added = sorted(after.components - before.components)
+    removed = sorted(before.components - after.components)
+
+    def restrict(conn: Connectivity) -> frozenset:
+        """Bolunmeyi yalnizca ESKI pinlere daralt (bos gruplar dusurulur)."""
+        out = set()
+        for net in conn.partition:
+            kept = frozenset(pin for pin in net if pin in old_pins)
+            if kept:
+                out.add(kept)
+        return frozenset(out)
+
+    before_groups = {pin: net for net in restrict(before) for pin in net}
+    after_groups = {pin: net for net in restrict(after) for pin in net}
+    regrouped = [
+        (pin, before.net_of.get(pin, ""), after.net_of.get(pin, ""),
+         len(before_groups.get(pin) or ()), len(after_groups.get(pin) or ()))
+        for pin in sorted(old_pins & set(after.net_of))
+        if before_groups.get(pin) != after_groups.get(pin)
+    ]
+
+    # (2) Yeni pinlerden hangileri ESKI bir pinle ayni aga dustu?
+    joined: list[tuple[PinKey, str, str, int, int]] = []
+    if not allow_connections:
+        for net in after.partition:
+            old_here = [pin for pin in net if pin in old_pins]
+            new_here = [pin for pin in net if pin not in old_pins]
+            if old_here and new_here:
+                name = after.net_of.get(new_here[0], "")
+                joined.extend(
+                    (pin, "", name, 0, len(net)) for pin in sorted(new_here)
+                )
+
+    ok = (
+        not lost
+        and not removed
+        and not regrouped
+        and not joined
+        and set(added) == set(expected_added)
+    )
+    regrouped = regrouped + joined
+    return ConnectivityDiff(
+        ok=ok,
+        lost_pins=lost,
+        gained_pins=sorted(set(after.net_of) - old_pins),
+        regrouped=regrouped,
+        added_components=added,
+        removed_components=removed,
+    )
+
+
 def verify_unchanged(
     before_sch: Path,
     after_sch: Path,
