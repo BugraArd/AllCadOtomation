@@ -188,14 +188,37 @@ def polish(
     deadline = time.perf_counter() + (budget_s if budget_s is not None else ctx.time_budget_s)
     rng = random.Random(ctx.seed)
 
+    # Asama 5 kancasi: baglam bir siralayici sunuyorsa adaylar once ona
+    # gosterilir. Siralayici YALNIZCA denenme sirasini degistirir - kabul
+    # karari asagida yine `ctx.evaluate` ile verilir, yani monotonluk
+    # garantisi siralayici tamamen yanilsa bile bozulmaz.
+    #
+    # Siralayici SADECE (2) ince ayar asamasinda devreye girer. Olculdu:
+    # (1) onarim asamasinda hamleler zaten anlamli bir sirada gelir - yaricap
+    # artan, yani "en kucuk yer degistirme once". Bu muhafazakar sira komsu
+    # kisitlari bozmadigi icin degerlidir; modelin "tek basina en cok
+    # iyilestiren" hamlesi ise buyuk siçramalar secip baska bulgulari
+    # aciyordu (`complex_hierarchy` 94 -> 84...89, dort model varyantinda da).
+    # (2) ince ayar asamasinin sirasi ise BUGUN RASTGELE (`rng.shuffle`),
+    # yani orada kaybedilecek bir bilgi yok.
+    ranker = getattr(ctx, "move_ranker", None)
+
     best = dict(start)
     best_eval = ctx.evaluate(best)
     if best_eval is None:
         return best
 
-    def try_moves(moves) -> bool:
-        """Ilk iyilestiren hamleyi kabul eder (first-improvement)."""
+    def try_moves(moves, rank: bool = False) -> bool:
+        """Ilk iyilestiren hamleyi kabul eder (first-improvement).
+
+        `rank` YALNIZCA ince ayar asamasinda acilir - sebebi asagida (2).
+        """
         nonlocal best, best_eval
+        if rank and ranker is not None and moves:
+            try:
+                moves = ranker(best, best_eval, list(moves))
+            except Exception:
+                pass  # siralayici patlarsa arama kendi sirasiyla devam eder
         for ref, xyr in moves:
             if time.perf_counter() > deadline:
                 return False
@@ -234,7 +257,7 @@ def polish(
     while time.perf_counter() < deadline and movable and stagnant < len(movable):
         ref = movable[idx % len(movable)]
         idx += 1
-        if try_moves(_nudge_moves(ref, best, ctx, rng)):
+        if try_moves(_nudge_moves(ref, best, ctx, rng), rank=True):
             stagnant = 0
             if verbose:
                 print(f"    ince ayar: {ref} -> {best_eval.score:.1f}")
@@ -242,6 +265,17 @@ def polish(
             stagnant += 1
 
     return best
+
+
+# --------------------------------------------------------------- disa acilan
+#
+# Asama 5 (ML) veri toplayicisi ve ogrenilmis yerlestirici, aramanin GERCEKTEN
+# gordugu aday dagilimiyla calismak zorunda. Baska bir yerde ikinci bir hamle
+# ureteci yazmak yerine ayni fonksiyonlar disa aciliyor - tek kaynak.
+
+finding_moves = _finding_moves
+nudge_moves = _nudge_moves
+with_move = _with
 
 
 def keep_best(

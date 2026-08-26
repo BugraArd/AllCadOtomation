@@ -17,6 +17,7 @@ from .baseline import Identity, RandomShuffle
 from .cluster import ClusterPlacer
 from .codex import Codex
 from .force import ForcePlacer
+from .learned import Learned
 
 # ad -> yerlestirici fabrikasi
 PLACERS: dict[str, type] = {
@@ -25,6 +26,8 @@ PLACERS: dict[str, type] = {
     "random": RandomShuffle,
     # Uretim yerlestiricisi (Asama 3 ciktisi)
     "auto": Auto,
+    # Asama 5: auto + ogrenilmis hamle siralamasi (bkz. pcbqa/ml/)
+    "learned": Learned,
     # Yarisan yerlestiriciler
     "cluster": ClusterPlacer,
     "force": ForcePlacer,

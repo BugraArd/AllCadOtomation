@@ -14,9 +14,11 @@ KiCad üzerinde bir otomasyon sistemi geliştiriyorum. Nihai hedef: **PCB ve
 sorusunu makineye sordurmak ve zamanla her şeyi kendi yerleştiren bir sisteme
 dönüştürmek istiyorum.
 
-Proje 4 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4e).**
+Proje 5 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4e, 5).**
 **KiCad 11 beklenmedi** — şematik okuma da yazma da KiCad 10 ile çalışıyor
-(bkz. §10).
+(bkz. §10). Aşama 5 makine öğrenimi altyapısıdır (bkz. §11); altyapı hazır ve
+ölçülmüş durumda, ama öğrenilmiş yerleştirici uçtan uca henüz `auto`yu
+geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 
 | Aşama | Kapsam | Durum |
 |---|---|---|
@@ -29,6 +31,7 @@ Proje 4 aşamaya bölündü. **Hepsi bitti (0, 1, 2, 3, 4a-4e).**
 | 4c | Atomik yazma + açık-proje koruması | ✅ Bitti |
 | 4d | Bağlantı koruyan sembol taşıma | ✅ Bitti |
 | 4e | Şematik yerleştirme kalitesi + toplu uygulama | ✅ Bitti |
+| 5 | Makine öğrenimi altyapısı (veri, model, ölçüm, güvenli bağlantı) | ✅ Bitti |
 
 ---
 
@@ -112,8 +115,17 @@ pcbqa/
     refine.py      bulgu güdümlü cila — hakemin gerçek puanını optimize eder
     auto.py        ÜRETİM yerleştiricisi: kaba + cila + gerileme tabanı
     cluster.py     kümeleme tabanlı kaba yerleşim (auto bunu kullanır)
+    learned.py     auto + öğrenilmiş hamle sıralaması (Aşama 5)
     force.py / anneal.py / codex.py   yarışan diğer motorlar
     baseline.py    identity / random (hakem doğrulaması)
+  ml/              Aşama 5 — makine öğrenimi altyapısı
+    features.py    DONMUŞ öznitelik şeması (v1, 51 öznitelik)
+    collect.py     gerçek hakemle etiketlenmiş veri kümesi (CLI)
+    dataset.py     JSONL + KART BAZLI bölme
+    metrics.py     regresyon + sıralama metrikleri
+    model.py / linear.py / trees.py   model sözleşmesi, ridge, GBT
+    train.py       eğitim/karşılaştırma CLI
+    models/        eğitilmiş modeller (JSON)
   __main__.py      komut satırı
   default_rules.yaml
 samples/
@@ -160,6 +172,11 @@ sadece `.kicad_pcb` ile çalışır.
 .\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb
 .\.venv\Scripts\python -m pcbqa.ipc_apply --board samples\bench_bad.kicad_pcb --apply
 run.cmd samples\pic_programmer                                # kısayol
+
+# Aşama 5 — ML hattı
+.\.venv\Scripts\python -m pcbqa.ml.collect --suite "<demolar>" --out .work\moves.jsonl
+.\.venv\Scripts\python -m pcbqa.ml.train .work\moves.jsonl --model all --target all --cv 5
+.\.venv\Scripts\python -m pcbqa.harness --placer auto --placer learned
 ```
 
 Analiz bayrakları: `--rules --json --work-dir --kicad-cli --no-kicad-checks --no-color --fail-on`
@@ -636,3 +653,212 @@ topolojisini gerçekten modelleyen bir bağlantı grafiği kurmak — o zaman uc
 - **Bus içeren sayfalar varsayılan olarak kapalı** (yukarıdaki nota bakın).
   Demo projelerinin önemli bir kısmı bus kullanıyor, yani 4e şu an esas olarak
   bus'sız sayfalarda iş görüyor.
+
+---
+
+## 11. Aşama 5 TAMAMLANDI — makine öğrenimi altyapısı
+
+Bu aşamanın çıktısı bir **altyapı**dır: veri toplama, öznitelik çıkarımı,
+model eğitimi, dürüst ölçüm ve arama motoruna güvenli bağlantı. Model
+kalitesi bugün `auto`yu geçmiyor (bkz. §11.5) — ama artık geçip geçmediği
+**ölçülebiliyor**, ve ölçüm hattı bir sonraki denemeyi ucuzlatıyor.
+
+### 11.1 Neden ML, ve tam olarak neye
+
+Aşama 3'ün dersi "yerleştirici hakemin puanladığı şeyi optimize etmeli"ydi.
+Sıradaki darboğaz hakemin **maliyeti**: bir değerlendirme `bench_bad`de
+2.1 ms, `pic_programmer`da 6.1 ms, `jetson`da çok daha fazla (§9'daki
+"bütçe yumuşak" sınırının kök sebebi bu). Yerel arama bütçesinin neredeyse
+tamamını `ctx.evaluate` çağrılarına harcıyor.
+
+Sorulan soru: **"bu bileşeni buraya taşırsam hakemin puanı artar mı?"**
+sorusunu, hakemi çağırmadan tahmin edebilir miyiz? Cevabı bilen bir model,
+adayları denenme sırasına dizerek aynı bütçede daha çok iyileşme yakalatabilir.
+
+### 11.2 Mimari kararı: **model karar vermez, sıra önerir**
+
+Bu, tüm altyapıyı belirleyen karardır ve bozulmamalı. Model çıktısı yalnızca
+`refine.polish` içindeki aday hamlelerin **sırasını** değiştirir; bir hamlenin
+kabul edilip edilmeyeceğine hâlâ `ctx.evaluate` karar verir. Sonuçları:
+
+- Monotonluk garantisi (Aşama 3) aynen duruyor — model tamamen yanılsa bile
+  sonuç başlangıçtan kötü olamaz.
+- Bozuk/eski model dosyası aramayı durduramaz; sıralayıcı patlarsa arama kendi
+  sırasıyla devam eder.
+- Model yoksa `learned` sessizce `auto` gibi davranır (depo modelsiz de çalışır).
+
+`tests/test_ml.py::AdversarialRankerTests` bunu kasten zorluyor: **en kötü
+hamleyi başa alan** sıralayıcı ve her çağrıda istisna fırlatan sıralayıcı ile
+`polish` koşuluyor, ikisinde de gerileme yok.
+
+`base.py`'ye eklenen tek şey varsayılanlı `ctx.move_ranker` alanı — Aşama 3'ün
+`evaluator`ı nasıl eklendiyse aynı şekilde, geriye uyumlu.
+
+### 11.3 Kurulan araçlar
+
+```
+pcbqa/ml/
+  features.py    DONMUS sema (v1, 51 oznitelik): Design + aday hamle -> vektor
+  collect.py     gercek hakemle etiketlenmis veri kumesi (CLI)
+  dataset.py     JSONL depolama + KART BAZLI bolme
+  metrics.py     regresyon + SIRALAMA metrikleri
+  model.py       model sozlesmesi, JSON kaydet/yukle, kayit defteri
+  linear.py      ridge regresyon (saf Python)
+  trees.py       gradyan artirmali agaclar (saf Python, histogram tabanli)
+  train.py       egitim/karsilastirma CLI
+  models/move-v1.json   depoya konan egitilmis model (5 KB)
+pcbqa/placement/learned.py   auto + ogrenilmis siralama
+tests/test_ml.py             29 test
+```
+
+Katmanlama `model.py`/`rules.py`nin KiCad'i bilmemesiyle aynı: `features.py` ve
+`collect.py` PCB'yi bilir, çekirdek bilmez. Şematik tarafı aynı çekirdeği
+kullanmak isterse yalnızca yeni bir `features`/`collect` çifti gerekir.
+
+**Bağımlılık eklenmedi.** numpy/scikit-learn yok; problem boyutu (~50 öznitelik,
+~50 bin satır) saf Python için fazlasıyla küçük ve Windows Store Python'da
+tekerlek/derleyici derdi açmıyor. Modeller **JSON**: git diff'i okunabilir,
+sürümler arası taşınabilir, ve çalıştırılabilir kod taşımadığı için
+başkasından gelen bir model dosyasını açmak güvenlik sorunu değil.
+
+### 11.4 Öznitelikler neden yerel (ve neden test ediliyorlar)
+
+51 özniteliğin tamamı tek bir bileşenin **kendi netleri ve yakın
+komşularıyla** hesaplanır; maliyet kartın büyüklüğüne değil bileşenin
+derecesine bağlıdır:
+
+| kart | bileşen | öznitelik | tam değerlendirme | oran |
+|---|---|---|---|---|
+| bench_bad | 18 | 32 µs | 2.09 ms | 65x |
+| pic_programmer | 63 | 72 µs | 6.12 ms | 85x |
+
+İlk sürüm 250 µs sürüyordu; profil, sürenin %77'sinin `geom.distance`
+(gerçek poligon mesafesi) içinde geçtiğini gösterdi. Çakışma testi gerçek
+poligonla (SAT) kaldı — `courtyard_overlap` kuralı da öyle çalışıyor — ama
+**açıklık** ölçüsü sınır kutusu boşluğuna çevrildi; ayrık kutular için SAT'a
+hiç girilmiyor.
+
+Yerel hesabın sessizce yanlış olması en tehlikeli hata sınıfı olurdu (model
+sağlam veriyle eğitildiğini sanır). Bu yüzden `d_hpwl` özniteliği testlerde
+**tam yeniden hesaplamayla** karşılaştırılıyor.
+
+### 11.5 Ölçüm — ve `learned` neden hâlâ `auto`yu geçmiyor
+
+Bakılan metrik R² değil. Yerel arama ilk iyileştiren hamleyi kabul ettiği için
+asıl soru "skoru artıran hamleye kaçıncı denemede ulaşıldığı", ve tabanı
+cilanın **bugün** kullandığı sıra (rastgele sıra değil — hamle üreteci zaten
+yarıçap sırasına dizili, rastgeleyi taban almak modele haksız avantaj verir).
+
+21 karttan 49.699 örnek, **kart bazlı 5 katlı** çapraz doğrulama:
+
+| model | hedef | ikili doğruluk | skor hızlanması |
+|---|---|---|---|
+| mean (taban) | — | 0.500 | 1.00x |
+| **ridge** | **sign** | **0.714** | **1.56x** |
+| gbt | score | 0.581 | 1.53x |
+| ridge | score | 0.691 | 1.51x |
+| gbt | value | 0.698 | 1.36x |
+
+Yani öğrenilecek gerçek bir sinyal var. **Ama uçtan uca yansımıyor.** Modelin
+hiç görmediği kartlarda (eğitimden çıkarılarak), 5 sn bütçe:
+
+| kart | önce | `auto` | `learned` |
+|---|---|---|---|
+| pic_programmer | 45 | 94 | 94 |
+| complex_hierarchy | 54 | 94 | 94 |
+| sonde xilinx | 73 | 100 | 100 |
+| interf_u | 5 | 12–14 | 12–15 |
+| jetson (1125 bileşen, 60 sn) | 93 | 93.3 | 93.3 |
+
+19 demo kartlık tam regresyon paketinde (bütçe 15 sn) `learned` **19 kartın
+19'unda `auto` ile birebir aynı** sonucu veriyor, hiçbirinde gerileme yok.
+`interf_u` satırındaki oynama üç tekrarda `auto` için de aynı aralıkta çıkıyor
+— duvar saati bütçesinden gelen gürültü.
+
+Sebep: bu bütçelerde `auto` zaten doyuma ulaşıyor. Sıralamayı hızlandırmak
+ulaşılabilir **tavanı** yükseltmiyor, sadece oraya daha çabuk varıyor.
+`learned` bu yüzden `force`/`anneal` gibi bir **araştırma yerleştiricisi**;
+üretim yerleştiricisi hâlâ `auto`.
+
+### 11.6 Yol boyunca bulunan iki gerçek problem (tekrar keşfetmeyin)
+
+**1. Etiket seçimi model seçiminden daha önemli.** İlk çalışan model `sign`
+hedefiyle ("hakemi mutlu eder mi") eğitildi ve `complex_hierarchy`yi
+94 → 81'e **düşürdü** — üstelik HPWL'i iyileştirerek (1680 → 1594 mm). Veri
+kümesine bakınca sebep göründü: etiketi pozitif olan hamlelerin **%81'i skoru
+hiç değiştirmiyor**, yalnızca teli birkaç mm kısaltıyor (skor 0.1 adımlarla
+yuvarlanıyor, HPWL ise eşitlik bozucu). Model bunları öğrenip cilayı mikro
+HPWL kazançlarına yönlendirdi; hakemin saydığı hatalar açık kaldı. Kural:
+**modele neyi sıralamasını istiyorsak etiket tam olarak o olmalı**
+(`--target score`). Aynı sebeple `train.py`'de kazanan, "her iyileşme"
+hızlanmasına değil **skor artıran hamle** hızlanmasına göre seçiliyor.
+
+**2. Her sıra bilgisiz değildir — modeli her yere sokmayın.** Onarım
+aşamasında hamleler zaten anlamlı bir sırada üretiliyor: yarıçap artan, yani
+"en küçük yer değiştirme önce". Bu muhafazakâr sıra komşu kısıtları bozmadığı
+için değerlidir; modelin "tek başına en çok iyileştiren" hamlesi ise büyük
+sıçramalar seçip başka bulguları açıyordu (dört model varyantının **dördü de**
+`complex_hierarchy`yi 84–89'a düşürdü). Sıralayıcı bu yüzden **yalnızca ince
+ayar aşamasında** devreye giriyor — orada sıra bugün zaten `rng.shuffle` ile
+rastgele, yani kaybedilecek bilgi yok. Bu kısıtlamadan sonra hiçbir varyant
+gerileme yapmadı.
+
+Bir üçüncüsü daha var, küçük ama sinsi: ilk metrik sürümünde `mean` taban
+çizgisi 1.07x "hızlanma" ve 0.748 ikili doğruluk gösteriyordu. Sabit tahmin
+eden bir model bunları veremez — beraberlik durumu yanlış sayılıyordu. Taban
+çizgisinin **tam olarak** 1.00x ve 0.500 vermesi artık test ediliyor
+(`MetricTests`). Bir ML hattında ilk kurulacak şey taban çizgisidir; taban
+yanlışsa üstündeki her sayı yanlıştır.
+
+### 11.7 Bilinen sınırlar (Aşama 5)
+
+- **Uçtan uca kazanç yok** (§11.5). Altyapı hazır, model yeterince iyi değil.
+- Veri kümesi yalnızca **KiCad demo kartlarından** toplandı (21 kart). Gerçek
+  bir üretim kartı havuzu çok daha çeşitli olurdu.
+- Öznitelikler yalnızca **öteleme + döndürme** hamlelerini tanımlar; katman
+  değiştirme, takas (swap), grup taşıma yok.
+- GBT eğitimi saf Python: 50 bin satır / 60 ağaç ≈ 14 sn. Veri 10 katına
+  çıkarsa eğitim dakikalara çıkar; o noktada numpy tartışması açılır.
+- `--target sign` ile eğitilmiş bir modeli **onarım aşamasına** bağlarsanız
+  §11.6'daki gerileme geri gelir. Sıralayıcının nereye bağlandığını
+  `refine.polish` içindeki `rank=True` çağrısı belirliyor.
+
+### 11.8 Sıradaki adım (öneri)
+
+Kazanç, sıralamayı hızlandırmakta değil **arama uzayını genişletmekte**
+görünüyor: `auto` doyuma ulaşıyor çünkü hamle repertuarı dar (tek bileşen
+öteleme/döndürme). Model bir kez kurulduğuna göre, pahalı ama güçlü hamleleri
+(iki bileşen takası, küme taşıma, katman değiştirme) **ucuza eleyebilecek**
+bir aday üreteci olarak kullanmak daha umut verici. Yani modeli mevcut
+adayları sıralamak için değil, **daha çok aday üretmeyi karşılanabilir kılmak**
+için kullanın.
+
+---
+
+## 12. Aşama 0-5 yeniden doğrulama (2026-08-26)
+
+Tüm aşamalar sıfırdan koşuldu.
+
+| Ne | Sonuç |
+|---|---|
+| Birim testleri | **111 test, hepsi geçiyor** (52 sn) |
+| Referans skorlar (0/1) | pic_programmer 45, video 29, ecc83 100, bench_good 67, bench_bad 2 — **hepsi aynı** |
+| `kicad-cli` entegrasyonu (1) | 10.0.4 bulundu, ERC/DRC koştu |
+| Çıkış kodları (0/1) | temiz 0, bulgulu 1, eksik proje 2 |
+| IPC (2), KiCad kapalıyken | temiz hata + çıkış 2, karta dokunulmadı |
+| Hakem doğrulaması (3) | `identity` kazancı +0.0 |
+| Regresyon paketi (3+5) | **19 kart × 2 yerleştirici, hiçbirinde gerileme yok** |
+| Şematik okuma (4a) | 15 demo projesi, 4.874 sembol, 16.154 pin, **0 bozuk parantez** |
+| Netlist kalkanı (4b) | R1 (+12.7, −10.16) → `/VPP_ON` VCC'ye kaynıyor (12→15 pin), **yazma reddedildi, dosya bayt bayt aynı** |
+| Atomik yazma (4c) | 230.132 bayt yazıldı + yedek; yazılan dosyanın netlist'i **birebir aynı** (111 net / 236 pin) |
+| Açık-proje koruması (4c) | `~pic_programmer.kicad_pro.lck` varken çıkış 2, yazma yok |
+| Bağlantı koruyan taşıma (4d) | R1 (78.74, 43.18) → (81.28, 43.18), tel ucu 2 / property 5 birlikte taşındı |
+| Şematik yerleştirme (4e) | pic_programmer kök 985.5 → 976.6 mm; vme-wren `/fpga/fpga-config` 1206.5 → **1069.1 mm** (−%11.4), kalkan temiz |
+| Bus koruması (4e) | bus'lı sayfalarda taşıma önerilmiyor (varsayılan) |
+| ML hattı (5) | 21 karttan 49.699 örnek toplandı, 3 model × 3 hedef eğitildi ve ölçüldü |
+
+**Doğrulama sırasında görülen tek sapma** — HANDOFF'un 4e bölümünde "video/RAMS
+%21" yazıyor; o sayfada 2 bus öğesi var ve bus koruması **sonradan** eklendiği
+için artık taşıma önerilmiyor. Gerileme değil, bilinçli muhafazakârlığın
+sonucu. Bus'sız sayfalarda 4e ölçümleri korunuyor (yukarıdaki fpga-config
+satırı).

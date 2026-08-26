@@ -9,6 +9,10 @@ Asama 3'te eklenen (varsayilanli, eski yerlestiriciler etkilenmez):
 `ctx.evaluate(placement)` -> hakemin gercek puani. Vekil maliyet yerine bunu
 optimize edin; genelleme farki buradan cikiyor.
 
+Asama 5'te eklenen (yine varsayilanli): `ctx.move_ranker` -> aday hamleleri
+denenme sirasina dizen istege bagli fonksiyon. Ogrenilmis model buraya
+baglanir. Kabul karari degismedi, hala `evaluate`.
+
 Bir yerlestirici yazmak icin tek yapmaniz gereken:
 
     from pcbqa.placement.base import Placer, PlacementContext, Placement
@@ -35,6 +39,12 @@ from ..model import Design
 
 # ref -> (x_mm, y_mm, rotation_derece)
 Placement = dict[str, tuple[float, float, float]]
+
+# Tek bir aday hamle: (ref, (x, y, rot))
+Move = tuple[str, tuple[float, float, float]]
+# Adaylari denenme sirasina dizer. Hamleleri ELEYEBILIR de - kabul karari
+# yine hakemde oldugu icin bu yalnizca hizi etkiler, dogrulugu degil.
+MoveRanker = Callable[[Placement, "Evaluation", list[Move]], list[Move]]
 
 
 @dataclass
@@ -85,6 +95,11 @@ class PlacementContext:
     # Hakemin gercek hedef fonksiyonu; harness dolduruyor. None ise
     # yerlestirici kendi vekil maliyetiyle calisir (eski davranis korunur).
     evaluator: Callable[[Placement], Evaluation] | None = None
+    # Asama 5: aday hamleleri DENENME SIRASINA gore dizen istege bagli
+    # siralayici (bkz. `pcbqa/ml/`). Kabul karari hala `evaluate` iledir;
+    # bu yalnizca "once hangisini deneyelim" sorusunu cevaplar. None ise
+    # arama kendi sirasiyla calisir (eski davranis korunur).
+    move_ranker: MoveRanker | None = None
 
     def movable(self) -> list[str]:
         """Tasinabilir bilesenlerin referanslari."""

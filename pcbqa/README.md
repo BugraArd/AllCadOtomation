@@ -1,4 +1,4 @@
-# pcbqa — KiCad tasarım kalite analizi (Aşama 0)
+# pcbqa — KiCad tasarım kalite analizi ve otomatik yerleştirme
 
 KiCad projelerini **salt-okunur** analiz eden bir araç. Tasarımınızda hiçbir
 değişiklik yapmaz — sadece okur, ölçer ve rapor eder.
@@ -53,6 +53,126 @@ $env:PCBQA_KICAD_CLI = "C:\Program Files\KiCad\10.0\bin\kicad-cli.exe"
 ```
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
+
+## Aşama 5: makine öğrenimi altyapısı
+
+Aşama 3'ün dersi "yerleştirici, hakemin puanladığı şeyi optimize etmeli"ydi.
+Aşama 5 sıradaki soruyu sorar: hakemin ölçümü **doğru ama pahalı** (60
+bileşenli kartta 2 ms, `pic_programmer`da 6 ms, `jetson` gibi kartlarda çok
+daha fazla — `auto`nun süre bütçesini aşmasının sebebi bu). Yerel arama saniyede
+binlerce aday dener; bunların hangisinin denemeye değer olduğunu **öğrenilmiş
+bir model** söyleyebilir mi?
+
+```powershell
+# 1) Gerçek hakemle etiketlenmiş veri topla
+.\.venv\Scripts\python -m pcbqa.ml.collect --suite "C:\Program Files\KiCad\10.0\share\kicad\demos" `
+    --board samples\bench_bad.kicad_pcb --rules pcbqa\default_rules.yaml `
+    --out .work\moves.jsonl --budget 25
+
+# 2) Modelleri eğit ve KARŞILAŞTIR (mean = taban çizgisi, identity'nin ML karşılığı)
+.\.venv\Scripts\python -m pcbqa.ml.train .work\moves.jsonl --model all --target all --cv 5 `
+    --out pcbqa\ml\models\move-v1.json
+
+# 3) Öğrenilmiş sıralamayla yerleştir
+.\.venv\Scripts\python -m pcbqa.harness --placer auto --placer learned --board samples\bench_bad.kicad_pcb
+```
+
+### Model karar vermez, sıra önerir
+
+Bu ayrım altyapının tamamını belirledi. Model yalnızca aday hamleleri
+**denenme sırasına** dizer; bir hamlenin kabul edilip edilmeyeceğine hâlâ
+`ctx.evaluate` (gerçek hakem) karar verir. Sonuçları:
+
+- Model iyi çalışırsa aynı bütçede daha çok iyileşme yakalanır.
+- Model **tamamen yanılırsa** sonuç sadece biraz yavaşlar; skor düşemez.
+- Bozuk/eski bir model dosyası aramayı durduramaz — sıralayıcı patlarsa
+  arama kendi sırasıyla devam eder.
+
+Testlerde bu bilerek zorlanıyor: kasten **en kötü hamleyi başa alan** bir
+sıralayıcıyla ve her çağrıda istisna fırlatan bir sıralayıcıyla `polish`
+koşturuluyor; ikisinde de sonuç başlangıçtan kötü çıkmıyor.
+
+### Ölçülen şey: kaç değerlendirmede ilk iyileşmeyi buluyoruz
+
+R² değil. Yerel arama ilk iyileştiren hamleyi kabul ettiği için asıl soru
+"skoru artıran hamleye kaçıncı denemede ulaşıldığı". Taban, cilanın **bugün**
+kullandığı sıra. 21 karttan toplanan 49.699 örnekte, kart bazlı 5 katlı çapraz
+doğrulama:
+
+| model | hedef | ikili doğruluk | skor hızlanması |
+|---|---|---|---|
+| mean (taban) | — | 0.500 | 1.00x |
+| ridge | sign | **0.714** | **1.56x** |
+| gbt | score | 0.581 | 1.53x |
+| ridge | score | 0.691 | 1.51x |
+| gbt | value | 0.698 | 1.36x |
+| ridge | value | 0.695 | 1.34x |
+
+Yani öğrenilecek gerçek bir sinyal var: model, skoru artıran hamleyi ortalama
+2.8 yerine ~1.4 denemede buluyor.
+
+### Uçtan uca sonuç: `learned` şu an `auto`yu geçmiyor
+
+Dürüst tablo şu: sıralama kazancı yerleştirme **kalitesine** yansımıyor.
+Modelin hiç görmediği dört kartta (eğitim kümesinden çıkarılarak), 5 sn bütçe:
+
+| kart | önce | `auto` | `learned` |
+|---|---|---|---|
+| pic_programmer | 45 | 94 | 94 |
+| complex_hierarchy | 54 | 94 | 94 |
+| sonde xilinx | 73 | 100 | 100 |
+| interf_u | 5 | 12–14 | 12–15 |
+| jetson (1125 bileşen, 60 sn) | 93 | 93.3 | 93.3 |
+
+`interf_u` satırındaki oynama üç tekrarda `auto` için de aynı aralıkta çıkıyor
+— duvar saati bütçesinden gelen gürültü, model etkisi değil. Sebep basit:
+bu bütçelerde `auto` zaten doyuma ulaşıyor, sıralamayı hızlandırmak
+ulaşılabilir tavanı yükseltmiyor. `learned` bu yüzden `force`/`anneal` gibi bir
+**araştırma yerleştiricisi** olarak duruyor; üretim yerleştiricisi hâlâ `auto`.
+
+### Yol boyunca bulunan iki gerçek problem
+
+**1. Etiket seçimi model seçiminden daha önemli.** İlk model `sign` hedefiyle
+(“hakemi mutlu eder mi”) eğitildi ve `complex_hierarchy`yi 94 → 81 **düşürdü**
+— üstelik HPWL'i iyileştirerek (1680 → 1594). Sebep veri kümesinde görünüyor:
+etiketi pozitif olan hamlelerin **%81'i skoru hiç değiştirmiyor**, yalnızca
+teli birkaç mm kısaltıyor. Model bunları öğrenip cilayı mikro HPWL
+kazançlarına yönlendirdi, hakemin saydığı hatalar açık kaldı. Kural: modele
+neyi sıralamasını istiyorsak etiket **tam olarak o** olmalı (`--target score`).
+
+**2. Her sıra bilgisiz değildir.** Onarım aşamasında hamleler zaten anlamlı bir
+sırada üretiliyor: yarıçap artan, yani "en küçük yer değiştirme önce". Bu
+muhafazakâr sıra komşu kısıtları bozmadığı için değerlidir; modelin "tek başına
+en çok iyileştiren" hamlesi ise büyük sıçramalar seçip başka bulguları
+açıyordu. Sıralayıcı bu yüzden **yalnızca ince ayar aşamasında** devreye
+giriyor — orada sıra bugün zaten `rng.shuffle` ile rastgele, yani kaybedilecek
+bilgi yok. Bu kısıtlamadan sonra dört model varyantının hiçbiri gerileme
+yapmadı.
+
+### Öznitelikler neden yerel
+
+51 öznitelik var ve hepsi tek bir bileşenin **kendi netleri ve yakın
+komşularıyla** hesaplanıyor; maliyet kartın büyüklüğüne değil bileşenin
+derecesine bağlı. Ölçüldü:
+
+| kart | bileşen | öznitelik | tam değerlendirme | oran |
+|---|---|---|---|---|
+| bench_bad | 18 | 32 µs | 2.09 ms | 65x |
+| pic_programmer | 63 | 72 µs | 6.12 ms | 85x |
+
+Yerel hesabın sessizce yanlış olmaması kritik — model o zaman sağlam veriyle
+eğitildiğini sanır. Bu yüzden `d_hpwl` özniteliği testlerde **tam yeniden
+hesaplamayla** karşılaştırılıyor.
+
+### Bağımlılık yok
+
+`numpy`/`scikit-learn` eklenmedi. Ridge regresyon (normal denklemler +
+Cholesky) ve gradyan artırmalı ağaçlar (histogram tabanlı) saf Python;
+problem boyutu (~50 öznitelik, ~50 bin satır) bunun için fazlasıyla küçük ve
+proje `sexpr.py`den beri bağımlılıksız kalmayı tercih ediyor. Modeller
+**JSON** olarak saklanıyor: git diff'i okunabilir, Python sürümleri arasında
+taşınabilir, ve içinde çalıştırılabilir kod olmadığı için başkasından gelen bir
+model dosyasını açmak güvenlik sorunu değil.
 
 ## Aşama 4a/4b: şematik okuma ve netlist kalkanı
 
@@ -499,8 +619,36 @@ pcbqa/
   ipc_apply.py     kazanan yerleştiriciyi seçip IPC uygulamasını koşturan CLI
   report.py        terminal raporu + skor
   synth.py         sentetik test kartı üreteci
+  harness.py       yerleştiricileri koşturur, puanlar, kazanan kartı yazabilir
+  schematic.py     .kicad_sch okuyucu (hiyerarşik, pin/bbox geometrisi çözülmüş)
+  sch_verify.py    netlist değişmezliği kalkanı
+  sch_write.py     atomik yazma + açık-proje koruması + yedek
+  sch_move.py      bağlantı koruyan sembol taşıma
+  sch_place.py     şematik yerleştirme optimizasyonu
+  sch_apply.py     toplu uygulama (tek doğrulama, tek yazma)
   __main__.py      komut satırı
+  placement/
+    base.py        DONMUŞ arayüz: Placer, PlacementContext, Evaluation
+    refine.py      bulgu güdümlü cila — hakemin gerçek puanını optimize eder
+    auto.py        ÜRETİM yerleştiricisi: kaba + cila + gerileme tabanı
+    learned.py     auto + öğrenilmiş hamle sıralaması (Aşama 5)
+    cluster.py / force.py / anneal.py / codex.py   yarışan motorlar
+    baseline.py    identity / random (hakem doğrulaması)
+  ml/              Aşama 5 — makine öğrenimi altyapısı
+    features.py    DONMUŞ öznitelik şeması: tasarım + aday hamle -> vektör
+    collect.py     gerçek hakemle etiketlenmiş veri kümesi üretir
+    dataset.py     JSONL depolama + KART BAZLI bölme
+    metrics.py     regresyon + sıralama metrikleri
+    model.py       model sözleşmesi, JSON kaydet/yükle, kayıt defteri
+    linear.py      ridge regresyon (saf Python)
+    trees.py       gradyan artırmalı ağaçlar (saf Python)
+    train.py       eğitim/karşılaştırma komut satırı
+    models/        eğitilmiş modeller (JSON)
 ```
+
+`ml/` içinde de aynı katmanlama var: `features.py` ve `collect.py` PCB'yi bilir,
+geri kalanı bilmez. Şematik tarafı (Aşama 4e) aynı çekirdeği kullanmak
+istediğinde yalnızca yeni bir `features`/`collect` çifti yazmak yetecek.
 
 `model.py` ve `rules.py` KiCad'i **hiç bilmez** — sadece kendi veri modelini
 görürler. Bu ayrım bilinçli: Aşama 3'ün yerleştirme motoru da aynı modeli
@@ -558,3 +706,7 @@ tanesi zaten tam proje değil (PCB'si yok) ve temiz hata mesajı veriyorlar.
   yüzün alanını toplamak %100'ü aşan anlamsız sonuçlar verirdi).
 - HPWL bir tahmindir; gerçek bakır uzunluğu değil. Yönlendirme öncesi
   karşılaştırma için tasarlanmıştır.
+- **Öğrenilmiş sıralayıcı (`learned`) uçtan uca henüz kazanç vermiyor.**
+  Model sıralamayı ölçülebilir şekilde iyileştiriyor (çapraz doğrulamada
+  1.56x) ama bu bütçelerde `auto` zaten doyuma ulaştığı için yerleştirme
+  kalitesi değişmiyor. Üretim yerleştiricisi `auto`.
