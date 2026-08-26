@@ -32,6 +32,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 4d | Bağlantı koruyan sembol taşıma | ✅ Bitti |
 | 4e | Şematik yerleştirme kalitesi + toplu uygulama | ✅ Bitti |
 | 5 | Makine öğrenimi altyapısı (veri, model, ölçüm, güvenli bağlantı) | ✅ Bitti |
+| 6/A | Geniş hamle repertuarı + model filtresi (yol haritası A1-A3) | ⚠️ Bitti, kazanç yok (§13) |
 
 ---
 
@@ -126,6 +127,7 @@ pcbqa/
     model.py / linear.py / trees.py   model sözleşmesi, ridge, GBT
     train.py       eğitim/karşılaştırma CLI
     models/        eğitilmiş modeller (JSON)
+  placement/repertoire.py   geniş hamle repertuarı: takas / küme / bölge (Aşama 6)
   __main__.py      komut satırı
   default_rules.yaml
 samples/
@@ -862,3 +864,121 @@ Tüm aşamalar sıfırdan koşuldu.
 için artık taşıma önerilmiyor. Gerileme değil, bilinçli muhafazakârlığın
 sonucu. Bus'sız sayfalarda 4e ölçümleri korunuyor (yukarıdaki fpga-config
 satırı).
+
+---
+
+## 13. Aşama 6 / Faz A — geniş hamle repertuarı + model filtresi
+
+Yol haritasının A1–A3 adımları. **Sonuç kısmen olumsuz ve bu bölüm asıl olarak
+onu kaydediyor**: altyapı çalışıyor, ölçümler net, ama Faz A'nın dayandığı
+"repertuar darlığı tavanı belirliyor" varsayımı ölçüldüğünde büyük ölçüde
+çürüdü. Aynı yola tekrar girilmesin diye sebepleri aşağıda.
+
+### 13.1 Ne inşa edildi
+
+| Parça | İş |
+|---|---|
+| `base.Compound` | Birleşik hamle: aynı anda birden fazla bileşen. Tek bileşenli hamle 1 elemanlı özel hali |
+| `placement/repertoire.py` | `swaps` (takas), `clusters` (IC + uyduları), `regions` (boş bölgeye sıçrama) |
+| `refine.polish` 3. aşama | Geniş repertuar, `keep` ile değerlendirme bütçesi sabitlenmiş |
+| `features.py` v2 | Birleşik hamleleri **doğru** hesaplar + 8 birleşik öznitelik (51 → 59) |
+| `metrics.recall_at_k` | Eleme riski: top-K kesiminden kaç iyileşme sağ çıkıyor |
+| `collect --saturate` | Doymuş durumdan da örnekleme |
+| `tests/test_repertoire.py` | 15 test |
+
+Birleşik hamle **şart**tı: takas ancak iki bileşen aynı anda oynarsa işe yarar.
+Ara adımdan gitmek (önce A, sonra B) her seferinde çakışma üretir ve hakem ara
+durumu reddeder.
+
+### 13.2 Ölçüm 1 — repertuar gerçekten iyileşme içeriyor mu? **Evet, ama HPWL'de**
+
+Dar repertuarın tükendiği (doymuş) bir yerleşimde, adayların hakemin sıralama
+anahtarını (`better_than`) iyileştirme oranı:
+
+| üretici | pic_programmer | interf_u |
+|---|---|---|
+| kümе taşıma | **%28.3** | **%20.5** |
+| takas | %1.8 | %3.2 |
+| bölge sıçraması | %0.0 | %1.7 |
+
+⚠️ **Bu sayıları yanlış okumayın** — ilk okuyuşta ben okudum. `better_than`
+sözlükseldir ve skor eşitken **HPWL** karar verir. Aynı hamlelerin *skoru*
+artırma oranı yalnızca **%0.3**. Yani geniş repertuar güçlü bir **tel uzunluğu**
+optimizasyoncusu, ama kural bulgularını neredeyse hiç kapatmıyor. Skor
+bulgulardan geldiği için tavan da bu yüzden yerinde duruyor.
+
+`regions` bu ölçümle **kapatıldı**: hiçbir şey bulmuyor ama adayların üçte
+birini yiyordu (`include_regions=True` ile açılır).
+
+### 13.3 Ölçüm 2 — bütçe politikası: üç deneme, üçü de öğretici
+
+3. aşama ilk sürümde **hiç çalışmadı**. Sebep: 1. ve 2. aşama kendiliğinden
+bitmiyor. Durma şartı "bir tur gez, hiçbiri iyileşmesin"; HPWL bir eşitlik
+bozucu olduğu için her zaman birkaç mikron kazandıran bir kaydırma bulunuyor.
+
+| deneme | 19 kartlık pakette sonuç |
+|---|---|
+| a) Sabit %30 pay kes | **Berabere**: StickHub +1.2, video +3.3 / complex_hierarchy −2.8, interf_u −2.3 |
+| b) "Durgunluk yalnızca SKOR artışında sıfırlansın" | **Daha kötü**: 2 iyi, 3 kötü (complex_hierarchy −5.5) |
+| c) 1. ve 2. aşamadan zaman **çalma**, geniş aşamayı opt-in yap | Gerileme riski **sıfır** — seçilen |
+
+(b)'nin başarısızlığı en öğretici olanı: **sadece HPWL kısaltan hamleler boşa
+gitmiyor, plato aşma mekanizması onlar.** Bileşenleri yavaş yavaş yeniden
+konumlandırıyorlar ve skor kazancı ancak birkaç adım sonra ulaşılabilir hale
+geliyor. "Skoru artırmayan hamle zaman israfıdır" sezgisi ölçümle çürüdü.
+
+Bu yüzden geniş aşama **varsayılan olarak kapalı**: `auto` commit edilmiş
+davranışını birebir koruyor.
+
+### 13.4 Ölçüm 3 (A3) — eleme riski ve K seçimi
+
+`recall_at_k` ile, 21 karttan 67.511 örnek üzerinde (doymuş başlangıçlar dahil):
+
+| K | hit (parti) | recall |
+|---|---|---|
+| 4 | %92.1 | %50.5 |
+| **8** | **%96.8** | %72.4 |
+| 12 | %96.8 | %83.8 |
+| 24 | %100 | %100 |
+
+Karar verdirici sütun `hit`: yerel arama ilk iyileşmeyi kabul edip durduğu için
+top-K içinde **en az bir** iyileşmenin sağ kalması yeterli. `WIDE_KEEP = 12`
+artık tahmin değil, bu eğriden geliyor (%95 eşiğini marjla karşılıyor).
+
+### 13.5 Ölçüm 4 (A2) — model filtresi zar atmayı geçiyor mu? **Henüz hayır**
+
+Üç kol, aynı değerlendirme bütçesi, 15 sn:
+
+| kart | `auto` (dar) | +geniş, **zar** seçimi | +geniş, **model** seçimi |
+|---|---|---|---|
+| StickHub | 55.1 | **56.3** | **56.3** |
+| complex_hierarchy | 91.6 | 91.6 | **94.3** |
+| interf_u | 15.9 | **27.8** | 21.9 |
+| video / pic_programmer / kit-dev | — | değişmedi | değişmedi |
+
+Model, zar atmaya karşı tutarlı bir üstünlük göstermiyor. Sebebi `recall_at_k`
+tablosunda görünüyor: aday havuzları zaten küçük (küme partisi ~13, takas ~20),
+K = 12 ile **zar da neredeyse her şeyi tutuyor**. Filtrelemenin kazanç
+üretebilmesi için havuzun K'dan çok daha büyük olması gerekir — yani
+`SWAP_MAX_PARTNERS` sınırının kalkması. O sınır maliyet için konmuştu; kaldırmak
+ancak aday üretimi ucuz kalırsa mantıklı.
+
+Model tarafındaki saf sıralama ölçümü ise iyileşti (v2 şeması, doymuş veri):
+`gbt:sign` skor artıran hamleyi 3.5 yerine 2.5 denemede buluyor (**1.40x**),
+ikili doğruluk 0.694, taban 1.00x/0.500.
+
+### 13.6 Bilinen sınırlar / bir sonraki adım
+
+- Geniş repertuar **opt-in**: `ctx.allow_wide_moves = True` veya
+  `polish(..., wide_keep=N)`; `Learned(wide=True)`. Şematik tarafı (4e)
+  açıkça kapatır — takas/küme/bölge PCB kavramları.
+- Takas ortakları 20 ile sınırlı; model filtresinin anlam kazanabilmesi için
+  bu sınırın kalkması gerekir (bkz. 13.5).
+- **Faz A'nın asıl dersi:** tavanı belirleyen şey repertuar darlığı değil,
+  skorun **kural bulgularından** gelmesi. Bulguları kapatan hamleler
+  onarım aşamasının ürettiği hamlelerdir; geniş repertuar tel uzunluğuna
+  çalışıyor. Yol haritasında Faz A'dan beklenen kazanç bu yüzden gelmedi.
+- Buna göre **Faz C (öznitelik şeması v3 — pin düzeyi geometri, kural tipi
+  bağlamı) Faz D'den ve A'nın devamından önce gelmeli**: skor bulgulardan
+  geliyorsa, modelin bulguları görmesi gerekir. Şu anki öznitelikler bulguyu
+  yalnızca "bu bileşen bir bulguda geçiyor mu" düzeyinde görüyor.

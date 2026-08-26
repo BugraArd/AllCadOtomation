@@ -24,6 +24,7 @@ from pcbqa.ml.model import MeanModel, load as load_model
 from pcbqa.ml.trees import GBTModel
 from pcbqa.placement.base import Evaluation, PlacementContext
 from pcbqa.placement.learned import Learned, ModelRanker
+from pcbqa.placement import refine
 from pcbqa.placement.refine import polish
 from pcbqa.rules import load_rules
 
@@ -131,6 +132,45 @@ class FeatureCorrectnessTests(unittest.TestCase):
         self.assertGreaterEqual(f["overlaps_after"], 1.0)
         self.assertGreater(f["d_overlaps"], 0.0)
         self.assertAlmostEqual(f["clearance_after"], 0.0)
+
+    def test_compound_sees_all_moved_components_at_once(self):
+        """Takasta A'nin yeni HPWL'i B ESKI yerindeymis gibi hesaplanamaz.
+
+        Hesaplanirsa hamlenin tam yarisi yanlis olur ve model sistematik
+        olarak yanlis egitilir. Yerel hesap tam yeniden hesaplamayla
+        karsilastiriliyor.
+        """
+        design, _, ctx = bench_context()
+        fz = MoveFeaturizer(design, ctx.locked)
+        placement = ctx.current()
+        fz.refresh(placement, ctx.evaluate(placement))
+
+        a, b = ctx.movable()[0], ctx.movable()[1]
+        swap = ((a, placement[b]), (b, placement[a]))
+        f = named(fz.features_compound(swap))
+        self.assertEqual(f["is_swap"], 1.0)
+        self.assertAlmostEqual(f["moved_count_log"], math.log1p(2))
+
+        moved = refine.with_moves(placement, swap)
+        base = apply_placement(design, placement)
+        after = apply_placement(design, moved)
+        nets = {p.net for r in (a, b) for p in base.pins_of(r) if p.net}
+        exact = sum(after.hpwl(n) - base.hpwl(n) for n in nets)
+        self.assertAlmostEqual(f["d_hpwl_all"], exact, places=6)
+
+    def test_single_move_is_not_flagged_as_swap(self):
+        design, _, ctx = bench_context()
+        fz = MoveFeaturizer(design, ctx.locked)
+        placement = ctx.current()
+        fz.refresh(placement, ctx.evaluate(placement))
+        ref = ctx.movable()[0]
+        x, y, rot = placement[ref]
+        f = named(fz.features_compound(((ref, (x + 3.0, y, rot)),)))
+        self.assertEqual(f["is_swap"], 0.0)
+        self.assertAlmostEqual(f["moved_count_log"], math.log1p(1))
+        # Tek atomda birincil blok ile birlesik blok ortusmeli
+        self.assertAlmostEqual(f["d_hpwl"], f["d_hpwl_all"], places=9)
+        self.assertAlmostEqual(f["move_dist"], f["move_dist_max"], places=9)
 
     def test_kind_one_hot_has_exactly_one_bit(self):
         design, _, ctx = bench_context()
@@ -316,9 +356,9 @@ class RankerTests(unittest.TestCase):
         ranker = ModelRanker(fz, Descending())
         ref = ctx.movable()[0]
         x, y, rot = placement[ref]
-        moves = [(ref, (x + d, y, rot)) for d in (1.0, 9.0, 3.0, 5.0)]
+        moves = [((ref, (x + d, y, rot)),) for d in (1.0, 9.0, 3.0, 5.0)]
         ordered = ranker(placement, ev, list(moves))
-        self.assertEqual([m[1][0] - x for m in ordered], [9.0, 5.0, 3.0, 1.0])
+        self.assertEqual([m[0][1][0] - x for m in ordered], [9.0, 5.0, 3.0, 1.0])
 
     def test_short_lists_are_left_alone(self):
         design, _, ctx = bench_context()
@@ -328,7 +368,7 @@ class RankerTests(unittest.TestCase):
         fz.refresh(placement, ev)
         ranker = ModelRanker(fz, MeanModel(value=0.0))
         ref = ctx.movable()[0]
-        moves = [(ref, placement[ref])]
+        moves = [((ref, placement[ref]),)]
         self.assertEqual(ranker(placement, ev, list(moves)), moves)
         self.assertEqual(ranker.calls, 0)
 
@@ -371,7 +411,7 @@ class AdversarialRankerTests(unittest.TestCase):
         self.assertGreaterEqual(ctx.evaluate(result).key, before.key)
 
     def test_shipped_model_matches_the_frozen_schema(self):
-        path = Path(__file__).resolve().parent.parent / "pcbqa" / "ml" / "models" / "move-v1.json"
+        path = Path(__file__).resolve().parent.parent / "pcbqa" / "ml" / "models" / "move-v2.json"
         if not path.exists():
             self.skipTest("depoda egitilmis model yok")
         model = load_model(path)

@@ -632,6 +632,7 @@ pcbqa/
     refine.py      bulgu güdümlü cila — hakemin gerçek puanını optimize eder
     auto.py        ÜRETİM yerleştiricisi: kaba + cila + gerileme tabanı
     learned.py     auto + öğrenilmiş hamle sıralaması (Aşama 5)
+    repertoire.py  geniş hamle repertuarı: takas / küme taşıma (Aşama 6, opt-in)
     cluster.py / force.py / anneal.py / codex.py   yarışan motorlar
     baseline.py    identity / random (hakem doğrulaması)
   ml/              Aşama 5 — makine öğrenimi altyapısı
@@ -706,6 +707,11 @@ tanesi zaten tam proje değil (PCB'si yok) ve temiz hata mesajı veriyorlar.
   yüzün alanını toplamak %100'ü aşan anlamsız sonuçlar verirdi).
 - HPWL bir tahmindir; gerçek bakır uzunluğu değil. Yönlendirme öncesi
   karşılaştırma için tasarlanmıştır.
+- **Geniş hamle repertuarı (`repertoire.py`) varsayılan olarak kapalı.**
+  Takas/küme taşıma tel uzunluğunu iyi kısaltıyor (doymuş yerleşimde küme
+  hamlelerinin %28'i hakemin sıralama anahtarını iyileştiriyor) ama kural
+  bulgularını neredeyse hiç kapatmıyor (%0.3), yani skoru yükseltmiyor.
+  Açmak için `ctx.allow_wide_moves = True`. Ayrıntılı ölçüm: HANDOFF §13.
 - **Öğrenilmiş sıralayıcı (`learned`) uçtan uca henüz kazanç vermiyor.**
   Model sıralamayı ölçülebilir şekilde iyileştiriyor (çapraz doğrulamada
   1.56x) ama bu bütçelerde `auto` zaten doyuma ulaştığı için yerleştirme

@@ -206,6 +206,21 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {key:<15}{cv['spearman']:>10.3f}{cv['pairwise']:>10.3f}"
                       f"{cv['speedup']:>9.2f}x{cv['speedup_score']:>11.2f}x")
 
+    # --- ELEME EGRISI (A3): genis repertuarda K'yi buradan secin, tahminle degil.
+    win = results[winner]
+    print()
+    print("  ELEME RISKI - top-K kesiminden sag cikan SKOR ARTIRAN hamleler")
+    print(f"  {'K':>5}{'hit (parti)':>14}{'recall':>10}   <- hit: en az bir iyilesme sag kaldi mi")
+    print("  " + "-" * 45)
+    for k, row in sorted(win["recall_score"].items()):
+        print(f"  {k:>5}{row['hit']:>13.1%}{row['recall']:>10.1%}")
+    safe = [k for k, row in sorted(win["recall_score"].items()) if row["hit"] >= 0.95]
+    if safe:
+        print(f"  hit >= %95 icin yeterli K: {safe[0]}  "
+              f"(refine.WIDE_KEEP bunu karsilamali)")
+    else:
+        print("  UYARI: hicbir K'da hit %95'e ulasmiyor - eleme iyilesme kaybettiriyor")
+
     best = trained[winner]
     if isinstance(best, RidgeModel):
         print()
@@ -226,6 +241,10 @@ def main(argv: list[str] | None = None) -> int:
                 k: round(v, 4)
                 for k, v in results[winner].items()
                 if isinstance(v, (int, float))
+            },
+            "recall_score": {
+                str(k): {m: round(v, 4) for m, v in row.items()}
+                for k, row in results[winner]["recall_score"].items()
             },
         }
         best.save(args.out)

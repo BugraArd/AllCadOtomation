@@ -11,7 +11,7 @@ duruyor. Yani:
 
 Bu, ML'i sisteme sokmanin guvenli yolu: model KARAR vermez, SIRA onerir.
 
-Model yoksa (`pcbqa/ml/models/move-v1.json` bulunamazsa) sinif sessizce
+Model yoksa (`pcbqa/ml/models/move-v2.json` bulunamazsa) sinif sessizce
 `auto` gibi davranir; yani depo modelsiz de calisir.
 """
 
@@ -20,12 +20,12 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from .base import Evaluation, Move, Placement, PlacementContext
+from .base import Compound, Evaluation, Placement, PlacementContext
 from .cluster import ClusterPlacer
 from . import refine
 
 # Egitilmis modelin varsayilan yeri. `python -m pcbqa.ml.train --out ...`
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "models" / "move-v1.json"
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "models" / "move-v2.json"
 
 COARSE_SHARE = 0.45
 # Oznitelik cikarimi da zaman yiyor; cok kisa listelerde siralamanin getirisi
@@ -34,11 +34,14 @@ MIN_MOVES_TO_RANK = 4
 
 
 class ModelRanker:
-    """Aday hamleleri modelin tahminine gore buyukten kucuge dizer.
+    """Aday BIRLESIK hamleleri modelin tahminine gore buyukten kucuge dizer.
 
-    `top_k` verilirse liste kisaltilir da. Varsayilani None (eleme YOK) -
-    eleme, modelin dusuk puan verdigi bir iyilesmeyi tamamen kaybettirebilir;
-    yalnizca sira degistirmek ise hicbir sey kaybettirmez, sadece erken bulur.
+    `top_k` verilirse liste kisaltilir da. Varsayilani None (eleme YOK):
+    eleme, modelin dusuk puan verdigi bir iyilesmeyi tamamen kaybettirebilir,
+    sira degistirmek ise hicbir sey kaybettirmez. Genis repertuar asamasinda
+    (Asama 6) eleme ZORUNLU hale gelir - takas O(n^2) aday uretir ve hepsini
+    gercek hakemle denemek imkansiz - ama orada kesmeyi `refine.polish`
+    yapiyor, cunku ayni kesme `auto` icin de rastgele uygulanmali (adil A/B).
     """
 
     def __init__(self, featurizer, model, top_k: int | None = None) -> None:
@@ -50,8 +53,8 @@ class ModelRanker:
         self._stamp: tuple[int, float] | None = None
 
     def __call__(
-        self, placement: Placement, evaluation: Evaluation, moves: list[Move]
-    ) -> list[Move]:
+        self, placement: Placement, evaluation: Evaluation, moves: list[Compound]
+    ) -> list[Compound]:
         if len(moves) < MIN_MOVES_TO_RANK:
             return moves
         # Yerlesim degistiyse onbellekleri tazele. Kimlik + skor damgasi,
@@ -63,13 +66,12 @@ class ModelRanker:
         self.calls += 1
         self.ranked += len(moves)
         scored = []
-        for move in moves:
-            ref, xyr = move
+        for compound in moves:
             try:
-                value = self.model.predict(self.featurizer.features(ref, xyr))
+                value = self.model.predict(self.featurizer.features_compound(compound))
             except Exception:
                 value = 0.0
-            scored.append((value, move))
+            scored.append((value, compound))
         scored.sort(key=lambda kv: -kv[0])
         ordered = [m for _, m in scored]
         return ordered[: self.top_k] if self.top_k else ordered
@@ -95,9 +97,18 @@ class Learned:
 
     name = "learned"
 
-    def __init__(self, model_path: Path | None = None, top_k: int | None = None) -> None:
+    def __init__(
+        self,
+        model_path: Path | None = None,
+        top_k: int | None = None,
+        wide: bool = False,
+    ) -> None:
         self.model_path = model_path
         self.top_k = top_k
+        # Genis repertuar (Asama 6 / Faz A) varsayilan olarak KAPALI - `auto`
+        # ile ayni sebeple (bkz. refine.WIDE_SHARE). Acildiginda modelin isi
+        # nitel olarak degisir: siralamak degil, ELEMEK.
+        self.wide = wide
         self.ranker: ModelRanker | None = None
 
     def run(self, ctx: PlacementContext) -> Placement:
@@ -112,7 +123,7 @@ class Learned:
         # ctx DEGISTIRILMEZ (sozlesme: girdi salt-okunur). Siralayici, cilaya
         # verilen turetilmis baglamlara takilir.
         def child(budget: float) -> PlacementContext:
-            return PlacementContext(
+            sub = PlacementContext(
                 design=ctx.design,
                 locked=ctx.locked,
                 seed=ctx.seed,
@@ -120,6 +131,8 @@ class Learned:
                 evaluator=ctx.evaluator,
                 move_ranker=self.ranker,
             )
+            sub.allow_wide_moves = self.wide or getattr(ctx, "allow_wide_moves", False)
+            return sub
 
         coarse_budget = ctx.time_budget_s * COARSE_SHARE
         try:

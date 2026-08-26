@@ -23,7 +23,8 @@ import random
 import time
 from typing import Any, Iterable
 
-from .base import Evaluation, Placement, PlacementContext
+from .base import Compound, Evaluation, Move, Placement, PlacementContext
+from .repertoire import Repertoire
 
 # Bulgu kaynakli hamlelerde denenen yaricap kesirleri (limitin katlari)
 _RADIUS_FRACTIONS = (0.35, 0.55, 0.75)
@@ -31,6 +32,35 @@ _RADIUS_FRACTIONS = (0.35, 0.55, 0.75)
 _ANGLE_STEPS = 8
 # Ince ayar hamlelerinde denenen kaydirmalar (mm)
 _NUDGES = (0.5, 1.0, 2.0, 4.0)
+# Genis repertuar asamasinda bilesen basina kac aday gercek hakeme gider.
+# Aday uretimi ucuz, DEGERLENDIRME pahali (2-6 ms); butceyi bu sayi belirler.
+WIDE_KEEP = 12
+# Genis repertuara ayrilan butce payi. 3. asama VARSAYILAN OLARAK KAPALI
+# (`ctx.allow_wide_moves` veya `wide_keep` ile acilir); acildiginda toplam
+# butcenin bu kadari 1. ve 2. asamadan kesilir.
+#
+# ## Neden varsayilan kapali - olculdu, tahmin degil
+#
+# 1. ve 2. asama bu payi vermeden 3. asamaya hic sira birakmiyor: durma sarti
+# "bir tur gez, hicbir sey iyilesmesin", ama HPWL bir esitlik bozucu oldugu
+# icin her zaman birkac mikron kazandiran bir kaydirma bulunuyor.
+#
+# Ilk cozum sabit pay kesmekti. 19 kartlik pakette sonuc BERABERE: 2 kart
+# iyilesti (StickHub +1.2, video +3.3), 2 kart kotulesti (complex_hierarchy
+# -2.8, interf_u -2.3).
+#
+# Ikinci cozum "durgunluk sayaci yalnizca SKOR artisinda sifirlansin" idi -
+# yani asama, skor uretmeyi birakinca devretsin. DAHA KOTU cikti (2 iyi,
+# 3 kotu; complex_hierarchy -5.5). Sebebi ogretici: sadece HPWL kisaltan
+# hamleler BOSA GITMIYOR, plato asma mekanizmasi onlar. Bilesenleri yavas
+# yavas yeniden konumlandiriyorlar ve skor kazanci ancak birkac adim sonra
+# ulasilabilir hale geliyor. "Skoru artirmayan hamle zaman israfidir"
+# sezgisi yanlisti.
+#
+# Uctuncu ve gecerli olan karar: 1. ve 2. asamadan zaman CALMA. Genis
+# repertuar yalnizca acikca istendiginde calisir; boylece `auto` commit
+# edilmis davranisini birebir korur ve gerileme riski sifirdir.
+WIDE_SHARE = 0.2
 
 
 def _refs_of(finding: Any) -> list[str]:
@@ -52,6 +82,24 @@ def _with(placement: Placement, ref: str, xyr: tuple[float, float, float]) -> Pl
     out = dict(placement)
     out[ref] = xyr
     return out
+
+
+def _with_all(placement: Placement, compound: Compound) -> Placement:
+    """BIRLESIK hamleyi uygulanmis YENI bir yerlestirme sozlugu.
+
+    Butun atomlar ayni anda uygulanir; ara adim diye bir sey yoktur. Takasin
+    calisabilmesinin sarti bu - A'yi once tasiyip sonra B'yi tasimak arada
+    kesin bir cakisma uretir ve hakem o ara durumu reddeder.
+    """
+    out = dict(placement)
+    for ref, xyr in compound:
+        out[ref] = xyr
+    return out
+
+
+def _as_compounds(moves: Iterable[Move]) -> list[Compound]:
+    """Tek bilesenli hamleleri 1 elemanli birlesige sarar."""
+    return [(m,) for m in moves]
 
 
 def _ring(cx: float, cy: float, radius: float) -> Iterable[tuple[float, float]]:
@@ -176,17 +224,39 @@ def polish(
     budget_s: float | None = None,
     *,
     verbose: bool = False,
+    wide_keep: int | None = None,
 ) -> Placement:
     """Baslangic yerlesimini hakem olcutuyle iyilestirir.
 
     Hicbir zaman baslangictan kotu bir sonuc dondurmez. `ctx.evaluate`
     yoksa (eski cagri yolu) girdiyi oldugu gibi geri verir.
+
+    `wide_keep`: genis repertuar asamasinda (3) bilesen basina kac aday
+    gercek hakeme gonderilir. 0 verilirse o asama hic calismaz - sematik
+    tarafi (Asama 4e) takas/kume kavramlarina sahip olmadigi icin kendi
+    baglaminda 0 gecer. Varsayilan `WIDE_KEEP`.
     """
     if ctx.evaluator is None:
         return dict(start)
 
     deadline = time.perf_counter() + (budget_s if budget_s is not None else ctx.time_budget_s)
+    full_deadline = deadline  # asamalar arasinda `deadline` daraltilip geri acilir
     rng = random.Random(ctx.seed)
+    if wide_keep is None:
+        wide_keep = WIDE_KEEP if getattr(ctx, "allow_wide_moves", False) else 0
+    if wide_keep > 0:
+        # 3. asamaya bir TABAN pay ayrilir. Asil devretme mekanizmasi bu degil
+        # (o, asagidaki "yalnizca skor artisi sayilir" kurali); bu yalnizca
+        # 1. ve 2. asamanin skor uretmeye devam ettigi kartlarda genis
+        # repertuarin hic denenmeden kalmamasini garanti eder.
+        #
+        # Ilk surumde tek mekanizma sabit pay kesmekti ve 19 kartlik pakette
+        # sonuc BERABEREYDI: 2 kart iyilesti (StickHub +1.2, video +3.3),
+        # 2 kart kotulesti (complex_hierarchy -2.8, interf_u -2.3). Sebep
+        # acikti - hala ilerleyen kartlardan zaman calmak.
+        deadline = time.perf_counter() + (full_deadline - time.perf_counter()) * (
+            1.0 - WIDE_SHARE
+        )
 
     # Asama 5 kancasi: baglam bir siralayici sunuyorsa adaylar once ona
     # gosterilir. Siralayici YALNIZCA denenme sirasini degistirir - kabul
@@ -208,21 +278,36 @@ def polish(
     if best_eval is None:
         return best
 
-    def try_moves(moves, rank: bool = False) -> bool:
-        """Ilk iyilestiren hamleyi kabul eder (first-improvement).
+    def try_moves(moves, rank: bool = False, keep: int | None = None) -> bool:
+        """Ilk iyilestiren BIRLESIK hamleyi kabul eder (first-improvement).
 
-        `rank` YALNIZCA ince ayar asamasinda acilir - sebebi asagida (2).
+        `rank` YALNIZCA ince ayar ve genis repertuar asamalarinda acilir -
+        sebebi asagida (2).
+
+        `keep` verilirse aday listesi o sayiya indirilir. Bu, genis
+        repertuarin (takas O(n^2) aday uretir) degerlendirme butcesini
+        sinirlamak icin sart. ADALET NOKTASI: siralayici varsa en iyi `keep`
+        tanesi, yoksa RASTGELE `keep` tanesi denenir - yani `auto` ile
+        `learned` ayni sayida gercek degerlendirme yapar ve aradaki fark
+        yalnizca SECIMDEN gelir.
         """
         nonlocal best, best_eval
-        if rank and ranker is not None and moves:
+        moves = list(moves)
+        if not moves:
+            return False
+        if rank and ranker is not None:
             try:
-                moves = ranker(best, best_eval, list(moves))
+                moves = list(ranker(best, best_eval, moves))
             except Exception:
                 pass  # siralayici patlarsa arama kendi sirasiyla devam eder
-        for ref, xyr in moves:
+        if keep is not None and len(moves) > keep:
+            # Siralayici zaten en iyileri basa aldiysa bastan kes; almadiysa
+            # rastgele orneklem al (bir uctan kesmek konum onyargisi yaratir).
+            moves = moves[:keep] if (rank and ranker is not None) else rng.sample(moves, keep)
+        for compound in moves:
             if time.perf_counter() > deadline:
                 return False
-            cand = _with(best, ref, xyr)
+            cand = _with_all(best, compound)
             ev = ctx.evaluate(cand)
             if ev is not None and ev.better_than(best_eval):
                 best, best_eval = cand, ev
@@ -244,7 +329,7 @@ def polish(
         for finding in errors + warnings:
             if time.perf_counter() > deadline:
                 break
-            if try_moves(_finding_moves(finding, best, ctx)):
+            if try_moves(_as_compounds(_finding_moves(finding, best, ctx))):
                 improved = True
                 if verbose:
                     print(f"    onarim: {getattr(finding, 'rule_id', '?')} -> {best_eval.score:.1f}")
@@ -257,12 +342,45 @@ def polish(
     while time.perf_counter() < deadline and movable and stagnant < len(movable):
         ref = movable[idx % len(movable)]
         idx += 1
-        if try_moves(_nudge_moves(ref, best, ctx, rng), rank=True):
+        if try_moves(_as_compounds(_nudge_moves(ref, best, ctx, rng)), rank=True):
             stagnant = 0
             if verbose:
                 print(f"    ince ayar: {ref} -> {best_eval.score:.1f}")
         else:
             stagnant += 1
+
+    # 3) GENIS REPERTUAR (Asama 6): takas, kume tasima, bolge sicramasi.
+    #
+    # (1) ve (2) tukendiginde arama tek-bilesen hamleleriyle ulasilabilen bir
+    # yerel en iyide durur. Regresyon paketinde 19 kartin 8'inde `auto`nun hic
+    # iyilestirme bulamamasinin sebebi buydu: iyilestiren hamle repertuarda
+    # YOKTU. Bu asama tavani yukseltmeyi hedefler.
+    #
+    # Aday sayisi burada patlar (takas O(n^2)); `keep` ile degerlendirme
+    # butcesi sabitlenir ve secimi ya model ya da zar yapar.
+    deadline = full_deadline
+    if wide_keep > 0:
+        repertoire = Repertoire(ctx, rng)
+        rng.shuffle(movable)
+        idx = 0
+        stagnant = 0
+        while time.perf_counter() < deadline and movable and stagnant < len(movable):
+            ref = movable[idx % len(movable)]
+            idx += 1
+            hit = False
+            # Partiler ZENGINDEN FAKIRE sirali (bkz. `wide_batches`); her biri
+            # kendi `keep` butcesiyle denenir, boylece fakir bir uretici zengin
+            # olani sulandiramaz.
+            for label, moves in repertoire.wide_batches(ref, best):
+                if try_moves(moves, rank=True, keep=wide_keep):
+                    hit = True
+                    if verbose:
+                        print(f"    genis/{label}: {ref} -> {best_eval.score:.1f}")
+                    break
+            if hit:
+                stagnant = 0
+            else:
+                stagnant += 1
 
     return best
 
@@ -276,6 +394,8 @@ def polish(
 finding_moves = _finding_moves
 nudge_moves = _nudge_moves
 with_move = _with
+with_moves = _with_all
+as_compounds = _as_compounds
 
 
 def keep_best(

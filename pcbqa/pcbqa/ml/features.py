@@ -1,6 +1,9 @@
 """DONMUS OZNITELIK SEMASI - bir aday hamleyi sayilara cevirir.
 
 Bu dosya `placement/base.py` ile ayni statude: **geri uyumsuz degistirmeyin.**
+(v2, Asama 6: birlesik hamleler - takas/kume tasima - eklendi. Tek bilesenli
+hamlelerde ilk 51 deger v1 ile birebir ayni anlami tasir; sonuna 8 oznitelik
+eklendi, yani v1 modelleri yeniden egitilmeli.)
 Egitilmis model dosyalari oznitelik ADLARINI ve SIRASINI icinde saklar; sema
 degisirse eski modeller sessizce yanlis sayilari okur. Yeni oznitelik eklemek
 icin `FEATURE_VERSION`'i artirin ve yeni adi listenin SONUNA koyun -
@@ -39,7 +42,7 @@ from .. import geom
 from ..model import Design
 
 # Sema surumu. Oznitelik listesi her degistiginde artar.
-FEATURE_VERSION = 1
+FEATURE_VERSION = 2
 
 # Bilesen turleri - `model.ref_kind` ile ayni kume, sabit sirali.
 KINDS: tuple[str, ...] = (
@@ -120,6 +123,19 @@ FEATURE_NAMES: tuple[str, ...] = (
     "net_partner_mean_before",
     "net_partner_mean_after",
     "d_net_partner_mean",
+    # --- BIRLESIK hamle blogu (sema v2, Asama 6): hamlenin tumunu ozetler.
+    # Tek bilesenli hamlelerde bu degerler yukaridaki birincil bloktan
+    # turetilebilir; ayri tutulmalarinin sebebi takas/kume hamlelerinde
+    # ayrismalari - orada birincil bilesenin gordugu ile hamlenin toplam
+    # etkisi farkli seylerdir.
+    "moved_count_log",
+    "is_swap",
+    "move_dist_total",
+    "move_dist_max",
+    "d_hpwl_all",
+    "d_hpwl_all_norm",
+    "d_overlaps_all",
+    "clearance_after_min",
 )
 
 FEATURE_COUNT = len(FEATURE_NAMES)
@@ -127,6 +143,12 @@ FEATURE_COUNT = len(FEATURE_NAMES)
 
 def _log1p(v: float) -> float:
     return math.log1p(max(0.0, v))
+
+
+def _bbox_of(poly: Sequence[tuple[float, float]]) -> tuple[float, float, float, float]:
+    xs = [px for px, _ in poly]
+    ys = [py for _, py in poly]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def _rotate(dx: float, dy: float, degrees: float) -> tuple[float, float]:
@@ -359,39 +381,51 @@ class MoveFeaturizer:
         minx, miny, maxx, maxy = self.outline
         return min(x - minx, maxx - x, y - miny, maxy - y)
 
-    def _net_state(
-        self, ref: str, xyr: tuple[float, float, float] | None
-    ) -> tuple[float, list[float]]:
-        """Bilesenin netlerinin HPWL toplami ve net basina degerler.
+    # ------------------------------------------------- birlesik hamle hesabi
+    #
+    # Asama 6: bir hamle artik birden fazla bileseni AYNI ANDA oynatabilir
+    # (takas, kume tasima). Bu, hesabi da degistirir: A'nin yeni tel
+    # uzunlugu B hala eski yerindeymis gibi hesaplanirsa takasin tam yarisi
+    # yanlis olur. Asagidaki her fonksiyon `moved` sozlugunun TAMAMINI dikkate
+    # alir; tek bilesenli hamle bunun 1 elemanli ozel halidir.
 
-        `xyr` verilirse bu bilesenin pinleri oraya tasinmis varsayilir; None
-        ise mevcut onbellek kullanilir. Maliyet netin pin sayisiyla orantili,
-        kartin buyuklugunden bagimsiz.
+    def _nets_touched(self, refs: Iterable[str]) -> list[str]:
+        """Verilen bilesenlerin dokundugu netler (tekrarsiz, kararli sirada)."""
+        seen: dict[str, None] = {}
+        for ref in refs:
+            for name in self._static[ref].nets:
+                seen.setdefault(name, None)
+        return list(seen)
+
+    def _hpwl(
+        self, names: Sequence[str], moved: dict[str, tuple[float, float, float]] | None
+    ) -> tuple[float, list[float]]:
+        """Verilen netlerin HPWL toplami ve net basina degerleri.
+
+        `moved` verilirse o bilesenlerin pinleri yeni konumlarindan hesaplanir.
+        Maliyet netlerin pin sayisiyla orantili, kartin buyuklugunden bagimsiz.
         """
-        static = self._static[ref]
         per_net: list[float] = []
         total = 0.0
-        nx = ny = nrot = 0.0
-        if xyr is not None:
-            nx, ny, nrot = xyr
-        for name in static.nets:
+        for name in names:
+            cached = self._pin_xy[name]
             xs: list[float] = []
             ys: list[float] = []
-            cached = self._pin_xy[name]
-            if xyr is None:
+            if not moved:
                 for _, px, py in cached:
                     xs.append(px)
                     ys.append(py)
             else:
                 offsets = self._net_pins[name]
                 for i, (pin_ref, px, py) in enumerate(cached):
-                    if pin_ref == ref:
-                        rx, ry = _rotate(offsets[i][1], offsets[i][2], nrot)
-                        xs.append(nx + rx)
-                        ys.append(ny + ry)
-                    else:
+                    target = moved.get(pin_ref)
+                    if target is None:
                         xs.append(px)
                         ys.append(py)
+                    else:
+                        rx, ry = _rotate(offsets[i][1], offsets[i][2], target[2])
+                        xs.append(target[0] + rx)
+                        ys.append(target[1] + ry)
             if len(xs) < 2:
                 per_net.append(0.0)
                 continue
@@ -400,11 +434,18 @@ class MoveFeaturizer:
             total += hpwl
         return total, per_net
 
-    def _partner_distances(self, ref: str, x: float, y: float) -> tuple[float, float]:
+    def _partner_distances(
+        self,
+        ref: str,
+        x: float,
+        y: float,
+        moved: dict[str, tuple[float, float, float]] | None = None,
+    ) -> tuple[float, float]:
         """Ayni nete bagli bilesenlere en kisa ve ortalama mesafe.
 
         `proximity` kurallarinin ucuz vekili: o kurallarin tamami "ayni nette
-        su bilesen su kadar yakin mi" biciminde.
+        su bilesen su kadar yakin mi" biciminde. Partnerin kendisi de
+        tasiniyorsa YENI konumu kullanilir.
         """
         best = FAR_MM
         total = 0.0
@@ -415,7 +456,8 @@ class MoveFeaturizer:
                 if other == ref or other in seen:
                     continue
                 seen.add(other)
-                ox, oy, _ = self._pos[other]
+                target = moved.get(other) if moved else None
+                ox, oy = (target[0], target[1]) if target else self._pos[other][:2]
                 d = math.hypot(ox - x, oy - y)
                 best = min(best, d)
                 total += min(d, FAR_MM)
@@ -424,7 +466,13 @@ class MoveFeaturizer:
         return best, mean
 
     def _overlap_state(
-        self, ref: str, poly: list[tuple[float, float]], x: float, y: float
+        self,
+        ref: str,
+        poly: list[tuple[float, float]],
+        x: float,
+        y: float,
+        moved: dict[str, tuple[float, float, float]] | None = None,
+        new_polys: dict[str, list[tuple[float, float]]] | None = None,
     ) -> tuple[float, float, float]:
         """(cakisan komsu sayisi, en kucuk aciklik, yaricaptaki komsu sayisi).
 
@@ -434,8 +482,30 @@ class MoveFeaturizer:
         mesafesi olcumun %77'sini yiyordu (profil) ve siralamaya kattigi sey
         kutu boslugundan farksizdi. Cakismayan iki kutu icin bu deger gercek
         mesafenin alt siniridir, yani yon olarak dogru.
+
+        **Takasta kritik nokta:** izgara ESKI konumlardan kurulu. Tasinan
+        bilesenler o yuzden komsu listesinden cikarilip YENI konumlariyla geri
+        eklenir - yoksa A, B'nin eski yerine tasindiginda B'yi orada bulup
+        hayali bir cakisma raporlanir, ve takas asla kabul edilmez.
         """
-        neighbors = self._neighbors(ref, x, y)
+        candidates: list[tuple[tuple[float, float, float, float], list[tuple[float, float]]]] = []
+        for other in self._neighbors(ref, x, y):
+            if moved and other in moved:
+                continue
+            box = self._bbox.get(other)
+            if box is not None:
+                candidates.append((box, self._poly[other]))
+        if moved and new_polys:
+            for other, target in moved.items():
+                if other == ref:
+                    continue
+                if math.hypot(target[0] - x, target[1] - y) > self.radius:
+                    continue
+                other_poly = new_polys[other]
+                if not other_poly:
+                    continue
+                candidates.append((_bbox_of(other_poly), other_poly))
+
         minx = min(px for px, _ in poly)
         maxx = max(px for px, _ in poly)
         miny = min(py for _, py in poly)
@@ -443,11 +513,7 @@ class MoveFeaturizer:
 
         overlaps = 0
         clearance = FAR_MM
-        for other in neighbors:
-            box = self._bbox.get(other)
-            if box is None:
-                continue
-            omnx, omny, omxx, omxy = box
+        for (omnx, omny, omxx, omxy), other_poly in candidates:
             gx = omnx - maxx if omnx > maxx else (minx - omxx if minx > omxx else 0.0)
             gy = omny - maxy if omny > maxy else (miny - omxy if miny > omxy else 0.0)
             if gx > 0.0 or gy > 0.0:
@@ -457,49 +523,97 @@ class MoveFeaturizer:
                 continue
             # Kutular kesisiyor: burada gercek poligon testi sart. Nadir
             # oldugu icin pahali `geom.distance` yalnizca bu dala duser.
-            if geom.overlap(poly, self._poly[other]):
+            if geom.overlap(poly, other_poly):
                 overlaps += 1
                 clearance = 0.0
             elif clearance > 0.0:
-                clearance = min(clearance, geom.distance(poly, self._poly[other]))
-        return float(overlaps), min(clearance, FAR_MM), float(len(neighbors))
+                clearance = min(clearance, geom.distance(poly, other_poly))
+        return float(overlaps), min(clearance, FAR_MM), float(len(candidates))
 
     # ------------------------------------------------------------------ oznitelik
 
     def features(self, ref: str, xyr: tuple[float, float, float]) -> list[float]:
-        """Aday hamle icin oznitelik vektoru. `FEATURE_NAMES` ile ayni sirada."""
+        """Tek bilesenli hamle icin oznitelik vektoru (1 elemanli birlesik)."""
+        return self.features_compound(((ref, xyr),))
+
+    def features_compound(self, atoms: Sequence[tuple[str, tuple[float, float, float]]]) -> list[float]:
+        """Birlesik hamle icin oznitelik vektoru. `FEATURE_NAMES` ile ayni sirada.
+
+        Ilk atom BIRINCIL sayilir: bilesen kimligi, tur, bulgu ve hamle
+        geometrisi bloklari ondan doldurulur. Boylece tek bilesenli hamlelerde
+        vektorun ilk 51 degeri sema v1 ile birebir ayni anlami tasir.
+        """
         if not self._ready:
             raise RuntimeError("once refresh(placement) cagirin")
-        if ref not in self._static:
-            raise KeyError(f"kartta boyle bir bilesen yok: {ref!r}")
+        if not atoms:
+            raise ValueError("bos birlesik hamle")
 
-        static = self._static[ref]
-        x0, y0, rot0 = self._pos[ref]
-        x1, y1, rot1 = float(xyr[0]), float(xyr[1]), float(xyr[2])
+        moved: dict[str, tuple[float, float, float]] = {}
+        for ref, xyr in atoms:
+            if ref not in self._static:
+                raise KeyError(f"kartta boyle bir bilesen yok: {ref!r}")
+            moved[ref] = (float(xyr[0]), float(xyr[1]), float(xyr[2]))
+        new_polys = {r: self._abs_poly(r, t) for r, t in moved.items()}
+
+        primary = atoms[0][0]
+        static = self._static[primary]
+        x0, y0, rot0 = self._pos[primary]
+        x1, y1, rot1 = moved[primary]
 
         kind_hot = [0.0] * len(KINDS)
         kind_hot[static.kind_index] = 1.0
-        severity, ratio = self._finding.get(ref, (0.0, 0.0))
+        severity, ratio = self._finding.get(primary, (0.0, 0.0))
 
-        hpwl_before, per_before = self._net_state(ref, None)
-        hpwl_after, per_after = self._net_state(ref, (x1, y1, rot1))
+        # Birincil bilesenin netleri: tum tasinanlar dikkate alinarak
+        primary_nets = static.nets
+        hpwl_before, per_before = self._hpwl(primary_nets, None)
+        hpwl_after, per_after = self._hpwl(primary_nets, moved)
         d_hpwl = hpwl_after - hpwl_before
         deltas = [a - b for a, b in zip(per_after, per_before)]
         worst = max(deltas) if deltas else 0.0
-        improved = (
-            sum(1 for d in deltas if d < -1e-9) / len(deltas) if deltas else 0.0
+        improved = sum(1 for d in deltas if d < -1e-9) / len(deltas) if deltas else 0.0
+
+        ov_b, cl_b, nb_b = self._overlap_state(primary, self._poly[primary], x0, y0)
+        ov_a, cl_a, nb_a = self._overlap_state(
+            primary, new_polys[primary], x1, y1, moved, new_polys
         )
 
-        ov_b, cl_b, nb_b = self._overlap_state(ref, self._poly[ref], x0, y0)
-        poly_after = self._abs_poly(ref, (x1, y1, rot1))
-        ov_a, cl_a, nb_a = self._overlap_state(ref, poly_after, x1, y1)
-
-        pmin_b, pmean_b = self._partner_distances(ref, x0, y0)
-        pmin_a, pmean_a = self._partner_distances(ref, x1, y1)
+        pmin_b, pmean_b = self._partner_distances(primary, x0, y0)
+        pmin_a, pmean_a = self._partner_distances(primary, x1, y1, moved)
 
         dist = math.hypot(x1 - x0, y1 - y0)
         edge_b = self._edge_distance(x0, y0)
         edge_a = self._edge_distance(x1, y1)
+
+        # --- birlesik blok: hamlenin TUMUNU ozetler
+        dists = []
+        for ref, target in moved.items():
+            ox, oy, _ = self._pos[ref]
+            dists.append(math.hypot(target[0] - ox, target[1] - oy))
+        all_nets = self._nets_touched(moved)
+        all_before, _ = self._hpwl(all_nets, None)
+        all_after, _ = self._hpwl(all_nets, moved)
+        d_overlaps_all = 0.0
+        clearance_min = FAR_MM
+        for ref, target in moved.items():
+            b_ov, _, _ = self._overlap_state(ref, self._poly[ref], *self._pos[ref][:2])
+            a_ov, a_cl, _ = self._overlap_state(
+                ref, new_polys[ref], target[0], target[1], moved, new_polys
+            )
+            d_overlaps_all += a_ov - b_ov
+            clearance_min = min(clearance_min, a_cl)
+        # Takas: tam iki bilesen ve ikisi de digerinin eski yerine gidiyor.
+        is_swap = 0.0
+        if len(atoms) == 2:
+            (ra, ta), (rb, tb) = atoms[0], atoms[1]
+            pa, pb = self._pos[ra], self._pos[rb]
+            if (
+                abs(ta[0] - pb[0]) < 1e-6
+                and abs(ta[1] - pb[1]) < 1e-6
+                and abs(tb[0] - pa[0]) < 1e-6
+                and abs(tb[1] - pa[1]) < 1e-6
+            ):
+                is_swap = 1.0
 
         vec = [
             *self._board_block,
@@ -509,7 +623,7 @@ class MoveFeaturizer:
             static.extent,
             _log1p(len(static.nets)),
             *kind_hot,
-            1.0 if ref in self._finding else 0.0,
+            1.0 if primary in self._finding else 0.0,
             severity,
             ratio,
             dist,
@@ -537,6 +651,15 @@ class MoveFeaturizer:
             pmean_b,
             pmean_a,
             pmean_a - pmean_b,
+            # --- birlesik blok (sema v2)
+            _log1p(len(moved)),
+            is_swap,
+            sum(dists),
+            max(dists),
+            all_after - all_before,
+            (all_after - all_before) / self._diag,
+            d_overlaps_all,
+            clearance_min,
         ]
         if len(vec) != FEATURE_COUNT:  # sema ile kod ayrisirsa hemen patla
             raise AssertionError(
@@ -545,6 +668,7 @@ class MoveFeaturizer:
         return vec
 
     def features_many(
-        self, moves: Sequence[tuple[str, tuple[float, float, float]]]
+        self, moves: Sequence[Sequence[tuple[str, tuple[float, float, float]]]]
     ) -> list[list[float]]:
-        return [self.features(ref, xyr) for ref, xyr in moves]
+        """Birden fazla BIRLESIK hamle icin vektorler."""
+        return [self.features_compound(m) for m in moves]

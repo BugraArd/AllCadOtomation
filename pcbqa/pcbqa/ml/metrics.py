@@ -154,6 +154,48 @@ def evals_to_first_gain(
     }
 
 
+def recall_at_k(
+    batches: Sequence[Sequence[tuple[float, float]]],
+    ks: Sequence[int] = (4, 8, 12, 16, 24),
+    threshold: float = 1e-9,
+) -> dict[int, dict[str, float]]:
+    """ELEME riskini olcer: top-K kesiminden kac iyilestiren hamle sag cikiyor.
+
+    Siralama kayipsizdir - sirayi degistirmek hicbir adayi yok etmez, sadece
+    daha erken bulur. **Eleme oyle degildir**: modelin dusuk puan verdigi bir
+    iyilesme tamamen kaybolur ve arama onu bir daha goremez. Genis repertuarda
+    eleme zorunlu oldugu icin (takas O(n^2) aday uretir) K'yi tahminle degil bu
+    egriyle secmek gerekir.
+
+    Iki sayi doner ve **karar verdirici olan `hit`tir**:
+
+      * `recall` - iyilestiren hamlelerin yuzde kaci top-K icinde.
+      * `hit`    - partilerin yuzde kacinda top-K icinde EN AZ BIR iyilestiren
+        hamle var. Yerel arama ilk iyilesmeyi kabul edip durdugu icin
+        gerceklen gereken sey budur; digerlerini kaybetmek maliyetsizdir.
+    """
+    out: dict[int, dict[str, float]] = {}
+    usable = [b for b in batches if any(a > threshold for a, _ in b)]
+    for k in ks:
+        if not usable:
+            out[k] = {"recall": 0.0, "hit": 0.0, "batches": 0.0}
+            continue
+        recalls: list[float] = []
+        hits = 0
+        for batch in usable:
+            order = sorted(range(len(batch)), key=lambda i: -batch[i][1])[:k]
+            good_total = sum(1 for a, _ in batch if a > threshold)
+            kept = sum(1 for i in order if batch[i][0] > threshold)
+            recalls.append(kept / good_total)
+            hits += 1 if kept else 0
+        out[k] = {
+            "recall": sum(recalls) / len(recalls),
+            "hit": hits / len(usable),
+            "batches": float(len(usable)),
+        }
+    return out
+
+
 def evaluate(
     samples: Sequence[Any],
     predict: Callable[[list[float]], float],
@@ -199,4 +241,7 @@ def evaluate(
         "evals_order_score": score_search["order"],
         "speedup_score": score_search["speedup"],
         "scored_batches": int(score_search["batches"]),
+        # Eleme riski: hem "her iyilesme" hem "skor artiran" olcutuyle
+        "recall": recall_at_k(batches),
+        "recall_score": recall_at_k(score_batches),
     }

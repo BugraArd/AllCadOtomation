@@ -13,6 +13,11 @@ Asama 5'te eklenen (yine varsayilanli): `ctx.move_ranker` -> aday hamleleri
 denenme sirasina dizen istege bagli fonksiyon. Ogrenilmis model buraya
 baglanir. Kabul karari degismedi, hala `evaluate`.
 
+Asama 6'da hamle kavrami BIRLESIK hamleye genisledi (`Compound`): takas ve
+kume tasima gibi ayni anda birden fazla bileseni oynatan hamleler. Tek
+bilesenli hamle 1 elemanli birlesik olarak ifade edilir, yani `Placer`
+arayuzu degismedi - bu yalnizca cila katmanini ve siralayiciyi ilgilendirir.
+
 Bir yerlestirici yazmak icin tek yapmaniz gereken:
 
     from pcbqa.placement.base import Placer, PlacementContext, Placement
@@ -40,11 +45,21 @@ from ..model import Design
 # ref -> (x_mm, y_mm, rotation_derece)
 Placement = dict[str, tuple[float, float, float]]
 
-# Tek bir aday hamle: (ref, (x, y, rot))
+# Tek bir bilesenin yer degistirmesi: (ref, (x, y, rot))
 Move = tuple[str, tuple[float, float, float]]
+# BIRLESIK HAMLE (Asama 6): ayni anda uygulanan bir veya daha fazla yer
+# degistirme. Tek bilesenli bir hamle 1 elemanli birlesiktir, yani eski hamle
+# kavrami bunun ozel halidir. Takas ve kume tasima ancak boyle ifade edilebilir:
+# iki bilesen AYNI ANDA yer degistirmezse aradaki adim hep cakisma uretir ve
+# hakem hicbirini kabul etmez.
+Compound = tuple[Move, ...]
 # Adaylari denenme sirasina dizer. Hamleleri ELEYEBILIR de - kabul karari
 # yine hakemde oldugu icin bu yalnizca hizi etkiler, dogrulugu degil.
-MoveRanker = Callable[[Placement, "Evaluation", list[Move]], list[Move]]
+#
+# Asama 6'da imza `list[Move]` -> `list[Compound]` olarak genisletildi. Bu
+# alani uygulayan tek yer `pcbqa/ml`; hicbir yerlestirici kendi siralayicisini
+# yazmiyordu, o yuzden kirilma alani yok.
+MoveRanker = Callable[[Placement, "Evaluation", list[Compound]], list[Compound]]
 
 
 @dataclass

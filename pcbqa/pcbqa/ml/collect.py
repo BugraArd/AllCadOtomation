@@ -48,7 +48,8 @@ from ..harness import (
     make_evaluator,
 )
 from ..placement import refine
-from ..placement.base import Placement, PlacementContext
+from ..placement.base import Compound, Placement, PlacementContext
+from ..placement.repertoire import Repertoire
 from ..rules import load_rules
 from .dataset import Dataset, Sample
 from .features import FEATURE_NAMES, FEATURE_VERSION, MoveFeaturizer
@@ -93,6 +94,8 @@ def collect_board(
     max_batch: int = 24,
     max_findings: int = 12,
     nudge_refs: int = 6,
+    wide_refs: int = 4,
+    saturate_s: float = 0.0,
     verbose: bool = True,
 ) -> Dataset:
     """Tek karttan ornek toplar. Hakem her aday icin GERCEKTEN calisir."""
@@ -112,16 +115,31 @@ def collect_board(
         return ds
 
     fz = MoveFeaturizer(design, ctx.locked)
+    repertoire = Repertoire(ctx, random.Random(seed))
     rng = random.Random(seed)
     deadline = time.perf_counter() + budget_s
     group = board_path.stem
     batch_no = 0
     evals = 0
 
-    for start_index in range(max(1, starts)):
+    total_starts = max(1, starts) + (1 if saturate_s > 0 else 0)
+    for start_index in range(total_starts):
         if time.perf_counter() > deadline:
             break
-        placement = ctx.current() if start_index == 0 else perturb(ctx.current(), ctx, rng)
+        if saturate_s > 0 and start_index == total_starts - 1:
+            # DOYMUS BASLANGIC - genis repertuarin gercekte calistigi durum.
+            #
+            # Onceki yorungeler kartin ham halinden basliyor; orada onarim
+            # hamleleri bol ve genis repertuar neredeyse hic kazanmiyor
+            # (olculdu: skor artiran aday orani %0.3). Oysa `polish`in 3.
+            # asamasi ancak 1. ve 2. asama TUKENDIGINDE calisir ve o durumda
+            # ayni oran %20-28. Modeli yalnizca ilk dagilimda egitmek, onu
+            # hic gormeyecegi bir dunyaya hazirlamak olurdu.
+            placement = refine.polish(ctx.current(), ctx, budget_s=saturate_s, wide_keep=0)
+        elif start_index == 0:
+            placement = ctx.current()
+        else:
+            placement = perturb(ctx.current(), ctx, rng)
         current = ctx.evaluate(placement)
         if current is None:
             break
@@ -130,20 +148,30 @@ def collect_board(
         # iyilestiren hamle kabul edilir; iyilestiren yoksa yorunge biter.
         while time.perf_counter() < deadline:
             fz.refresh(placement, current)
-            step_best: tuple[float, str, tuple[float, float, float]] | None = None
+            step_best: tuple[float, Compound] | None = None
 
             findings = list(current.findings)
             errors = [f for f in findings if getattr(f, "severity", "") == "error"]
             warnings = [f for f in findings if getattr(f, "severity", "") == "warning"]
-            groups: list[tuple[str, list]] = []
+            groups: list[tuple[str, list[Compound]]] = []
             for finding in (errors + warnings)[:max_findings]:
-                moves = refine.finding_moves(finding, placement, ctx)
+                moves = refine.as_compounds(refine.finding_moves(finding, placement, ctx))
                 if moves:
                     groups.append((f"f{getattr(finding, 'rule_id', '?')}", moves))
             refs = [r for r in ctx.movable() if r in placement]
             rng.shuffle(refs)
             for ref in refs[:nudge_refs]:
-                groups.append((f"n{ref}", refine.nudge_moves(ref, placement, ctx, rng)))
+                groups.append(
+                    (f"n{ref}", refine.as_compounds(refine.nudge_moves(ref, placement, ctx, rng)))
+                )
+            # Asama 6: genis repertuar da veri kumesinde temsil edilmeli.
+            # Modelin kullanimda gorecegi adaylarin buyuk kismi artik takas ve
+            # kume tasima; egitim kumesinde yoklarsa model onlari hic taniyamaz
+            # (klasik dagilim kaymasi).
+            for ref in refs[:wide_refs]:
+                wide = repertoire.wide_moves(ref, placement)
+                if wide:
+                    groups.append((f"w{ref}", wide))
 
             if not groups:
                 break
@@ -155,10 +183,10 @@ def collect_board(
                 if len(moves) > max_batch:
                     moves = rng.sample(moves, max_batch)
                 batch_no += 1
-                for ref, xyr in moves:
+                for compound in moves:
                     if time.perf_counter() > deadline:
                         break
-                    cand = refine.with_move(placement, ref, xyr)
+                    cand = refine.with_moves(placement, compound)
                     after = ctx.evaluate(cand)
                     evals += 1
                     if after is None:
@@ -166,12 +194,13 @@ def collect_board(
                     y = label_of(current, after)
                     ds.add(
                         Sample(
-                            features=fz.features(ref, xyr),
+                            features=fz.features_compound(compound),
                             label=y,
                             group=group,
                             batch=f"{start_index}-{batch_no}",
                             extra={
-                                "ref": ref,
+                                "ref": compound[0][0],
+                                "n": len(compound),
                                 "src": source[0],
                                 "d_score": round(after.score - current.score, 3),
                                 "d_err": after.errors - current.errors,
@@ -181,11 +210,11 @@ def collect_board(
                     )
                     produced += 1
                     if step_best is None or y > step_best[0]:
-                        step_best = (y, ref, xyr)
+                        step_best = (y, compound)
 
             if not produced or step_best is None or step_best[0] <= 0.0:
                 break  # iyilestiren hamle kalmadi - yorunge burada biter
-            placement = refine.with_move(placement, step_best[1], step_best[2])
+            placement = refine.with_moves(placement, step_best[1])
             nxt = ctx.evaluate(placement)
             if nxt is None:
                 break
@@ -218,6 +247,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--budget", type=float, default=20.0, help="Kart basina saniye")
     ap.add_argument("--starts", type=int, default=2, help="Kart basina yorunge sayisi")
+    ap.add_argument("--saturate", type=float, default=0.0,
+                    help="Ek bir DOYMUS yorunge: once bu kadar saniye dar cila, "
+                         "sonra oradan ornekle (genis repertuarin gercek dagilimi)")
     ap.add_argument("--max-batch", type=int, default=24, help="Aday listesi basina ornek")
     ap.add_argument("--limit", type=int, default=0, help="En fazla kac kart (0 = hepsi)")
     args = ap.parse_args(argv)
@@ -253,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
                 budget_s=args.budget,
                 starts=args.starts,
                 max_batch=args.max_batch,
+                saturate_s=args.saturate,
             )
         except Exception as exc:  # bozuk kart toplamayi durdurmasin
             print(f"  {board.stem[:33]:<33} ATLANDI ({str(exc)[:40]})", flush=True)
@@ -264,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         "boards": len(boards),
         "seed": args.seed,
         "budget_s": args.budget,
+        "saturate_s": args.saturate,
     }
     total.save(args.out)
     summary = total.summary()

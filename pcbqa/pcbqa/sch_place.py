@@ -271,6 +271,11 @@ class SchematicArena:
         # Rotasyon desteklenmiyor (bkz. modul basligi); denemek bosa harcanan
         # degerlendirme demek.
         self.allow_rotation = False
+        # Asama 6'nin genis repertuari (takas / kume tasima / bolge sicramasi)
+        # PCB kavramlaridir: courtyard boyutu, kart bolgesi, uydu kondansator.
+        # Sematikte bunlarin karsiligi yok - `Repertoire` zaten `ctx.design`
+        # uzerinden bir Board bekliyor, arena Board sunmuyor.
+        self.allow_wide_moves = False
 
         self.evaluator = self.evaluate
 
