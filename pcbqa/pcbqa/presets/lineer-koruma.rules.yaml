@@ -20,6 +20,7 @@ rules:
     type: proximity
     severity: error
     description: "LDO giris kondansatoru VIN pinine yakin olmali (TI: < 5 mm)"
+    weight: 6   # NITEL kaynak sayilastirildi: LDO app-note'lari mm VERMIYOR, 5 mm TI SLVA959B'nin genel bypass kuralindan
     pin:
       kind: ic
       function: "^(VIN|IN|VI)$"
@@ -32,6 +33,7 @@ rules:
     type: proximity
     severity: error
     description: "LDO cikis kondansatoru VOUT pinine yakin olmali (TI: < 5 mm)"
+    weight: 6   # ayni - nitel kaynak sayilastirildi
     pin:
       kind: ic
       function: "^(VOUT|OUT|VO)$"
@@ -45,6 +47,8 @@ rules:
   - id: motor-gate-izi-genisligi
     type: trace_width
     description: "Gate izleri yeterince genis olmali (TI SLVA959B: >= 0.508 mm @ 1 oz)"
+    weight: 10   # TI SLVA959B 4 (sayisal, 20 mil) - genislik surekli, olceklenir
+    scale: true
     net: "^(GATE|GH|GL|HG|LG|G[0-9])"
     current_a: 0.001
     min_width_mm: 0.508
@@ -55,6 +59,8 @@ rules:
     type: trace_width
     severity: error
     description: "Motor guc izleri (TI SNVA021C: >= 0.381 mm/A mutlak minimum)"
+    weight: 14   # TI SNVA021C 5: 0.381 mm/A MUTLAK minimum - surekli, olceklenir
+    scale: true
     net: "^(VM|VBAT|MOTOR|OUT[AB]|M[12])"
     current_a: 1.0
     min_width_mm: 0.381
@@ -63,6 +69,7 @@ rules:
     type: proximity
     severity: error
     description: "Motor surucu bypass kondansatoru besleme pinine yakin (TI: < 5 mm)"
+    weight: 10   # TI SLVA959B 5.3.1 (sayisal: < 0.5 cm)
     pin:
       kind: ic
       ref: "^U"
@@ -84,6 +91,7 @@ rules:
     type: proximity
     severity: error
     description: "TVS/ESD korumasi konnektore bitisik olmali (TI SLVA680A; sayi ikincil kaynak)"
+    weight: 14   # onemi OLCULMUS (ROHM 66AN067E: 52 nH -> TVS islevsiz, 3.4 kV vs 107 V) ama 5 mm esigi IKINCIL kaynak
     pin:
       kind: connector
     partner:
@@ -100,6 +108,7 @@ rules:
     type: proximity
     severity: error
     description: "Sicaklik sensorunun bypass kondansatoru <= 5 mm (TI SNOA986A)"
+    weight: 12   # TI SNOA986A 3: garanti sarti olarak sayisal (<= 5 mm)
     pin:
       kind: ic
       ref: "^(U|TMP|IC)"
@@ -115,6 +124,7 @@ rules:
     type: keep_apart
     severity: error
     description: "I2C pull-up direncleri sicaklik sensorunden >= 10 mm (TI SNOA986A: oz-isinma)"
+    weight: 12   # TI SNOA986A 3: sayisal (>= 10 mm), oz-isinma olcumu bozuyor
     a:
       kind: resistor
     b:
@@ -129,6 +139,7 @@ rules:
   - id: manyetik-sensor-guc-izinden-uzak
     type: keep_apart
     description: "Manyetometre/IMU guc bilesenlerinden >= 10 mm (NXP AN4247; kalibrasyon yine de sart)"
+    weight: 4   # HESAP (NXP AN4247 formulunden); kaynak zaten yerlesimle cozulemeyecegini soyluyor
     a:
       kind: ic
       ref: "^(IMU|MAG|LSM|MPU|BM[IX])"

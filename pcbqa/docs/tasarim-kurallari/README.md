@@ -78,6 +78,43 @@ rules:
 `uretim` ön ayarı, sağlam bir gerçek kartta (KiCad'in `pic_programmer` demosu)
 **sıfır bulgu** üretir; bu bir testle korunuyor (`tests/test_presets.py`).
 
+### Ağırlıklar — kanıt gücüne göre
+
+Her ön ayar kuralı bir `weight` taşır: o kuralın bulgusunun skora yazacağı ceza.
+Değeri **kanıtın gücü** belirler, kuralın ne kadar "ciddi hissettirdiği" değil.
+
+| Kanıt sınıfı | Bant | Örnek |
+|---|---|---|
+| **Güvenlik** | 24 | `uretim-gerilim-acikligi` (IPC-2221B Tablo 6-1) |
+| **Ölçülmüş etki** | 16–20 | `buck-giris-kondansatoru` — TI AN-2155: sıcak döngü 6→18 mm²'de SW spike 2.4×, EMI marjı −1.6 dB |
+| **Standart / sayısal app-note** | 8–16 | `buck-sw-induktor` (ROHM 66AN015E Öncelik 2), `sensor-pullup-uzak-dursun` (TI SNOA986A) |
+| **Kaynaklı ama nitel** | 4–8 | `ldo-giris-kondansatoru` — LDO app-note'ları mm **vermiyor**; 5 mm TI'ın genel bypass kuralından |
+| **Mühendislik seçimi** | 1–2 | `hs-kristal-regulatorden-uzak` — kaynakta sayı **yok** |
+
+İki ayarın gerekçesi ayrıca not edilmeli:
+
+- `hs-usb-cift-eslestirme` **8** aldı, 12 değil: TI'ın dört dokümanı bu eşik için
+  **75 kat** farklı değer veriyor (2 / 50 / 100 / 150 mil) ve biri kendi içinde
+  tutarsız. Belirsizlik ağırlığı düşürür.
+- `esd-tvs-konnektore-yakin` **14** aldı: *önemi* ölçülmüş (ROHM 66AN067E —
+  52 nH'lik bir iz TVS'i tamamen işlevsiz bırakıyor, ilk tepe 3.4 kV yerine
+  107 V olmalıydı) ama *eşiği* ikincil kaynaktan. Önem yukarı, eşik belirsizliği
+  aşağı çekiyor.
+
+### Ölçekleme — yalnızca formül varsa
+
+`scale: true` yalnızca altı kuralda açık: `buck-guc-izi-genisligi`,
+`buck-guc-via-sayisi`, `motor-gate-izi-genisligi`, `motor-guc-izi`,
+`uretim-gerilim-acikligi`, `uretim-min-iz-genisligi`.
+
+Ortak yanları: hepsinin kaynağı **sürekli bir ilişki** (IPC-2221B formülü, TI'ın
+via akım tablosu). Orada "iki kat dar" fiziksel olarak anlamlıdır.
+
+Mesafe kurallarında ölçekleme **kapalı**, çünkü kaynaklar bir *eşik* veriyor,
+bir *eğri* değil: TI decoupling için 6.35 mm der ama 12.7 mm'nin tam iki kat
+kötü olduğunu **söylemez**. Ölçeklemek uydurma olurdu. Bu ayrım testle
+korunuyor (`test_scaling_only_where_the_source_is_a_formula`).
+
 ### Eklenen kural tipleri
 
 | Tip | Ne ölçer | Kaynak |

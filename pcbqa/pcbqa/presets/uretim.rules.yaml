@@ -27,6 +27,7 @@ rules:
     type: courtyard_overlap
     severity: error
     description: "Bilesen courtyard'lari cakismamali (IPC-7351B Level N: 0.25 mm excess)"
+    weight: 16   # IPC-7351B standart; ihlal montaj hatasi demek
     clearance_mm: 0.0
 
   # --- Kart kenari --------------------------------------------------------
@@ -38,6 +39,7 @@ rules:
   - id: uretim-kart-kenari
     type: edge_clearance
     description: "Bilesenler kart kenarindan yeterince iceride olmali (0.3 mm routing / 0.5 mm V-score)"
+    weight: 8   # uretici tavsiyesi, kaynaklar celisiyor (0.13-0.51 mm)
     min_distance_mm: 0.3
     ignore_refs: ["^J", "^P", "^CON", "^MH", "^H\\d", "^SW", "^TP"]
     max_findings: 15
@@ -58,6 +60,8 @@ rules:
     type: clearance_voltage
     severity: error
     description: "Netler arasi bakir acikligi gerilime yetmeli (IPC-2221B Tablo 6-1)"
+    weight: 24   # GUVENLIK - IPC-2221B Tablo 6-1; formul surekli, olceklenir
+    scale: true
     class: B2
     default_voltage: 0
     voltages:
@@ -74,6 +78,8 @@ rules:
     type: trace_width
     severity: error
     description: "Hicbir iz uretim minimumunun altinda olmamali (standart sinif: 0.15 mm)"
+    weight: 20   # fab siniri: ihlal = kart URETILEMEZ; surekli, olceklenir
+    scale: true
     net: ".*"
     current_a: 0.001
     min_width_mm: 0.15

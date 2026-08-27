@@ -45,6 +45,48 @@ class PresetLoadTests(unittest.TestCase):
                 with self.subTest(preset=preset.name, rule=rule.id):
                     self.assertTrue(rule.description, f"{rule.id} aciklamasiz")
 
+    def test_every_rule_has_a_weight(self):
+        """Faz 1c: severity tek basina yeterli degil, her kural agirlik tasimali."""
+        for preset in sorted(PRESETS.glob("*.yaml")):
+            for rule in load_rules(preset):
+                with self.subTest(preset=preset.name, rule=rule.id):
+                    self.assertIsNotNone(rule.weight, f"{rule.id} agirliksiz")
+                    self.assertGreater(rule.weight, 0.0)
+
+    def test_every_weight_cites_a_source(self):
+        """Kaynaksiz agirlik yok - "uydurma sayi yazilmaz" kurali burada da gecerli.
+
+        Satir bicimi:  weight: 20   # <kaynak notu>
+        """
+        for preset in sorted(PRESETS.glob("*.yaml")):
+            for lineno, line in enumerate(
+                preset.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                stripped = line.strip()
+                if not stripped.startswith("weight:"):
+                    continue
+                with self.subTest(preset=preset.name, line=lineno):
+                    self.assertIn("#", stripped, "agirligin yaninda kaynak notu yok")
+                    note = stripped.split("#", 1)[1].strip()
+                    self.assertGreater(len(note), 10, f"kaynak notu cok kisa: {note!r}")
+
+    def test_scaling_only_where_the_source_is_a_formula(self):
+        """`scale` yalnizca kaynagin SUREKLI bir iliski verdigi kurallarda.
+
+        Kaynak bir ESIK veriyorsa ("< 5 mm") olcekleme uydurma olurdu: TI
+        6.35 mm der, 12.7 mm'nin tam iki kat kotu oldugunu SOYLEMEZ.
+        """
+        formula_types = {"trace_width", "via_current", "clearance_voltage"}
+        for preset in sorted(PRESETS.glob("*.yaml")):
+            for rule in load_rules(preset):
+                if rule.scale:
+                    with self.subTest(preset=preset.name, rule=rule.id):
+                        self.assertIn(
+                            rule.type,
+                            formula_types,
+                            f"{rule.id}: kaynagi formul olmayan kuralda scale acik",
+                        )
+
     def test_every_preset_runs_without_error(self):
         design = load_design(ROUTED)
         for preset in sorted(PRESETS.glob("*.yaml")):

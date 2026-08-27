@@ -25,6 +25,7 @@ rules:
     type: proximity
     severity: error
     description: "Her IC guc pininin yakininda kendi decoupling kondansatoru olmali (TI SBAA113: < 6.35 mm)"
+    weight: 12   # TI SBAA113: kaynakli TEK sabit ust sinir (< 6.35 mm)
     pin:
       kind: ic
       pintype: power_in
@@ -43,6 +44,7 @@ rules:
   - id: hs-kristal-yuk-kondansatoru
     type: proximity
     description: "Kristalin yuk kondansatorleri kristale yakin olmali (kaynak niteliksel: 'close to each other')"
+    weight: 4   # kaynak NITEL ('close to each other'); 5 mm bizim sayilastirmamiz
     pin:
       kind: crystal
     partner:
@@ -55,6 +57,7 @@ rules:
   - id: hs-kristal-regulatorden-uzak
     type: keep_apart
     description: "Kristal anahtarlamali regulatorden uzak olmali (SAYISAL KAYNAK YOK - secim)"
+    weight: 2   # MUHENDISLIK SECIMI - kaynakta sayi YOK
     a:
       kind: crystal
     b:
@@ -67,6 +70,7 @@ rules:
   - id: hs-i2c-pullup
     type: require_on_net
     description: "I2C hatlarinda pull-up direnci bekleniyor (NXP UM10204)"
+    weight: 12   # NXP UM10204; yoksa bus calismaz - islevsel kritiklik yuksek
     net: "(SDA|SCL|I2C)"
     partner:
       kind: resistor
@@ -79,6 +83,7 @@ rules:
     type: length_match
     severity: error
     description: "USB D+/D- uzunluk eslestirmesi (TI SPRAAR7E: 50 mil = 1.27 mm MAX)"
+    weight: 8   # TI SPRAAR7E 50 mil, ama kaynaklar arasi 75 KAT yayilim var (2/50/100/150 mil) - belirsizlik agirligi dusuruyor
     groups:
       - ["USB_DP", "USB_DM"]
       - ["D+", "D-"]
@@ -89,6 +94,7 @@ rules:
     type: length_match
     severity: error
     description: "Ethernet MDI cift ici eslestirme (Microchip: 50 mil = 1.27 mm)"
+    weight: 10   # Microchip DS00002054A: net sayisal (50 mil), celiski az
     groups:
       - ["TRD0_P", "TRD0_N"]
       - ["TRD1_P", "TRD1_N"]
@@ -98,6 +104,7 @@ rules:
   - id: hs-usb-net-uzunlugu
     type: net_length
     description: "USB 2.0 toplam iz uzunlugu (TI SPRAAR7E: max 12000 mil = 305 mm)"
+    weight: 8   # TI SPRAAR7E MAX degeri (12000 mil)
     net: "(USB_D|D\\+|D-)"
     max_hpwl_mm: 305.0
 

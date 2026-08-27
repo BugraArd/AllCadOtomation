@@ -30,6 +30,7 @@ rules:
     type: proximity
     severity: error
     description: "Giris kondansatoru regulatorun VIN pinine cok yakin olmali (ROHM: yol toplami < 6 mm)"
+    weight: 20   # olculmus etki: TI AN-2155, sicak dongu 6->18 mm2'de SW spike 2.4x, EMI marji -1.6 dB
     pin:
       kind: ic
       function: "^(VIN|PVIN|VCC|VDD)"
@@ -46,6 +47,7 @@ rules:
     type: proximity
     severity: error
     description: "Induktor, IC'nin SW pinine yakin olmali (ROHM: <= 4 mm)"
+    weight: 16   # ROHM 66AN015E Oncelik 2 (sayisal); SW alani TI AN-2155'te olculdu
     pin:
       kind: ic
       function: "^(SW|PH|LX|VSW|PHASE)"
@@ -58,6 +60,7 @@ rules:
   - id: buck-cikis-kondansatoru
     type: proximity
     description: "Cikis kondansatoru induktore yakin olmali (ROHM: <= 4 mm)"
+    weight: 10   # ROHM 66AN015E Oncelik 3 (sayisal)
     pin:
       kind: inductor
     partner:
@@ -71,6 +74,7 @@ rules:
     type: proximity
     severity: error
     description: "Geri besleme bolucu direncleri FB pinine yakin olmali (ROHM: <= 4 mm)"
+    weight: 12   # ROHM 66AN015E #4-2 (sayisal)
     pin:
       kind: ic
       function: "^(FB|VFB|VSENSE|ADJ)"
@@ -89,6 +93,7 @@ rules:
     type: keep_apart
     severity: error
     description: "Geri besleme bilesenleri induktorden uzak olmali (ROHM: >= 10 mm)"
+    weight: 10   # ROHM 66AN015E #4-1 (sayisal); keep_apart merkez olcer, yaklasim
     a:
       kind: resistor
       ref: "^R"
@@ -100,6 +105,7 @@ rules:
   - id: buck-fb-diyottan-uzak
     type: keep_apart
     description: "Geri besleme bilesenleri serbest gecis diyodundan uzak olmali (ROHM: >= 10 mm)"
+    weight: 8   # ROHM 66AN015E #4-1 (sayisal), ikincil yol
     a:
       kind: resistor
       ref: "^R"
@@ -120,6 +126,8 @@ rules:
     type: trace_width
     severity: error
     description: "Guc izleri akimi tasiyacak genislikte olmali (IPC-2221B)"
+    weight: 12   # IPC-2221B formulu - surekli iliski, olceklenir
+    scale: true
     net: "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$"
     current_a: 2.0
     delta_t_c: 10
@@ -131,6 +139,8 @@ rules:
   - id: buck-guc-via-sayisi
     type: via_current
     description: "Guc yolunda katman degistiren via'lar akimi tasimali (TI: ~1 via/A)"
+    weight: 10   # TI SLVA959B Tablo 3-1 - surekli iliski, olceklenir
+    scale: true
     net: "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$"
     current_a: 2.0
 
