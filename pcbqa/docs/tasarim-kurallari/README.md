@@ -130,6 +130,43 @@ FB izi → indüktör ≥ 10 mm, I2C pull-up → sıcaklık sensörü ≥ 10 mm,
 CIN GND ↔ COUT GND ≥ 10 mm. Yalnızca mesafe küçültmeye çalışan bir yerleştirici
 bunları sessizce ihlal eder.
 
+## Korpus kalibrasyonu (ölçüldü, 2026-08-28)
+
+`uretim` ön ayarı, KiCad'in kendi 19 demo kartında yerleştirme yapmadan
+puanlandı (`python -m pcbqa.harness --score-only <klasör>`).
+
+| Ölçüm | İlk koşum | Düzeltmelerden sonra |
+|---|---|---|
+| Medyan skor | 88.9 | **95.9** |
+| Çeyrekler | 40.6 / 88.9 / 100 | **80.7 / 95.9 / 100** |
+| En düşük | 1.3 | 18.6 |
+| Bulgu üreten kart | 11/19 | 10/19 |
+
+Koşum **iki gerçek kusur** yakaladı — kalibrasyonun bütün gerekçesi bu:
+
+**1. Pad katmanları okunmuyordu.** `interf_u` demosunda `BUS1.29` (VCC) ve
+`BUS1.60` (/PC-A2) aynı koordinatta çıkıyordu ve aralarında **0.000 mm** açıklık
+ölçülüyordu — gerçek bir kartta bu kısa devre demek olurdu. Sebep: bu bir
+**kart-kenarı konnektörü**, pad'ler kartın ön ve arka yüzünde. Tüm pad'leri "her
+katmanda" varsaymak yanlış alarm üretiyordu. Pad artık kendi bakır katmanlarını
+taşıyor; delikli pad tüm katmanlarda, SMD pad tek katmanda. Kartın skoru
+**1.6 → 72.6**.
+
+**2. Ön ayar, projenin kendi kararından sapmıştı.** `uretim-courtyard-cakisma`
+`error`/16 yazılmıştı; oysa `default_rules.yaml` **warning** diyor ve gerekçesini
+yazmış: *"bilerek çakıştırılan tasarımlar olduğu için"* — hatta StickHub'ı adıyla
+anarak. Korpus bunu sayısallaştırdı: 19 kartın **5'inde** (%26) çakışma var ve
+çoğu cömert courtyard tanımlarından geliyor (J7–J8 gibi komşu konnektörler),
+gerçek montaj çatışmasından değil. Düşük kesinlikli bir kural ağır ağırlık
+taşımamalı — `warning`/6'ya çekildi.
+
+Kalan düşük skorlar **meşru sinyal** olarak bırakıldı: StickHub'da gerçekten 26
+çakışma var, `multichannel_mixer-unrouted` zaten yerleştirilmemiş bir taslak.
+Daha fazla ayar yapmak kanıta değil korpusa uydurmak olurdu.
+
+Sonuç `tests/test_calibration.py` ile korunuyor: medyan ≥ 85 ve hiçbir kural
+kartların yarısından fazlasında ateşlememeli. KiCad kurulu değilse atlanır.
+
 ## Ölçülemeyenler
 
 Sayısal değeri araştırmada **bulunan** ama mevcut veri modeliyle

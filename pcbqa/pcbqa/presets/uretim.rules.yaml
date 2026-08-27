@@ -23,11 +23,25 @@ rules:
   #
   # NOT: IPC-7352 courtyard'i yalnizca SMD ve delikli diye ikiye ayirir;
   # bilesen tipine gore (QFP/BGA/elektrolitik) resmi tablo YOK.
+  #
+  # KALIBRASYON DUZELTMESI (Faz 1d): burada once severity: error / weight: 16
+  # yaziyordu. Bu, projenin kendi default_rules.yaml'indaki KAYITLI karardan
+  # sapmaydi - orada "bilerek cakistirilan tasarimlar oldugu icin varsayilan
+  # siddet warning" yaziyor ve StickHub adiyla aniliyor.
+  #
+  # 19 gercek KiCad demo kartinda olculdu: 5'inde (%26) courtyard cakismasi var
+  # (StickHub 25, tinytapeout 14, RoyalBlue54L-Feather 4). Cakismalar cogunlukla
+  # comert courtyard tanimlarindan geliyor (J7-J8 gibi komsu konnektorler),
+  # gercek montaj catismasindan degil.
+  #
+  # Kural KASITLI cakismayi kasitsizdan ayirt edemiyor; dusuk kesinlikli bir
+  # kural agir agirlik tasimamali, yoksa kaliteyle ilgisiz nedenlerle skoru
+  # domine eder. Kritik oldugu projelerde error'a yukseltin.
   - id: uretim-courtyard-cakisma
     type: courtyard_overlap
-    severity: error
+    severity: warning
     description: "Bilesen courtyard'lari cakismamali (IPC-7351B Level N: 0.25 mm excess)"
-    weight: 16   # IPC-7351B standart; ihlal montaj hatasi demek
+    weight: 6   # IPC-7351B standart ama dusuk kesinlik: 19 gercek kartin 5'inde atesliyor
     clearance_mm: 0.0
 
   # --- Kart kenari --------------------------------------------------------
@@ -41,7 +55,10 @@ rules:
     description: "Bilesenler kart kenarindan yeterince iceride olmali (0.3 mm routing / 0.5 mm V-score)"
     weight: 8   # uretici tavsiyesi, kaynaklar celisiyor (0.13-0.51 mm)
     min_distance_mm: 0.3
-    ignore_refs: ["^J", "^P", "^CON", "^MH", "^H\\d", "^SW", "^TP"]
+    # ^BUS: kalibrasyonda bulundu - interf_u demosunda BUS1 bir KART KENARI
+    # konnektoru ve kenarda olmasi DOGRU, ama "BUS" standart bir designator
+    # olmadigi icin ref_kind() onu "other" sayiyor; muafiyet listesi kacirmis.
+    ignore_refs: ["^J", "^P", "^CON", "^MH", "^H\\d", "^SW", "^TP", "^BUS"]
     max_findings: 15
 
   # --- Gerilim acikligi ---------------------------------------------------

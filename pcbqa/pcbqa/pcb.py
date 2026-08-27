@@ -41,6 +41,18 @@ class Pad:
     angle: float = 0.0
     # circle | oval | rect | roundrect | trapezoid | custom
     shape: str = "rect"
+    # Pad'in bulundugu BAKIR katmanlar. Bos demet = "tum bakir katmanlar"
+    # (delikli pad, dosyada "*.Cu" yazar). SMD pad tek katmandadir.
+    #
+    # Neden onemli: kart kenari konnektorlerinde on ve arka yuzdeki pad'ler
+    # AYNI x/y'dedir ve farkli netlere baglidir (interf_u demosunda BUS1.29 VCC,
+    # BUS1.60 /PC-A2). Katman ayrimi olmadan aralarinda 0.000 mm aciklik
+    # olculuyordu - gercek bir kartta kisa devre demek olurdu.
+    copper_layers: tuple[str, ...] = ()
+
+    @property
+    def on_all_layers(self) -> bool:
+        return not self.copper_layers
 
     @property
     def radius_mm(self) -> float:
@@ -265,6 +277,21 @@ def _pad_net(pad_node) -> str:
     return node[-1]  # ad her zaman son eleman
 
 
+def _pad_copper_layers(pad_node) -> tuple[str, ...]:
+    """Pad'in bakir katmanlari. Bos demet = tum bakir katmanlar.
+
+    Dosyada delikli pad "*.Cu", SMD pad "F.Cu" / "B.Cu" yazar. Maske/pasta
+    katmanlari elenir; aciklik olcumunu yalnizca bakir ilgilendirir.
+    """
+    node = child(pad_node, "layers")
+    if node is None:
+        return ()
+    layers = [str(x) for x in node[1:]]
+    if any(layer == "*.Cu" for layer in layers):
+        return ()
+    return tuple(layer for layer in layers if layer.endswith(".Cu"))
+
+
 def _local_points(node) -> list[tuple[float, float]]:
     """Bir cizim dugumundeki tum koordinatlari toplar (footprint yerel eksende)."""
     pts: list[tuple[float, float]] = []
@@ -354,6 +381,7 @@ def _read_footprint(node) -> Component | None:
                 size_y=as_float(psize[2]) if psize and len(psize) > 2 else 0.0,
                 angle=frot + (as_float(pat[3]) if pat and len(pat) > 3 else 0.0),
                 shape=str(pnode[3]) if len(pnode) > 3 and isinstance(pnode[3], str) else "rect",
+                copper_layers=_pad_copper_layers(pnode),
             )
         )
 

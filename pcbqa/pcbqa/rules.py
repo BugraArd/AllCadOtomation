@@ -700,22 +700,36 @@ def _copper_items(design: Design, net_name: str):
     ayak izi mertebesinde (0.5 mm) kuculttugu icin saglam kartlar ihlal
     veriyordu. Simdi daire ve oval TAM modelleniyor.
     """
-    items: list[tuple[list[tuple[float, float]], float, str]] = []
+    items: list[tuple[list[tuple[float, float]], float, frozenset[str] | None]] = []
     for track in design.board.tracks:
         if track.net == net_name:
             items.append(
-                ([(track.x1, track.y1), (track.x2, track.y2)], track.width / 2.0, track.layer)
+                (
+                    [(track.x1, track.y1), (track.x2, track.y2)],
+                    track.width / 2.0,
+                    frozenset({track.layer}),
+                )
             )
     for via in design.board.vias:
         if via.net == net_name:
-            items.append(([(via.x, via.y)], via.size / 2.0, "*"))
+            # Delikli via tum katmanlari deler; kor/gomulu via nadir ve bu
+            # varsayim onlarda MUHAFAZAKAR yonde (fazladan karsilastirma).
+            items.append(([(via.x, via.y)], via.size / 2.0, None))
     for comp in design.board.components:
         for pad in comp.pads:
             if pad.net != net_name:
                 continue
             pts, radius = pad.copper_shape()
-            items.append((pts, radius, "*"))
+            layers = None if pad.on_all_layers else frozenset(pad.copper_layers)
+            items.append((pts, radius, layers))
     return items
+
+
+def _layers_can_touch(a, b) -> bool:
+    """Iki bakir parcasi ayni katmanda bulunabilir mi? None = tum katmanlar."""
+    if a is None or b is None:
+        return True
+    return bool(a & b)
 
 
 def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
@@ -727,7 +741,10 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
     SINIRLAR (bilincli, gizlenmiyor):
       - Daire ve oval pad'ler tam, roundrect/custom pad'ler dortgen olarak
         alinir -> son ikisinde olcum bir miktar muhafazakar kalir.
-      - Via ve pad'ler tum katmanlarda varsayilir; izler kendi katmaninda.
+      - Pad'ler kendi bakir katmanlarinda karsilastirilir (delikli pad tum
+        katmanlarda). Bu ayrim sart: kart kenari konnektorlerinde on ve arka
+        yuzdeki pad'ler ayni x/y'dedir ve farkli netlere baglidir.
+      - Via'lar tum katmanlarda varsayilir (kor/gomulu via'da muhafazakar).
       - Poligon dokum (zone) okunmaz -> GND dokumu bu olcume girmez.
       - Bu CLEARANCE'tir, CREEPAGE degil. Sebeke izolasyonuna yetmez; kural
         250 V ustunde bulgu metnine ayrica uyari koyar.
@@ -773,9 +790,9 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
             required = ipc2221.clearance_mm(delta_v, klass)
 
             best = math.inf
-            for pts_a, r1, layer_a in copper[net_a]:
-                for pts_b, r2, layer_b in copper[net_b]:
-                    if layer_a != "*" and layer_b != "*" and layer_a != layer_b:
+            for pts_a, r1, layers_a in copper[net_a]:
+                for pts_b, r2, layers_b in copper[net_b]:
+                    if not _layers_can_touch(layers_a, layers_b):
                         continue
                     gap = geom.shape_distance(pts_a, pts_b) - r1 - r2
                     if gap < best:

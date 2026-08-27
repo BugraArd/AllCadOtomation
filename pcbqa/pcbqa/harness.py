@@ -315,6 +315,109 @@ def run_suite(boards: list[Path], names: list[str], rules, seed: int, budget: fl
     return {"rows": rows, "regressions": regressions}
 
 
+def score_corpus(boards: list[Path], rules) -> dict:
+    """Bir kart kumesini YERLESTIRME YAPMADAN puanlar (Faz 1d).
+
+    Neden ayri bir kip: kalibrasyon sorusu "yerlestiricim iyi mi" degil,
+    "OLCUTUM iyi mi". Sahaya cikmis, profesyonelce uretilmis bir karta skorumuz
+    dusuk veriyorsa yanlis olan kart degil SKORDUR. Yerlestirme calistirmak hem
+    gereksiz hem de olculen seyi degistirir.
+
+    Doner: kart basina satirlar + kural basina atesleme sayisi.
+    """
+    rows: list[dict] = []
+    fired: dict[str, int] = {}
+    boards_with_findings = 0
+
+    for board_path in boards:
+        try:
+            design = load_design(board_path)
+        except Exception as exc:
+            rows.append({"board": board_path.name, "error": str(exc)[:100]})
+            continue
+        if not design.board.components:
+            rows.append({"board": board_path.name, "error": "bilesen yok"})
+            continue
+
+        ev = evaluate_design(design, rules)
+        seen = {f.rule_id for f in ev.findings if f.severity != "info"}
+        for rule_id in seen:
+            fired[rule_id] = fired.get(rule_id, 0) + 1
+        if seen:
+            boards_with_findings += 1
+
+        rows.append(
+            {
+                "board": board_path.name,
+                "components": len(design.board.components),
+                "score": round(ev.score, 1),
+                "errors": ev.errors,
+                "warnings": ev.warnings,
+                "rules_fired": sorted(seen),
+            }
+        )
+
+    scored = [r for r in rows if "score" in r]
+    scores = sorted(r["score"] for r in scored)
+    return {
+        "boards": len(rows),
+        "scored": len(scored),
+        "skipped": len(rows) - len(scored),
+        "boards_with_findings": boards_with_findings,
+        "median": scores[len(scores) // 2] if scores else None,
+        "min": scores[0] if scores else None,
+        "max": scores[-1] if scores else None,
+        "quartiles": (
+            [scores[len(scores) // 4], scores[len(scores) // 2], scores[3 * len(scores) // 4]]
+            if len(scores) >= 4
+            else None
+        ),
+        "rule_fire_counts": dict(sorted(fired.items(), key=lambda kv: -kv[1])),
+        "rows": rows,
+    }
+
+
+def render_corpus(report: dict, rules, color: bool = True) -> None:
+    """Kalibrasyon raporunu yazar.
+
+    Yorum kurali: bir kural gercek kartlarin COGUNDA atesleniyorsa suphelidir -
+    kartlar degil, kural ya da esigi yanlis olabilir.
+    """
+    ok = len([r for r in report["rows"] if "score" in r])
+    print()
+    skipped = report["skipped"]
+    header = f"  KALIBRASYON - {ok} kart puanlandi"
+    if skipped:
+        header += f", {skipped} atlandi"
+    print(header)
+    print()
+    for row in report["rows"]:
+        if "error" in row:
+            print(f"  {row['board'][:38]:<40} ATLANDI ({row['error'][:34]})")
+            continue
+        print(
+            f"  {row['board'][:38]:<40}{row['components']:>5} bilesen"
+            f"{row['score']:>8.1f}{row['errors']:>5}h{row['warnings']:>4}u"
+        )
+
+    print()
+    q = report["quartiles"]
+    print(f"  skor: medyan {report['median']}, aralik {report['min']}-{report['max']}"
+          + (f", ceyrekler {q[0]}/{q[1]}/{q[2]}" if q else ""))
+    print(f"  bulgu ureten kart: {report['boards_with_findings']}/{ok}")
+
+    if report["rule_fire_counts"]:
+        print()
+        print("  kural basina atesleme (gercek kartlarda):")
+        for rule_id, count in report["rule_fire_counts"].items():
+            share = count / ok if ok else 0.0
+            flag = "  <- SUPHELI: kartlarin cogunda atesliyor" if share > 0.5 else ""
+            print(f"    {rule_id:<40}{count:>4}/{ok}  %{share*100:>5.1f}{flag}")
+    else:
+        print()
+        print("  hicbir kural ateslemedi")
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -344,6 +447,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Klasordeki tum .kicad_pcb dosyalarinda kostur (regresyon paketi)",
     )
+    ap.add_argument(
+        "--score-only",
+        type=Path,
+        default=None,
+        metavar="KLASOR",
+        help="Yerlestirme YAPMADAN klasordeki kartlari puanla (kalibrasyon)",
+    )
     args = ap.parse_args(argv)
 
     # Referans kart yalnizca tezgahin kendisinde anlamlidir. Baska bir kart
@@ -362,6 +472,23 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     rules = load_rules(args.rules)
+
+    if args.score_only is not None:
+        if not args.score_only.exists():
+            print(f"hata: klasor bulunamadi: {args.score_only}", file=sys.stderr)
+            return 2
+        boards = discover_boards(args.score_only)
+        if not boards:
+            print(f"hata: {args.score_only} altinda .kicad_pcb yok", file=sys.stderr)
+            return 2
+        report = score_corpus(boards, rules)
+        render_corpus(report, rules, color=not args.no_color)
+        if args.json:
+            args.json.write_text(
+                json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            print(f"\n  JSON: {args.json}")
+        return 0
 
     if args.suite is not None:
         if not args.suite.exists():
