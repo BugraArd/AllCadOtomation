@@ -108,6 +108,49 @@ rules:
     net: "(USB_D|D\\+|D-)"
     max_hpwl_mm: 305.0
 
+  # --- Bilesen DEGERI (KAPALI - beyan gerektirir) ---------------------------
+  # Bu kurallar tasarim dosyasinda OLMAYAN bilgi ister. Varsayilan uydurmak
+  # yanlis guven verirdi, o yuzden kapalilar - kendi degerlerinizi girip acin.
+  #
+  # I2C pull-up (NXP UM10204 7.1):
+  #   Rp(max) = tr / (0.8473 * Cb)      yukselme suresi butcesi
+  #   Rp(min) = (VDD - VOL) / IOL       surucunun cekebilecegi akim
+  #
+  # bus_capacitance_pf'yi kendiniz kestirmelisiniz: cihaz basina <= 10 pF
+  # (UM10204 Tablo 10) + iz kapasitansi (~0.5-1.5 pF/cm) + konnektor.
+  #
+  # DIKKAT: 200 pF ustunde duz direnc YETMEZ; UM10204 akim kaynagi ya da
+  # anahtarlamali direnc devresi ister. Kural o durumda "kabul araligi BOS"
+  # diye bildirir - bu gercek bir bulgudur, sessizce gecilmez.
+  #
+  # - id: hs-i2c-pullup-degeri
+  #   type: component_value
+  #   severity: warning
+  #   description: "I2C pull-up degeri bus kapasitansina uymali (NXP UM10204)"
+  #   weight: 12
+  #   select: { kind: resistor }
+  #   on_net: "(SDA|SCL)"
+  #   check: i2c_pullup
+  #   params:
+  #     vdd: 3.3
+  #     bus_capacitance_pf: 150
+  #     mode: fast              # standard | fast | fast_plus
+  #
+  # Kristal yuk kondansatoru (Microchip AN826):
+  #   CL = C/2 + Cstray  ->  C = 2 * (CL - Cstray),  stray 2-5 pF
+  # cl_pf kristalin datasheet degeridir; kondansatorun degeri DEGILDIR.
+  #
+  # - id: hs-kristal-yuk-degeri
+  #   type: component_value
+  #   severity: warning
+  #   description: "Kristal yuk kondansatoru CL'ye uymali (Microchip AN826)"
+  #   weight: 8
+  #   select: { kind: capacitor }
+  #   on_net: "(XTAL|OSC)"
+  #   check: crystal_load
+  #   params:
+  #     cl_pf: 12               # kristalin datasheet CL degeri
+
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER
 #
@@ -120,4 +163,6 @@ rules:
 #   - Via stub / backdrill (< 0.381 mm) - katman yigini bilgisi gerektirir.
 #   - Referans duzlem surekliligi (TI SPRAAR7E) - zone okuma gerektirir.
 #   - lambda/40: kondansatorun montajli rezonans frekansi BOM'da yok.
+#   - Bus kapasitansinin KENDISI: cihaz sayisi ve iz uzunlugundan tahmin
+#     edilebilir ama olculemez; component_value kurali beyan istiyor.
 # ---------------------------------------------------------------------------

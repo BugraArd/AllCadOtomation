@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 import yaml
 
-from . import geom, ipc2221
+from . import circuit, geom, ipc2221
 from .model import Design, PinRef
 
 SEVERITIES = ("error", "warning", "info")
@@ -684,6 +684,119 @@ def _check_keep_apart(design: Design, rule: Rule) -> list[Finding]:
     return findings
 
 
+def _bound(raw, name: str, rule_id: str) -> float | None:
+    """Sinir degeri: ya duz sayi (SI taban birimi) ya da "4k7" gibi bir metin."""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    parsed = circuit.parse_value(str(raw))
+    if parsed is None:
+        raise RuleError(f"{rule_id}: '{name}' cozulemedi: {raw!r}")
+    return parsed
+
+
+def _check_component_value(design: Design, rule: Rule) -> list[Finding]:
+    """Bilesen DEGERI hesaplanan araliga uyuyor mu?
+
+    Sinir iki bicimde verilebilir:
+      * dogrudan  -> `min: "1k"`, `max: "10k"`
+      * hesaplanmis -> `check: i2c_pullup` + `params: {...}`
+
+    Hesaplar `pcbqa/circuit.py` icinde ve hepsi kaynakli (NXP UM10204,
+    Microchip AN826, Richtek AN033).
+
+    IKI FARKLI "EKSIK" AYRILIR:
+      * Bilesenin degeri COZULEMIYORSA sessizce atlanir. Deger alanina serbest
+        metin yazmak yaygin; bunu hata saymak gurultu uretir.
+      * Kuralin kendisi eksikse (params'ta gereken beyan yok) HATA verilir.
+        O bir yapilandirma hatasidir, tasarim ozelligi degil - sessiz gecmek
+        kurali gorunmez bicimde etkisiz birakirdi.
+    """
+    select = Selector(rule.spec.get("select"))
+    on_net = _rx(rule.spec.get("on_net"))
+
+    check_name = rule.spec.get("check")
+    if check_name is not None:
+        if check_name not in circuit.CHECKS:
+            raise RuleError(
+                f"{rule.id}: bilinmeyen 'check' {check_name!r}; "
+                f"gecerli: {', '.join(sorted(circuit.CHECKS))}"
+            )
+        params = rule.spec.get("params") or {}
+        try:
+            value_range = circuit.CHECKS[check_name](params)
+        except KeyError as exc:
+            raise RuleError(
+                f"{rule.id}: '{check_name}' hesabi icin {exc} beyani gerekiyor "
+                "(params altinda verin)"
+            ) from None
+        except ValueError as exc:
+            raise RuleError(f"{rule.id}: '{check_name}' hesabi basarisiz: {exc}") from None
+    else:
+        low = _bound(rule.spec.get("min"), "min", rule.id)
+        high = _bound(rule.spec.get("max"), "max", rule.id)
+        if low is None and high is None:
+            raise RuleError(f"{rule.id}: 'min'/'max' ya da 'check' verilmeli")
+        value_range = circuit.ValueRange(low=low, high=high, source="kuralda verildi")
+
+    if value_range.low is not None and value_range.high is not None:
+        if value_range.low > value_range.high:
+            # Bu bazen GERCEK bir bulgudur: UM10204'e gore 400 pF fast-mode'da
+            # duz direncle cozum YOKTUR. Kurali sessizce gecmek yerine soyle.
+            return [
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"kabul araligi BOS: alt sinir {value_range.low:.4g} > "
+                        f"ust sinir {value_range.high:.4g} ({value_range.source}). "
+                        "Bu degerlerle cozum yok - devre topolojisi degismeli."
+                    ),
+                )
+            ]
+
+    # Netle sinirlandirma: bilesenin pinlerinden biri o nete bagli mi?
+    allowed: set[str] | None = None
+    if on_net is not None:
+        allowed = set()
+        for net_name in design.net_names():
+            if rule.net_ignored(net_name) or not on_net.search(net_name):
+                continue
+            allowed.update(p.ref for p in design.pins_on_net(net_name))
+
+    findings: list[Finding] = []
+    for comp in design.board.components:
+        if allowed is not None and comp.ref not in allowed:
+            continue
+        if not select.matches_component(design, comp.ref):
+            continue
+        value = circuit.parse_value(design.value_of(comp.ref))
+        if value is None:
+            continue  # deger okunamadi - sessiz
+        if value_range.contains(value):
+            continue
+
+        if value_range.low is not None and value < value_range.low:
+            limit, yon = value_range.low, "en az"
+        else:
+            limit, yon = value_range.high, "en fazla"
+        findings.append(
+            Finding(
+                rule_id=rule.id,
+                severity=rule.severity,
+                message=(
+                    f"{comp.ref} degeri {design.value_of(comp.ref)!r} "
+                    f"({value:.4g}); {yon} {limit:.4g} olmali ({value_range.source})"
+                ),
+                refs=[comp.ref],
+                measured=value,
+                limit=limit,
+            )
+        )
+    return findings
+
+
 def _check_copper_area(design: Design, rule: Rule) -> list[Finding]:
     """Bir netin bakir alani belirtilen araliktan cikmamali.
 
@@ -911,6 +1024,8 @@ CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
     "via_current": _check_via_current,
     "clearance_voltage": _check_clearance_voltage,
     "copper_area": _check_copper_area,
+    # devre dogrulugu (bilesen DEGERI)
+    "component_value": _check_component_value,
 }
 
 

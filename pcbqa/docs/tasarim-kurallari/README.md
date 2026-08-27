@@ -124,6 +124,25 @@ korunuyor (`test_scaling_only_where_the_source_is_a_formula`).
 | `clearance_voltage` | İki net arası bakır açıklığı ≥ gerilim farkının gerektirdiği | 02 §2.4 (IPC-2221B Tablo 6-1) |
 | `keep_apart` | İki bileşen kümesi arası **minimum** mesafe | 01 §1.4, 04 §4.0 |
 | `copper_area` | Bir netin toplam bakır alanı belirtilen aralıkta mı | 01 §1.3 (ROHM), 04 §4.2 (Richtek AN044) |
+| `component_value` | Bileşen **değeri** hesaplanan aralıkta mı | 03 §3.8 (NXP UM10204), 03 §3.2 (Microchip AN826), 01 §1.4 (Richtek AN033) |
+
+`component_value`, motorun ilk **devre doğruluğu** kuralı: geometriyi değil
+devrenin kendisini yargılıyor. Hesaplar `pcbqa/circuit.py` içinde:
+
+| Hesap | Formül | Kaynak |
+|---|---|---|
+| `i2c_pullup` | `Rp(max) = tr/(0.8473·Cb)`, `Rp(min) = (VDD−VOL)/IOL` | NXP UM10204 §7.1 |
+| `crystal_load` | `C = 2(CL − Cstray)`, stray 2–5 pF | Microchip AN826 |
+| `fb_divider` | `R2 ≤ Vfb/(100·Ibias)` | Richtek AN033 |
+
+Formüller kaynağın kendi sonucunu bağımsız olarak üretiyor: 400 pF fast-mode'da
+`Rp(min)` = 967 Ω > `Rp(max)` = 885 Ω çıkıyor — yani düz dirençle çözüm yok.
+UM10204 tam bunu söylüyor. Kural bunu "kabul aralığı **boş**" diye bildirir;
+sessizce geçmek kuralı görünmez biçimde etkisiz bırakırdı.
+
+**Bu kuralların hepsi kapalı gelir.** Hesaplar tasarım dosyasında olmayan bilgi
+istiyor (bus kapasitansı, besleme gerilimi, kristalin CL'si, FB bias akımı).
+Varsayılan uydurmak yanlış güven verirdi.
 
 `keep_apart`, araştırmanın ortaya çıkardığı bir boşluğu kapatıyor: kaynaklardaki
 kuralların şaşırtıcı bir kısmı "yaklaştır" değil **"uzaklaştır"** diyor —

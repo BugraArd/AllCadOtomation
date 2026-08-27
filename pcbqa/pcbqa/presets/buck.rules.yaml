@@ -160,6 +160,26 @@ rules:
     net: "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$"
     current_a: 2.0
 
+  # --- FB bolucu degeri (KAPALI - beyan gerektirir) -------------------------
+  # Richtek AN033: bolucuden gecen akim, FB pininin bias akiminin en az 100
+  # KATI olmali; yoksa bias akimi cikis gerilimini kaydirir.
+  #   I_bolucu = Vfb / R2 >= 100 * I_bias  ->  R2 <= Vfb / (100 * I_bias)
+  #
+  # Vfb ve bias akimi REGULATORUN datasheet degerleridir, tasarim dosyasinda
+  # yoktur. Kendi parcaniza gore girip acin.
+  #
+  # - id: buck-fb-bolucu-degeri
+  #   type: component_value
+  #   severity: warning
+  #   description: "FB bolucu akimi bias akiminin >= 100 kati olmali (Richtek AN033)"
+  #   weight: 10
+  #   select: { kind: resistor }
+  #   on_net: "^(FB|VFB|VSENSE)$"
+  #   check: fb_divider
+  #   params:
+  #     vfb: 0.8                # regulatorun FB referans gerilimi
+  #     bias_current_na: 100    # FB pin bias akimi (datasheet)
+
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER (arastirmada sayisal degeri var, kural yok)
 #
