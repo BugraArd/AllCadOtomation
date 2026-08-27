@@ -115,6 +115,56 @@ def _segment_distance(p1: Point, p2: Point, q1: Point, q2: Point) -> float:
     )
 
 
+def _segments_cross(p1: Point, p2: Point, q1: Point, q2: Point) -> bool:
+    """Iki dogru parcasi birbirini kesiyor mu?"""
+
+    def orient(a: Point, b: Point, c: Point) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    d1, d2 = orient(q1, q2, p1), orient(q1, q2, p2)
+    d3, d4 = orient(p1, p2, q1), orient(p1, p2, q2)
+    return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
+
+
+def segment_distance(p1: Point, p2: Point, q1: Point, q2: Point) -> float:
+    """Iki dogru parcasi arasindaki en kisa mesafe; kesisiyorlarsa 0.0.
+
+    `_segment_distance` yalnizca uc noktalari deniyor; birbirini KESEN iki
+    parca icin bu pozitif bir sayi dondurur (uclari uzaktadir). Aciklik
+    kurallarinda bu sessiz bir kacak olurdu - kesisen iki bakir izi arasindaki
+    aciklik sifirdir.
+    """
+    if _segments_cross(p1, p2, q1, q2):
+        return 0.0
+    return _segment_distance(p1, p2, q1, q2)
+
+
+def shape_distance(a: list[Point], b: list[Point]) -> float:
+    """Iki nokta kumesi arasindaki en kisa kenar mesafesi.
+
+    `distance()`ten farki: bozuk/dejenere sekilleri de kabul eder - tek nokta
+    (via, boyutsuz pad) ve iki nokta (iz merkez cizgisi). Bakir aciklik olcumu
+    tam olarak bu uc sekli karistirir.
+
+    Kesisen kenarlar 0.0 dondurur. Bir sekil digerinin TAMAMEN icindeyse
+    (kenarlar kesismiyorsa) sonuc pozitif cikar - farkli netlerin bakiri ic ice
+    olmasi zaten kisa devredir ve DRC'nin isidir.
+    """
+    if not a or not b:
+        return math.inf
+    best = math.inf
+    for i in range(len(a)):
+        p1 = a[i]
+        p2 = a[(i + 1) % len(a)] if len(a) > 1 else a[i]
+        for j in range(len(b)):
+            q1 = b[j]
+            q2 = b[(j + 1) % len(b)] if len(b) > 1 else b[j]
+            best = min(best, segment_distance(p1, p2, q1, q2))
+            if best <= 0.0:
+                return 0.0
+    return best
+
+
 def distance(a: Polygon, b: Polygon) -> float:
     """Iki poligon arasindaki en kisa mesafe. Kesisiyorlarsa 0.0 (negatif degil).
 

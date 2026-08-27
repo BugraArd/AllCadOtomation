@@ -32,6 +32,62 @@ class Pad:
     # konumlandirabilmek icin gerekli (yerlestirme motoru bunu kullanir).
     dx: float = 0.0
     dy: float = 0.0
+    # Pad bakirinin boyutu (mm). Aciklik kurallari pad'i noktasal kabul
+    # edemez: 1.6 mm'lik bir pad, 0.4 mm'lik bir acikliktan buyuktur.
+    size_x: float = 0.0
+    size_y: float = 0.0
+    # Pad bakirinin MUTLAK acisi (bilesen donmesi + pad'in kendi donmesi).
+    # Dikdortgen pad'in koselerini dogru yere koymak icin gerekir.
+    angle: float = 0.0
+    # circle | oval | rect | roundrect | trapezoid | custom
+    shape: str = "rect"
+
+    @property
+    def radius_mm(self) -> float:
+        """Pad'i cevreleyen dairenin yaricapi (kaba olcum icin)."""
+        return math.hypot(self.size_x, self.size_y) / 2.0
+
+    def copper_shape(self) -> tuple[list[tuple[float, float]], float]:
+        """Pad bakiri: (noktalar, sisme_yaricapi).
+
+        Sonuc, noktalarin `r` kadar sisirilmis halidir. Bu gosterim uc pad
+        turunu de TAM ifade eder:
+
+          * circle -> tek nokta + r            (kusursuz)
+          * oval   -> uzun eksen boyunca parca + kisa yarim genislik
+                      (stadyum sekli - kusursuz)
+          * rect   -> donmus dortgen + 0
+
+        Yuvarlak pad'i kareye yuvarlamak olcumu bozuyordu: TO-92'nin 1.27 mm
+        kosegen araliktaki 1.3 mm'lik iki yuvarlak pad'i kare kabul edilince
+        koseleri 0.03 mm cakisiyor ve saglam bir kart "aciklik ihlali"
+        veriyordu. Gercekte aralarinda 0.50 mm var.
+
+        roundrect/trapezoid/custom dortgen kabul edilir - kucuk bir fazla
+        tahmin, yani aciklik olcumunde guvenli yon.
+        """
+        if self.size_x <= 0 or self.size_y <= 0:
+            return [(self.x, self.y)], 0.0
+
+        if self.shape == "circle" or abs(self.size_x - self.size_y) < 1e-9:
+            return [(self.x, self.y)], min(self.size_x, self.size_y) / 2.0
+
+        if self.shape == "oval":
+            short = min(self.size_x, self.size_y)
+            span = (max(self.size_x, self.size_y) - short) / 2.0
+            dx, dy = (span, 0.0) if self.size_x > self.size_y else (0.0, span)
+            rx, ry = _rotate(dx, dy, self.angle)
+            return [(self.x - rx, self.y - ry), (self.x + rx, self.y + ry)], short / 2.0
+
+        hx, hy = self.size_x / 2.0, self.size_y / 2.0
+        corners = [
+            (self.x + rx, self.y + ry)
+            for rx, ry in (
+                _rotate(dx, dy, self.angle)
+                for dx, dy in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))
+            )
+        ]
+        return corners, 0.0
 
     @property
     def connected(self) -> bool:
@@ -109,12 +165,55 @@ class Component:
 
 
 @dataclass
+class Track:
+    """Bakir katmandaki bir iz parcasi (segment veya arc).
+
+    `width` mm cinsinden iz genisligi; akim tasima kurallari bunu olcer.
+    Arc'lar icin uzunluk, uc noktalar arasi duz mesafe ile YAKLASIK hesaplanir
+    (kural motoru uzunlugu degil genisligi kullandigi icin yeterli).
+    """
+
+    net: str
+    width: float
+    layer: str
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+    @property
+    def length_mm(self) -> float:
+        return math.hypot(self.x2 - self.x1, self.y2 - self.y1)
+
+    @property
+    def is_outer(self) -> bool:
+        """Dis katman mi? IPC akim tablolari ic/dis icin farklidir."""
+        return self.layer in ("F.Cu", "B.Cu")
+
+
+@dataclass
+class Via:
+    """Bir via. `size` bakir pad capi, `drill` delik capi (mm)."""
+
+    net: str
+    x: float
+    y: float
+    size: float
+    drill: float
+    layers: tuple[str, ...] = ()
+
+
+@dataclass
 class Board:
     """Okunmus kart."""
 
     path: Path
     components: list[Component] = field(default_factory=list)
     outline: tuple[float, float, float, float] | None = None  # (minx, miny, maxx, maxy)
+    # Yonlendirilmis bakir. Bos liste "kart henuz yonlendirilmemis" demektir;
+    # iz genisligi kurallari o durumda sessizce atlanir (bkz. rules.py).
+    tracks: list[Track] = field(default_factory=list)
+    vias: list[Via] = field(default_factory=list)
     # Dosyada atlanan bozuk parantez sayisi (0 ise dosya saglam)
     parse_warnings: int = 0
 
@@ -241,6 +340,7 @@ def _read_footprint(node) -> Component | None:
         dx = as_float(pat[1]) if pat and len(pat) > 1 else 0.0
         dy = as_float(pat[2]) if pat and len(pat) > 2 else 0.0
         rx, ry = _rotate(dx, dy, frot)
+        psize = child(pnode, "size")
         comp.pads.append(
             Pad(
                 number=pnode[1] if len(pnode) > 1 else "",
@@ -250,6 +350,10 @@ def _read_footprint(node) -> Component | None:
                 pintype=value(pnode, "pintype", default=""),
                 dx=dx,
                 dy=dy,
+                size_x=as_float(psize[1]) if psize and len(psize) > 1 else 0.0,
+                size_y=as_float(psize[2]) if psize and len(psize) > 2 else 0.0,
+                angle=frot + (as_float(pat[3]) if pat and len(pat) > 3 else 0.0),
+                shape=str(pnode[3]) if len(pnode) > 3 and isinstance(pnode[3], str) else "rect",
             )
         )
 
@@ -290,6 +394,67 @@ def _read_outline(root) -> tuple[float, float, float, float] | None:
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def _node_net(node) -> str:
+    """(net "VCC") ve eski (net 5 "VCC") bicimlerinin ikisi de: ad son elemandir."""
+    n = child(node, "net")
+    if n is None or len(n) < 2:
+        return ""
+    return str(n[-1])
+
+
+def _read_tracks(root) -> list[Track]:
+    """Ust duzey (segment ...) ve (arc ...) dugumleri.
+
+    KiCad bakir izleri kart kokunde tutar (footprint icindekiler degil).
+    Arc'ta orta nokta da vardir, ama genislik kurallari icin uc noktalar yeter.
+    """
+    tracks: list[Track] = []
+    for name in ("segment", "arc"):
+        for node in children(root, name):
+            start = child(node, "start")
+            end = child(node, "end")
+            width = child(node, "width")
+            if start is None or end is None or width is None:
+                continue
+            if len(start) < 3 or len(end) < 3:
+                continue
+            tracks.append(
+                Track(
+                    net=_node_net(node),
+                    width=as_float(width[1]) if len(width) > 1 else 0.0,
+                    layer=str(value(node, "layer", default="") or ""),
+                    x1=as_float(start[1]),
+                    y1=as_float(start[2]),
+                    x2=as_float(end[1]),
+                    y2=as_float(end[2]),
+                )
+            )
+    return tracks
+
+
+def _read_vias(root) -> list[Via]:
+    vias: list[Via] = []
+    for node in children(root, "via"):
+        at = child(node, "at")
+        if at is None or len(at) < 3:
+            continue
+        size = child(node, "size")
+        drill = child(node, "drill")
+        layers_node = child(node, "layers")
+        layers = tuple(str(x) for x in layers_node[1:]) if layers_node else ()
+        vias.append(
+            Via(
+                net=_node_net(node),
+                x=as_float(at[1]),
+                y=as_float(at[2]),
+                size=as_float(size[1]) if size and len(size) > 1 else 0.0,
+                drill=as_float(drill[1]) if drill and len(drill) > 1 else 0.0,
+                layers=layers,
+            )
+        )
+    return vias
+
+
 def read_board(path: str | Path) -> Board:
     """Bir .kicad_pcb dosyasini okur."""
     path = Path(path)
@@ -301,4 +466,6 @@ def read_board(path: str | Path) -> Board:
         if comp is not None:
             board.components.append(comp)
     board.outline = _read_outline(root)
+    board.tracks = _read_tracks(root)
+    board.vias = _read_vias(root)
     return board
