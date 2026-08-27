@@ -15,6 +15,16 @@ version: 1
 #   length_match       bir grup netin uzunlugu birbirine yakin olmali (diferansiyel cift)
 #   courtyard_overlap  bilesenler cakismamali, aralarinda montaj boslugu olmali
 #   edge_clearance     bilesenler kart kenarindan yeterince iceride olmali
+#   keep_apart         iki bilesen kumesi arasinda EN AZ N mm olmali
+#
+# Asagidakiler yalnizca YONLENDIRILMIS kartlarda olcum yapar; yerlestirme
+# asamasinda (kartta bakir yokken) sessizce atlanirlar:
+#   trace_width        iz genisligi akimi tasimaya yetmeli (IPC-2221B)
+#   via_current        netteki via'lar toplu olarak akimi tasimali
+#   clearance_voltage  iki net arasi bakir acikligi gerilim farkina yetmeli
+#
+# Devre tipine gore hazir esikler icin pcbqa/presets/ altina bakin; kendi kural
+# dosyanizdan `include:` ile dahil edebilirsiniz.
 #
 # Secici alanlari (pin / partner):
 #   ref        referans uzerinde duzenli ifade      -> "^U"
@@ -125,3 +135,33 @@ rules:
   #   groups:
   #     - ["USB_DP", "USB_DM"]
   #   tolerance_mm: 3
+
+  # --- 6) "Uzak dursun" kurallari (kapali) ---------------------------------
+  # Bunlar `proximity`nin TERSIDIR ve kolay atlanir: kural kaynaklarinin
+  # sasirtici bir kismi "yaklastir" degil "uzaklastir" der. Ornek (TI SNOA986A):
+  # I2C pull-up direncleri sicaklik sensorune 10 mm'den yakin olursa kendi
+  # oz-isinmalari olcumu bozar.
+  #
+  # Yerlestirici bu kurallara tepki verir - ayri bir ayar gerekmez; olculdu,
+  # bkz. tests/test_placement_keep_apart.py.
+  #
+  # - id: pullup-sicaklik-sensorunden-uzak
+  #   type: keep_apart
+  #   severity: error
+  #   description: "I2C pull-up direncleri sicaklik sensorunden >= 10 mm (TI SNOA986A)"
+  #   a: { kind: resistor }
+  #   b: { kind: ic, ref: "^(TMP|TEMP)" }
+  #   min_distance_mm: 10.0
+
+  # --- 7) Bakir kurallari (kapali - yonlendirilmis kart gerektirir) ---------
+  # `current_a` degerini KENDI tasariminiza gore verin; varsayilan yoktur.
+  #
+  # - id: guc-izi-genisligi
+  #   type: trace_width
+  #   severity: error
+  #   description: "Guc izleri akimi tasiyacak genislikte olmali (IPC-2221B)"
+  #   net: "^(VIN|VBUS|VOUT)$"
+  #   current_a: 2.0
+  #   delta_t_c: 10          # varsayilan 10 C sicaklik artisi
+  #   copper_oz: 1.0
+  #   method: ipc2221        # ya da mm_per_amp (ROHM'un 1 mm/A pratik kurali)
