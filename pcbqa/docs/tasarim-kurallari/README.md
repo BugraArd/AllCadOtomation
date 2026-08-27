@@ -123,6 +123,7 @@ korunuyor (`test_scaling_only_where_the_source_is_a_formula`).
 | `via_current` | Netteki via'ların toplam akım kapasitesi | 01 §1.8 (TI SLVA959B) |
 | `clearance_voltage` | İki net arası bakır açıklığı ≥ gerilim farkının gerektirdiği | 02 §2.4 (IPC-2221B Tablo 6-1) |
 | `keep_apart` | İki bileşen kümesi arası **minimum** mesafe | 01 §1.4, 04 §4.0 |
+| `copper_area` | Bir netin toplam bakır alanı belirtilen aralıkta mı | 01 §1.3 (ROHM), 04 §4.2 (Richtek AN044) |
 
 `keep_apart`, araştırmanın ortaya çıkardığı bir boşluğu kapatıyor: kaynaklardaki
 kuralların şaşırtıcı bir kısmı "yaklaştır" değil **"uzaklaştır"** diyor —
@@ -175,15 +176,26 @@ ortak eksik şu:
 
 | Gereken veri | Açtığı kurallar |
 |---|---|
-| **Bakır döküm (zone) okuma** | Sıcak döngü alanı (6 mm² iyi / 18 mm² kötü), SW bakır alanı ≤ 100 mm², indüktör altında bakır olmaması, termal bakır alanı (1 W → ~20 cm²), referans düzlem sürekliliği |
+| **Akım yolu topolojisi** | Sıcak döngü alanı (6 mm² iyi / 18 mm² kötü). Zone okuma **eklendi** ama bu hâlâ ölçülemiyor: döngü alanı tek bir netin alanı değil, CIN → high-side → low-side → CIN yolunun **çevrelediği** alan |
+| **Zone ∩ courtyard kesişimi** | İndüktör altında bakır olmaması (ROHM, ≥3 mm temizlik). `copper_area` toplam alanı ölçer, **nerede** olduğunu değil |
+| **Güç dissipasyonu beyanı** | Termal bakır alanı. Kural yazılabilir hale geldi ama eşik ortama bağlı: 1 W için TA=25 °C'de ~1.5 cm², TA=70 °C'de ~20 cm² (Richtek AN044). İkisi de dosyada yok |
 | **İz topolojisi analizi** | Stub uzunluğu, ESD izi endüktansı (52 nH → TVS işlevsiz), Kelvin bağlantı, fly-by sırası |
 | **Katman yığını (stackup)** | Via stub / backdrill, iç/dış katman gerçek bakır kalınlığı, empedans |
 | **3B / yükseklik** | Elektrolitik vent boşluğu, konnektör keep-out, muhafaza açıklığı |
 | **Kart kesikleri (iç Edge.Cuts)** | Creepage slot genişliği (PD1 0.25 / PD2 1.0 / PD3 1.5 mm), termal izolasyon yarığı |
 
-Bunlardan **zone okuma** en yüksek getirili olan: tek başına anahtarlamalı
-güç kaynaklarının en kritik üç kuralını (sıcak döngü, SW alanı, termal bakır)
-ölçülebilir hale getirir.
+**Zone okuma yapıldı** (`Kicad-akm`) ve beklenenin bir kısmını verdi:
+
+| Hedeflenen kural | Sonuç |
+|---|---|
+| SW bakır alanı ≤ 100 mm² | ✅ ölçülebilir — `buck-sw-bakir-alani` |
+| Termal bakır alanı | ⚠️ kural yazılabilir, ama eşik güç dissipasyonu beyanı istiyor (kapalı örnek olarak bırakıldı) |
+| Sıcak döngü alanı | ❌ hâlâ ölçülemiyor — netin alanı değil, akım yolunun çevrelediği alan gerekiyor |
+| İndüktör altında bakır | ❌ zone ∩ courtyard kesişimi gerekiyor |
+
+Yani "zone okuma üç kuralı birden açar" tahmini **fazla iyimserdi**: biri açıldı,
+biri kısmen, ikisi hâlâ kapalı. Alan ölçmek ile geometrik ilişki ölçmek farklı
+şeyler.
 
 ## Kapsam uyarısı
 

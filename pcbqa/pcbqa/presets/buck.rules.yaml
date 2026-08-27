@@ -134,6 +134,22 @@ rules:
     copper_oz: 1.0
     method: ipc2221
 
+  # --- Anahtarlama dugumu bakir alani -------------------------------------
+  # ROHM 66AN015E Oncelik 2: SW bakir alani <= 100 mm2 (IC ve L lehim adalari
+  # DAHIL). Buyuk SW bakiri dv/dt gurultusunu cevreye kapasitif kuplajlar.
+  #
+  # Kaynak bir ESIK veriyor, bir egri degil -> scale KAPALI.
+  #
+  # Olcum FAZLA TAHMINDIR (ustuste binen bakir iki kez sayilir); ust sinir
+  # kuralinda bu GUVENLI yondedir, en fazla yanlis alarm verir.
+  - id: buck-sw-bakir-alani
+    type: copper_area
+    severity: warning
+    description: "SW dugumu bakir alani sinirli olmali (ROHM 66AN015E: <= 100 mm2)"
+    weight: 14   # ROHM 66AN015E Oncelik 2 (sayisal); SW alani TI AN-2155'te olculdu
+    net: "^(SW|PH|LX|VSW|PHASE)$"
+    max_mm2: 100
+
   # TI SLVA773: guc yolunda amper basina 1 via. Via kapasitesi TI SLVA959B
   # Tablo 3-1'den (IPC-2221'in namlu hesabindan ~2 kat muhafazakar).
   - id: buck-guc-via-sayisi
@@ -147,11 +163,13 @@ rules:
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER (arastirmada sayisal degeri var, kural yok)
 #
-#   - Sicak dongu ALANI (TI AN-2155: 6 mm2 iyi, 18 mm2 kotu). Dongu alani
-#     CIN + high-side + low-side anahtarin cevreledigi bakir alan; zone ve
-#     akim yonu bilgisi gerektirir.
-#   - SW bakir ALANI <= 100 mm2 (ROHM). Zone/dokum okuma gerekir.
-#   - Induktor altinda bakir olmamasi (ROHM, >= 3 mm temizlik). Zone gerekir.
+#   - Sicak dongu ALANI (TI AN-2155: 6 mm2 iyi, 18 mm2 kotu). Zone okuma
+#     EKLENDI ama bu hala olculemiyor: dongu alani tek bir netin alani degil,
+#     CIN -> high-side -> low-side -> CIN yolunun CEVRELEDIGI alan. Akimin
+#     izledigi yolu bilmek gerekiyor, bakir miktarini degil.
+#   - Induktor altinda bakir olmamasi (ROHM, >= 3 mm temizlik). Zone poligonu
+#     ile bilesen courtyard'inin KESISIMI gerekir; copper_area yalnizca toplam
+#     alani olcer, nerede oldugunu degil.
 #   - CIN GND ile COUT GND arasi >= 10 mm (ROHM). Kondansatorun HANGI pininin
 #     GND oldugunu ayirt etmek gerekir; keep_apart bilesen merkezini olcer.
 #   - Termal via sayisi/araligi (TI SLMA002J: 5-9 via, ~1.2 mm aralik).

@@ -55,6 +55,22 @@ class Pad:
         return not self.copper_layers
 
     @property
+    def area_mm2(self) -> float:
+        """Pad bakirinin alani (mm2). Sekle gore tam hesaplanir."""
+        if self.size_x <= 0 or self.size_y <= 0:
+            return 0.0
+        if self.shape == "circle" or abs(self.size_x - self.size_y) < 1e-9:
+            r = min(self.size_x, self.size_y) / 2.0
+            return math.pi * r * r
+        if self.shape == "oval":
+            short = min(self.size_x, self.size_y)
+            long_ = max(self.size_x, self.size_y)
+            r = short / 2.0
+            # stadyum = iki yarim daire + ortadaki dikdortgen
+            return math.pi * r * r + (long_ - short) * short
+        return self.size_x * self.size_y
+
+    @property
     def radius_mm(self) -> float:
         """Pad'i cevreleyen dairenin yaricapi (kaba olcum icin)."""
         return math.hypot(self.size_x, self.size_y) / 2.0
@@ -216,6 +232,60 @@ class Via:
 
 
 @dataclass
+class ZoneFill:
+    """Bir zone'un TEK KATMANDAKI doldurulmus bakiri."""
+
+    layer: str
+    points: list[tuple[float, float]] = field(default_factory=list)
+
+    @property
+    def area_mm2(self) -> float:
+        return geom.area(self.points)
+
+
+@dataclass
+class Zone:
+    """Bakir dokum alani (poligon).
+
+    Iki poligon vardir ve karistirilmamalidir:
+      * `outline` - kullanicinin CIZDIGI sinir
+      * `fills`   - KiCad'in gercekten doldurdugu bakir (ada basina bir poligon,
+                    katman basina ayri)
+
+    Alan olcumu `fills` varsa ondan gelir: aciklik ve termal koprulerden sonra
+    kalan GERCEK bakir odur. Kart hic doldurulmamissa `outline`a duser ve bu
+    FAZLA tahmindir - bu yuzden `filled` bayragi ayrica tasinir.
+    """
+
+    net: str
+    layers: tuple[str, ...] = ()
+    outline: list[tuple[float, float]] = field(default_factory=list)
+    fills: list[ZoneFill] = field(default_factory=list)
+
+    @property
+    def filled(self) -> bool:
+        return bool(self.fills)
+
+    @property
+    def area_mm2(self) -> float:
+        """Bakir alani (mm2).
+
+        Doldurulmus poligonlarda delikler, poligonun kendisine giren ince
+        "kesik" yollarla temsil edilir; shoelace bu gidis-donusleri birbirini
+        goturdugu icin alan yine dogru cikar (yaklasik, ~%1).
+        """
+        if self.fills:
+            return sum(fill.area_mm2 for fill in self.fills)
+        return geom.area(self.outline)
+
+    def area_on(self, layer: str) -> float:
+        """Tek bir katmandaki bakir alani."""
+        if self.fills:
+            return sum(f.area_mm2 for f in self.fills if f.layer == layer)
+        return geom.area(self.outline) if layer in self.layers else 0.0
+
+
+@dataclass
 class Board:
     """Okunmus kart."""
 
@@ -226,6 +296,9 @@ class Board:
     # iz genisligi kurallari o durumda sessizce atlanir (bkz. rules.py).
     tracks: list[Track] = field(default_factory=list)
     vias: list[Via] = field(default_factory=list)
+    # Bakir dokum alanlari. Sicak dongu alani, SW bakir alani ve termal bakir
+    # alani kurallarinin on kosulu (bkz. docs/tasarim-kurallari/).
+    zones: list[Zone] = field(default_factory=list)
     # Dosyada atlanan bozuk parantez sayisi (0 ise dosya saglam)
     parse_warnings: int = 0
 
@@ -240,6 +313,48 @@ class Board:
             side = "B" if comp.layer.startswith("B.") else "F"
             totals[side] = totals.get(side, 0.0) + comp.area_mm2
         return totals
+
+    def copper_area_mm2(
+        self,
+        net: str,
+        layer: str | None = None,
+        sources: tuple[str, ...] = ("zone", "track", "pad"),
+    ) -> float:
+        """Bir netin toplam bakir alani (mm2).
+
+        UYARI - bu bir FAZLA TAHMINDIR: ustuste binen bakir (pad'in uzerinden
+        gecen iz, dokumun altindaki pad) iki kez sayilir. Poligon birlesimi
+        hesaplamak cok daha pahali ve bu olcumun kullanildigi kurallar icin
+        gereksiz.
+
+        Hatanin YONU kural tipine gore degisir, ve bu onemlidir:
+          * `max_mm2` (or. SW bakir alani <= 100 mm2) -> fazla tahmin GUVENLI
+            taraftadir; en fazla yanlis alarm verir.
+          * `min_mm2` (or. termal bakir alani) -> fazla tahmin GUVENSIZ taraftadir;
+            yetersiz bakiri yeterli gosterebilir. O kurallarda pay birakin.
+        """
+        total = 0.0
+        if "zone" in sources:
+            for zone in self.zones:
+                if zone.net != net:
+                    continue
+                total += zone.area_on(layer) if layer else zone.area_mm2
+        if "track" in sources:
+            for track in self.tracks:
+                if track.net != net:
+                    continue
+                if layer and track.layer != layer:
+                    continue
+                total += track.length_mm * track.width
+        if "pad" in sources:
+            for comp in self.components:
+                for pad in comp.pads:
+                    if pad.net != net:
+                        continue
+                    if layer and not pad.on_all_layers and layer not in pad.copper_layers:
+                        continue
+                    total += pad.area_mm2
+        return total
 
     def by_ref(self, ref: str) -> Component | None:
         for c in self.components:
@@ -483,6 +598,46 @@ def _read_vias(root) -> list[Via]:
     return vias
 
 
+def _points_of(node) -> list[tuple[float, float]]:
+    """Bir (pts (xy ..) (xy ..)) dugumundeki noktalar."""
+    pts = child(node, "pts")
+    if pts is None:
+        return []
+    return [
+        (as_float(xy[1]), as_float(xy[2])) for xy in children(pts, "xy") if len(xy) > 2
+    ]
+
+
+def _zone_layers(node) -> tuple[str, ...]:
+    """Zone'un katmanlari. Dosyada tekil (layer "F.Cu") ya da cogul
+    (layers "In1.Cu" "In2.Cu") olarak yazilabilir; ikisi de gecerli."""
+    plural = child(node, "layers")
+    if plural is not None:
+        return tuple(str(x) for x in plural[1:])
+    single = value(node, "layer", default=None)
+    return (str(single),) if single else ()
+
+
+def _read_zones(root) -> list[Zone]:
+    zones: list[Zone] = []
+    for node in children(root, "zone"):
+        # Zone'da net ADI ayri bir alanda: (net 1) (net_name "GND")
+        net = value(node, "net_name", default="") or ""
+        zone = Zone(
+            net=str(net),
+            layers=_zone_layers(node),
+            outline=_points_of(child(node, "polygon") or []),
+        )
+        for fill in children(node, "filled_polygon"):
+            points = _points_of(fill)
+            if len(points) >= 3:
+                zone.fills.append(
+                    ZoneFill(layer=str(value(fill, "layer", default="") or ""), points=points)
+                )
+        zones.append(zone)
+    return zones
+
+
 def read_board(path: str | Path) -> Board:
     """Bir .kicad_pcb dosyasini okur."""
     path = Path(path)
@@ -496,4 +651,5 @@ def read_board(path: str | Path) -> Board:
     board.outline = _read_outline(root)
     board.tracks = _read_tracks(root)
     board.vias = _read_vias(root)
+    board.zones = _read_zones(root)
     return board

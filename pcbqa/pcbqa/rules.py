@@ -684,6 +684,74 @@ def _check_keep_apart(design: Design, rule: Rule) -> list[Finding]:
     return findings
 
 
+def _check_copper_area(design: Design, rule: Rule) -> list[Finding]:
+    """Bir netin bakir alani belirtilen araliktan cikmamali.
+
+    Iki kaynakli kurali birden karsilar:
+      * SW bakir alani <= 100 mm2 (ROHM 66AN015E Oncelik 2) - EMI icin ust sinir
+      * termal bakir alani >= X (Richtek AN044 SOT-223 olcum egrisi) - alt sinir
+
+    Zone okunmayan/dokum yapilmamis kartlarda alan yalnizca iz ve pad'lerden
+    gelir; bu dogru ama eksiktir. `min_mm2` kullanan kural bu yuzden dokum
+    OLMAYAN kartlarda yanlis alarm verebilir - kart doldurulmus olmali.
+    """
+    net_rx = _net_matcher(rule)
+    max_mm2 = rule.spec.get("max_mm2")
+    min_mm2 = rule.spec.get("min_mm2")
+    if max_mm2 is None and min_mm2 is None:
+        raise RuleError(f"{rule.id}: 'max_mm2' ya da 'min_mm2' verilmeli")
+    max_mm2 = float(max_mm2) if max_mm2 is not None else None
+    min_mm2 = float(min_mm2) if min_mm2 is not None else None
+    if max_mm2 is not None and min_mm2 is not None and min_mm2 > max_mm2:
+        raise RuleError(f"{rule.id}: 'min_mm2' > 'max_mm2' - bu aralik bos")
+
+    layer = rule.spec.get("layer")
+    sources = tuple(rule.spec.get("sources") or ("zone", "track", "pad"))
+    unknown = set(sources) - {"zone", "track", "pad"}
+    if unknown:
+        raise RuleError(f"{rule.id}: bilinmeyen 'sources' degeri: {sorted(unknown)}")
+
+    findings: list[Finding] = []
+    for net_name in design.net_names():
+        if rule.net_ignored(net_name) or not net_rx.search(net_name):
+            continue
+        area = design.board.copper_area_mm2(net_name, layer=layer, sources=sources)
+        if area <= 0:
+            continue  # bu nette olculebilir bakir yok - sessiz
+        refs = sorted({p.ref for p in design.pins_on_net(net_name)})
+        where = f" ({layer})" if layer else ""
+        if max_mm2 is not None and area > max_mm2:
+            findings.append(
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"{net_name}{where}: bakir alani {area:.1f} mm2, "
+                        f"en fazla {max_mm2:g} mm2 olmali"
+                    ),
+                    refs=refs,
+                    measured=round(area, 2),
+                    limit=max_mm2,
+                )
+            )
+        elif min_mm2 is not None and area < min_mm2:
+            findings.append(
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"{net_name}{where}: bakir alani {area:.1f} mm2, "
+                        f"en az {min_mm2:g} mm2 olmali"
+                    ),
+                    refs=refs,
+                    measured=round(area, 2),
+                    limit=min_mm2,
+                )
+            )
+    findings.sort(key=lambda f: abs((f.measured or 0) - (f.limit or 0)), reverse=True)
+    return findings
+
+
 def _copper_items(design: Design, net_name: str):
     """Bir netin bakiri: (noktalar, sisme_yaricapi, katman) uculeri.
 
@@ -842,6 +910,7 @@ CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
     "trace_width": _check_trace_width,
     "via_current": _check_via_current,
     "clearance_voltage": _check_clearance_voltage,
+    "copper_area": _check_copper_area,
 }
 
 

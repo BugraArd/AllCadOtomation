@@ -147,6 +147,29 @@ rules:
       kind: inductor
     min_distance_mm: 10.0
 
+  # --- Termal bakir alani (KAPALI - beyan gerektirir) -----------------------
+  # Richtek AN044, SOT-223 icin OLCULMUS theta-JA egrisi:
+  #    16 mm2 -> 135 C/W | 100 mm2 -> 107 C/W | 2500 mm2 -> 50 C/W
+  #
+  # HESAP (dokuman 4.2): TA=25 C ve TJ<=125 C ise 1 W icin ~1.2-1.5 cm2 yeter;
+  # ama TA=70 C'de ayni 1 W icin ~20-22 cm2 gerekir. Yani esik ORTAMA ve GUC
+  # DISSIPASYONUNA baglidir ve ikisi de tasarim dosyasinda yoktur.
+  #
+  # Bu yuzden kural KAPALI: min_mm2'yi uydurmak yanlis guven verirdi. Kendi
+  # tasariminizin dissipasyonunu hesaplayip acin.
+  #
+  # DIKKAT: alan olcumu FAZLA TAHMINDIR (ustuste binen bakir iki kez sayilir).
+  # Ust sinirda bu guvenli yondedir ama ALT sinirda DEGILDIR - yetersiz bakiri
+  # yeterli gosterebilir. Buraya pay birakin.
+  #
+  # - id: termal-bakir-alani
+  #   type: copper_area
+  #   severity: warning
+  #   description: "Regulator cikisinda termal bakir alani yeterli olmali (Richtek AN044)"
+  #   weight: 10
+  #   net: "^(VOUT|VO|3V3|5V)$"
+  #   min_mm2: 2000        # ~20 cm2: 1 W @ TA=70 C, TJ<=125 C
+
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER
 #
@@ -156,8 +179,9 @@ rules:
 #   - TVS stub uzunlugu (0 mm - yasak). Iz topolojisi.
 #   - Sense direnci Kelvin baglantisi (TI SLVA959B 7.6) - diferansiyel cift
 #     rotasi kontrolu.
-#   - Termal bakir alani (1 W icin ~20 cm2, SOT-223 olculmus theta-JA egrisi).
-#     Zone okuma gerektirir.
+#   - Termal bakir alani: zone okuma EKLENDI, kural artik yazilabilir (asagida
+#     kapali ornek). Ama esik guc dissipasyonuna baglidir ve o bilgi tasarim
+#     dosyasinda YOKTUR - kullanicinin beyan etmesi gerekir.
 #   - Elektrolitik vent ustu bosluk (Nichicon: 2/3/5 mm cape gore) - 3B
 #     yukseklik bilgisi gerektirir.
 #   - Creepage slot genisligi (IEC 60664-1: PD1 0.25 / PD2 1.0 / PD3 1.5 mm) -
