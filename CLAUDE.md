@@ -58,20 +58,79 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 <!-- END BEADS INTEGRATION -->
 
 
+## Decision Records (Beads)
+
+> Bu bölüm yönetilen Beads bloğunun DIŞINDADIR; `bd setup claude` yeniden
+> çalıştırıldığında silinmez.
+
+Before changing an existing workaround, architecture, pin mapping,
+dependency version, timing value, or bug fix, run `bd prime` and inspect
+the relevant Beads records.
+
+After every meaningful bug fix or behavioral change, save:
+- problem,
+- decision,
+- reason,
+- affected files and symbols,
+- failed approaches,
+- validation/test result,
+- related commit SHA,
+- conditions under which the decision may be reverted.
+
+Never revert a recorded decision silently. Explain the conflict and obtain
+user approval before replacing it.
+
 ## Build & Test
 
-_Add your build and test commands here_
+Tüm komutlar `pcbqa/` dizininden, **sanal ortam yorumlayıcısıyla** çalışır.
+Sistem `python`'ı kullanmayın: `pyyaml` ve `kicad-python` yalnızca `.venv`
+içindedir.
 
 ```bash
-# Example:
-# npm install
-# npm test
+# Test (cerceve unittest'tir, pytest DEGIL - pytest kurulu degil)
+.venv\Scripts\python.exe -m unittest discover -s tests    # 277 test, ~2-3 dk
+
+# Tek modul
+.venv\Scripts\python.exe -m unittest tests.test_copper_rules
+
+# Calistirma
+run.cmd <proje> [secenekler]
+
+# Bagimliliklar
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+Derleme adımı yoktur (saf Python; setup.py/pyproject.toml da yok).
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+KiCad üzerinde **otomatik bileşen yerleştirme + kalite denetimi** yapan bir
+Python aracı. Gömülü firmware değildir: C/C++ kaynağı ve `compile_commands.json`
+yoktur.
+
+Katmanlar (her katman yalnızca altındakini bilir):
+
+1. **Ayrıştırma** — `sexpr.py` (bağımlılıksız s-expression), `pcb.py`
+   (`.kicad_pcb`: bileşen, pad, iz, via), `schematic.py`, `netlist.py`
+2. **Model** — `model.py` (`Design`, `PinRef`), `geom.py`. **KiCad'i bilmez.**
+3. **Kurallar** — `rules.py` (11 kural tipi, YAML), `ipc2221.py` (IPC-2221B
+   hesapları), `presets/` (kaynaklı eşik kütüphanesi)
+4. **Yerleştirme** — `placement/` (`auto` üretim yerleştiricisi)
+5. **Yazma** — `ipc_apply.py` (IPC), `sch_*.py`, `pcb_sync.py`
+6. **ML** — `ml/` (model karar vermez, hamle sırası önerir)
+
+Ayrıntı: `pcbqa/HANDOFF.md` (tam bağlam), `pcbqa/README.md`,
+`pcbqa/docs/tasarim-kurallari/` (kural eşiklerinin kaynakları).
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- **Kod ve YAML ASCII'dir**; dokümanlar (`.md`) tam Türkçe. Kod içi yorumlar da
+  Türkçe ama ASCII harflerle (`aciklik`, `genislik`).
+- Yorumlar **nedeni** anlatır, ne yaptığını değil. Ölçülmüş bir sayı varsa
+  yorumda geçer (ör. "0.03 mm cakisma TO-92'de yanlis alarm uretiyordu").
+- Kural eşiklerinin **kaynağı yazılır**; kaynağı olmayanlar "mühendislik
+  seçimi" diye etiketlenir. Uydurma sayı yazılmaz.
+- Testler davranıştan çok **sessizliği** korur: sağlam bir gerçek kartta
+  (`samples/pic_programmer`) bakır kuralları sıfır bulgu üretmelidir.
+- Netlist değişmezliği kutsaldır: yerleştirme bağlantıyı asla değiştirmez.
+- KiCad açıkken dosyaya yazılmaz (açık-proje koruması).
