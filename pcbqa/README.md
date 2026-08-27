@@ -478,7 +478,7 @@ Güvenlik davranışı:
 
 ## Kurallar
 
-Kurallar YAML ile tanımlanır, kod değiştirmek gerekmez. Yedi tip var:
+Kurallar YAML ile tanımlanır, kod değiştirmek gerekmez. On bir tip var:
 
 | Tip | Alan | Ne kontrol eder |
 |---|---|---|
@@ -487,8 +487,20 @@ Kurallar YAML ile tanımlanır, kod değiştirmek gerekmez. Yedi tip var:
 | `same_net` | niyet | Belirtilen pinler aynı nette mi |
 | `net_length` | sinyal | Netin tahmini uzunluğu (HPWL) bütçeyi aşıyor mu |
 | `length_match` | sinyal | Bir grup netin uzunluğu birbirine yakın mı (diferansiyel çift) |
+| `keep_apart` | yerleşim | İki bileşen kümesi arasında **en az** N mm var mı |
 | `courtyard_overlap` | üretim | Bileşenler çakışıyor mu, aralarında montaj boşluğu var mı |
 | `edge_clearance` | üretim | Bileşenler kart kenarından yeterince içeride mi |
+| `trace_width` | bakır | İz genişliği akımı taşımaya yetiyor mu (IPC-2221B) |
+| `via_current` | bakır | Netteki via'lar akımı taşıyabiliyor mu |
+| `clearance_voltage` | bakır | İki net arası açıklık gerilim farkına yetiyor mu |
+
+Son üçü **yalnızca yönlendirilmiş kartlarda** çalışır; yerleştirme aşamasında
+(kartta bakır yokken) sessizce atlanırlar.
+
+`keep_apart`, `proximity`nin tersidir ve gerçek bir boşluğu kapatır: üretici
+kurallarının şaşırtıcı bir kısmı "yaklaştır" değil **"uzaklaştır"** der —
+FB izi → indüktör ≥ 10 mm (ROHM), I2C pull-up → sıcaklık sensörü ≥ 10 mm (TI).
+Yalnızca mesafe küçültmeye çalışan bir yerleştirici bunları sessizce ihlal eder.
 
 ```yaml
 rules:
@@ -523,7 +535,62 @@ rules:
     type: edge_clearance
     min_distance_mm: 2.0
     ignore_refs: ["^J", "^MH"]   # konnektörler kasten kenardadır
+
+  - id: guc-izi-genisligi
+    type: trace_width
+    net: "^(VIN|VBUS|VOUT)$"
+    current_a: 2.0
+    delta_t_c: 10                # varsayılan 10 °C sıcaklık artışı
+    copper_oz: 1.0
+    method: ipc2221              # ya da mm_per_amp (ROHM'un 1 mm/A kuralı)
+
+  - id: guc-via-sayisi
+    type: via_current
+    net: "^VBUS$"
+    current_a: 2.0
+
+  - id: gerilim-acikligi
+    type: clearance_voltage
+    class: B2                    # B1 iç / B2 dış kaplamasız / B4 kaplamalı
+    voltages:
+      "^HV_": 400
+      "^VBUS$": 5
+
+  - id: pullup-sensorden-uzak
+    type: keep_apart
+    a: { kind: resistor }
+    b: { kind: ic, ref: "^TMP" }
+    min_distance_mm: 10.0
 ```
+
+### Hazır kural kütüphanesi ve `include`
+
+`pcbqa/presets/` altında, üretici app-note'larından ve IPC/IEC standartlarından
+toplanmış eşikleri taşıyan dört ön ayar var. Kendi kural dosyanızdan dahil edin:
+
+```yaml
+include:
+  - presets/uretim.rules.yaml      # her tasarımda geçerli, uyarlama gerekmez
+  - presets/buck.rules.yaml        # tasarımda buck converter varsa
+rules:
+  - id: kendi-kuralim
+    ...
+```
+
+| Ön ayar | İçerik |
+|---|---|
+| `uretim.rules.yaml` | courtyard (IPC-7351B), kart kenarı, fab min. iz, gerilim açıklığı |
+| `buck.rules.yaml` | CIN/SW/FB/COUT mesafeleri, güç izi genişliği, via sayısı |
+| `lineer-koruma.rules.yaml` | LDO, motor sürücü, ESD/TVS, sensör |
+| `yuksek-hiz.rules.yaml` | decoupling (λ/40), kristal, I2C, diferansiyel çiftler |
+
+Yollar dahil eden dosyaya göre çözülür; dairesel `include` ve tekrar eden kural
+`id`'si hata verir. `uretim` ön ayarı devre tipinden bağımsızdır ve sağlam bir
+gerçek kartta sıfır bulgu üretir (testle korunuyor).
+
+Eşiklerin **hepsinin kaynağı yazılı**, kaynağı olmayanlar "mühendislik seçimi"
+diye etiketli. Ayrıntı, çelişkiler ve ölçülemeyenler:
+[docs/tasarim-kurallari/](docs/tasarim-kurallari/README.md).
 
 ### `exclusive` neden önemli?
 

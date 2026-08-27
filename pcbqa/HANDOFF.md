@@ -40,6 +40,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 6/E | Kabul kuralı: tavlama benzeri kaçış | ⚠️ Ölçüldü, kazanç yok (§15) |
 | 6/F | `polish`e yakınsama ölçütü (skor sabrı) | ✅ Bitti (§16) |
 | 6/G | `auto` bütçe bölüşümü: sert tavan + artık devri + 75/25 | ✅ Bitti (§17) |
+| 7 | Devre tipine göre kural kütüphanesi + bakır okuma/kuralları | ✅ Bitti (§20) |
 
 ---
 
@@ -1619,3 +1620,152 @@ footprint'e **taşınmalı** — ikisi de parite uyarısıyla bulundu.
   footprint değişikliği karta yansımaz.
 - `sch_move` hâlâ "önce" ölçümünü kullanıcının klasöründe alıyor (§18.5'teki
   kilit sorunu); `sch_add`/`pcb_sync` iki kum havuzu kullanıyor.
+## 20. Aşama 7 — devre tipine göre kural kütüphanesi (2026-08-27)
+
+### 20.1 Neden
+
+Kural motorundaki eşikler (10 mm decoupling, 120 mm HPWL bütçesi) **uydurmaydı**
+— makul ama kaynaksız. Oysa gerçek sınır sistemden sisteme değişiyor: bir buck
+converter'ın giriş kondansatörü 3 mm'de olmalı, bir LDO'nunki 5 mm yeter, bir
+sıcaklık sensörünün pull-up direnci ise **10 mm'den uzak** durmalı.
+
+Dört araştırma ajanı internetten üretici app-note'u ve standart topladı
+(~90 kaynak, büyük çoğunluğu birincil). Sonuç `docs/tasarim-kurallari/` altında,
+her sayının yanında kaynağıyla.
+
+### 20.2 Araştırmanın asıl bulgusu: çoğu tavsiyenin sayısı yok
+
+Beklenen çıktı bir eşik tablosuydu; çıkan sonuç şu oldu:
+
+> **Birinci sınıf kaynakların çoğu mm cinsinden sayı vermez.** TI, ADI, Richtek,
+> ST, Microchip, NXP, Bosch, Sensirion — hepsi "as close as possible" der.
+
+Bosch bunu açıkça gerekçelendiriyor: *"a 'reasonable distance' depends on many
+customer specific variables and must therefore be [determined by the customer]"*.
+
+Sayı veren birkaç kaynak bu yüzden orantısız ağırlık taşıyor: **ROHM 66AN015E**
+(anahtarlamalı regülatör için sistematik sayısal kontrol listesi — bu alanda
+tek örneği), **TI SLVA959B**, **TI SNOA986A**, **TI AN-2155** (sıcak döngünün
+EMI'ye etkisinin ölçülmüş verisi), **IPC-2221B / IPC-7351B**.
+
+### 20.3 Kaynaklar çelişiyor — ve çelişkiler gizlenmedi
+
+| Konu | Yayılım | Karar |
+|---|---|---|
+| USB 2.0 intra-pair | TI'ın 4 dokümanı 2 / 50 / 100 / 150 mil — **75 kat**, biri kendi içinde tutarsız | 50 mil |
+| İz genişliği yöntemi | 3 A için 0.90 – 3.00 mm arası — **3.3 kat** | `method:` seçilebilir |
+| IPC-2152 daha mı gevşek? | Çıplak temel eğrisi IPC-2221'den **daha muhafazakâr** | IPC-2221B, ΔT parametre |
+| Via akım kapasitesi | 0.30 mm: TI 0.84 A, IPC-2221 1.45–1.69 A — **2 kat** | TI (muhafazakâr) |
+| 3W mu 5W mu | Folklor 3W; TI'ın tüm HS dokümanları **5W** | 5W |
+| 20H kuralı | **Shim & Hubing (IEEE EMC 2001) ölçümle çürüttü** — radyasyon hafifçe artıyor | Genel EMI kuralı olarak kullanma |
+
+İki ajan IPC-2152 konusunda ters şey söyledi; hesap yapılıp Jouppi'nin makalesi
+okununca ikisinin de kısmen haklı olduğu görüldü (çıplak eğri vs çarpanlı) —
+bu, `ipc2221.py`'nin docstring'ine ve dokümana yazıldı.
+
+### 20.4 Eklenen: bakır okuma
+
+Proje o güne kadar **bakırı hiç okumuyordu** — yalnızca footprint ve pad
+konumu. `pcb.py` genişletildi:
+
+- `Track` (net, genişlik, katman, uçlar, `is_outer`, `length_mm`) — `segment`
+  ve `arc` düğümleri
+- `Via` (net, konum, size, drill, layers)
+- `Pad.size_x/size_y/angle/shape` + **`copper_shape()`**
+
+`copper_shape()` gelişmenin en öğretici parçası. Pad'i önce çevreleyen daireye,
+sonra kareye yuvarladım; **ikisi de sağlam bir kartta hayali açıklık ihlali
+üretti** (0.5 mm ve 0.03 mm). TO-92'nin 1.27 mm köşegen aralıktaki iki yuvarlak
+pad'i kare kabul edilince köşeleri çakışıyor. Doğru çözüm şekli **tam**
+modellemek:
+
+| Şekil | Gösterim | Doğruluk |
+|---|---|---|
+| circle | tek nokta + yarıçap | kusursuz |
+| oval | uzun eksen boyunca parça + kısa yarım genişlik (stadyum) | kusursuz |
+| rect/roundrect | dönmüş dörtgen | roundrect'te küçük fazla tahmin |
+
+Üç şekil de aynı `(noktalar, şişme_yarıçapı)` gösterimine indiği için açıklık
+ölçümü tek ifade: `shape_distance(A, B) - rA - rB`.
+
+`geom.segment_distance()` da eklendi: mevcut `_segment_distance` yalnızca uç
+noktaları deniyordu ve **birbirini kesen** iki parça için pozitif sayı
+döndürüyordu — açıklık kuralında sessiz bir kaçak olurdu.
+
+### 20.5 Eklenen: dört kural tipi
+
+| Tip | Ne ölçer |
+|---|---|
+| `trace_width` | İz genişliği ≥ akımın gerektirdiği (IPC-2221B ya da ROHM mm/A) |
+| `via_current` | Netteki via'ların toplam akım kapasitesi (TI SLVA959B Tablo 3-1) |
+| `clearance_voltage` | İki net arası bakır açıklığı ≥ gerilim farkının gerektirdiği |
+| `keep_apart` | İki bileşen kümesi arası **minimum** mesafe |
+
+**`keep_apart` beklenmedik biçimde en önemlisi.** Araştırmadaki kuralların
+şaşırtıcı bir kısmı "yaklaştır" değil **"uzaklaştır"** diyor: FB izi →
+indüktör ≥ 10 mm, I2C pull-up → sıcaklık sensörü ≥ 10 mm (öz-ısınma),
+CIN GND ↔ COUT GND ≥ 10 mm (giriş gürültüsü GND üzerinden çıkışa taşınmasın).
+
+Bu, **yerleştiriciyi doğrudan ilgilendiriyor**: `auto` yalnızca HPWL küçültmeye
+çalışıyor, yani bu kısıtları sistematik olarak ihlal eder. Skor fonksiyonuna
+`keep_apart` cezası eklemek Aşama 8'in ilk adayı.
+
+Bakır kuralları **yönlendirilmemiş kartta sessizce atlanır** — yerleştirme
+aşamasında kartta bakır yok, ve orada bulgu üretmek gürültüden ibaret olurdu.
+
+### 20.6 Eklenen: ön ayar kütüphanesi + `include`
+
+`pcbqa/presets/` altında dört YAML (28 kural), her eşiğin yanında kaynağı.
+`load_rules` artık `include:` destekliyor (yollar dahil eden dosyaya göre;
+dairesel include ve tekrar eden `id` hata verir).
+
+`uretim.rules.yaml` devre tipinden bağımsız ve **sağlam bir gerçek kartta sıfır
+bulgu** üretiyor — bu bir testle korunuyor. Diğer üçü ref/net desenlerinin
+tasarıma uyarlanmasını gerektiriyor ve dosya başlıklarında öyle yazıyor.
+
+### 20.7 Ölçüldü: yöntem seçimi gerçekten fark ediyor
+
+`pic_programmer` kartının VCC izi 0.8 mm:
+
+| Yöntem | 2 A için gereken | Sonuç |
+|---|---|---|
+| IPC-2221B, ΔT=10 °C | 0.781 mm | **geçer** |
+| ROHM 1 mm/A | 2.000 mm | **kalır** |
+
+Aynı iz, aynı akım, iki savunulabilir kaynak, ters sonuç. Bu yüzden motor tek
+bir "doğru sayı" iddia etmiyor; `method`, `delta_t_c`, `copper_oz` parametre.
+
+`clearance_voltage` de doğru ayrım yapıyor: VPP 5 V'ta sessiz, 60 V'ta 0.6 mm
+eşiğiyle bulgu, 400 V'ta ayrıca "creepage gerekir" uyarısı.
+
+### 20.8 Kalan sınırlar
+
+Sayısal değeri araştırmada **bulunan** ama ölçülemeyen kurallar; her ön ayar
+dosyasının sonunda kendi listesi var. Ortak eksik:
+
+| Gereken veri | Açtığı kurallar |
+|---|---|
+| **Bakır döküm (zone) okuma** | Sıcak döngü alanı (6 mm² iyi / 18 mm² kötü — TI'ın ölçtüğü), SW bakır alanı ≤ 100 mm², indüktör altında bakır olmaması, termal bakır alanı (1 W → ~20 cm²) |
+| İz topolojisi | Stub uzunluğu, ESD izi endüktansı (52 nH → TVS tamamen işlevsiz), Kelvin bağlantı |
+| Katman yığını | Via stub/backdrill, gerçek bakır kalınlığı, empedans |
+| 3B / yükseklik | Elektrolitik vent boşluğu (Nichicon 2/3/5 mm), konnektör keep-out |
+| İç Edge.Cuts | Creepage slot genişliği (PD1 0.25 / PD2 1.0 / PD3 1.5 mm) |
+
+**Zone okuma en yüksek getirili olan:** tek başına anahtarlamalı güç
+kaynaklarının en kritik üç kuralını ölçülebilir hale getirir.
+
+Ayrıca: `clearance_voltage` **clearance** ölçer, **creepage değil** — şebeke
+izolasyonuna yetmez. İz genişliği hesabı **nominal** bakır kullanır; iç katman
+1 oz gerçekte ~25 µm olduğu için iç katman güç izlerinde hesap **~%25
+iyimser**.
+
+### 20.9 Testler
+
+`python -m unittest discover -s tests` → **277 test**, hepsi geçiyor
+(önceki 214 + `test_copper` 6 + `test_ipc2221` 15 + `test_copper_rules` 30 +
+`test_presets` 12).
+
+En değerli olanlar davranışı değil **sessizliği** koruyanlar:
+`test_sound_board_at_logic_voltage_is_silent` ve
+`test_manufacturing_preset_is_silent_on_sound_board` — ikisi de geliştirme
+sırasında gerçekten kırıldı ve pad şekli hatasını yakaladı.
