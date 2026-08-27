@@ -10,3 +10,6 @@ writable_roots = [
   'C:\tmp',
 ]
 network_access = false
+
+[features]
+hooks = true
