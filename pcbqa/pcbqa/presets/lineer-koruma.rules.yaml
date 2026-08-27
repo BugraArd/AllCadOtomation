@@ -1,0 +1,154 @@
+# LDO, motor surucu, ESD korumasi, sensor - yerlesim kurallari
+#
+# Kaynak: docs/tasarim-kurallari/04-lineer-motor-koruma.md
+#
+# ONEMLI BULGU: LDO app-note'larinin HICBIRI (TI, ADI, MaxLinear) giris/cikis
+# kondansatoru icin mm vermiyor - hepsi "as close as practical" diyor.
+# Buradaki 5 mm, TI'in motor surucu (SLVA959B) ve sicaklik sensoru (SNOA986A)
+# notlarindan gelen genel IC bypass kuralidir.
+
+version: 1
+
+defaults:
+  severity: warning
+  ignore_nets: ["GND", "AGND", "DGND", "PGND", "/GND"]
+
+rules:
+  # --- LDO / lineer regulator ---------------------------------------------
+  # TI SLVA959B 5.3.1: "less than 0.5 cm (0.2 in)". 2-3 mm hedefleyin.
+  - id: ldo-giris-kondansatoru
+    type: proximity
+    severity: error
+    description: "LDO giris kondansatoru VIN pinine yakin olmali (TI: < 5 mm)"
+    pin:
+      kind: ic
+      function: "^(VIN|IN|VI)$"
+    partner:
+      kind: capacitor
+    max_distance_mm: 5.0
+    require_partner: true
+
+  - id: ldo-cikis-kondansatoru
+    type: proximity
+    severity: error
+    description: "LDO cikis kondansatoru VOUT pinine yakin olmali (TI: < 5 mm)"
+    pin:
+      kind: ic
+      function: "^(VOUT|OUT|VO)$"
+    partner:
+      kind: capacitor
+    max_distance_mm: 5.0
+    require_partner: false
+
+  # --- Motor surucu / gate driver -----------------------------------------
+  # TI SLVA959B 4: gate izi >= 20 mil (0.508 mm) @ 1 oz.
+  - id: motor-gate-izi-genisligi
+    type: trace_width
+    description: "Gate izleri yeterince genis olmali (TI SLVA959B: >= 0.508 mm @ 1 oz)"
+    net: "^(GATE|GH|GL|HG|LG|G[0-9])"
+    current_a: 0.001
+    min_width_mm: 0.508
+
+  # TI SNVA021C 5: yuksek akim izi >= 15 mil/A = 0.381 mm/A mutlak minimum.
+  # Bu, IPC-2221'in 1 A/10 C degerinden (0.30 mm) daha sikidir.
+  - id: motor-guc-izi
+    type: trace_width
+    severity: error
+    description: "Motor guc izleri (TI SNVA021C: >= 0.381 mm/A mutlak minimum)"
+    net: "^(VM|VBAT|MOTOR|OUT[AB]|M[12])"
+    current_a: 1.0
+    min_width_mm: 0.381
+
+  - id: motor-bypass-kondansatoru
+    type: proximity
+    severity: error
+    description: "Motor surucu bypass kondansatoru besleme pinine yakin (TI: < 5 mm)"
+    pin:
+      kind: ic
+      ref: "^U"
+      pintype: power_in
+    partner:
+      kind: capacitor
+    max_distance_mm: 5.0
+    require_partner: true
+
+  # --- ESD / TVS ----------------------------------------------------------
+  # TI SLVA680A: TVS konnektore "immediately next to" olmali. Sayisal degeri
+  # ikincil (blog) kaynakli: < 5 mm.
+  #
+  # ASIL BUYUKLUK MESAFE DEGIL ENDUKTANS: ROHM 66AN067E, 50 mm x 0.5 mm bir
+  # izin 52 nH tasidigini ve 8 kV'ta TVS'i TAMAMEN islevsiz biraktigini
+  # (ilk tepe 3.4 kV) olcmus. ~1 nH ile ayni tepe 107 V. Mesafe esigi bunun
+  # yalnizca kaba bir vekilidir.
+  - id: esd-tvs-konnektore-yakin
+    type: proximity
+    severity: error
+    description: "TVS/ESD korumasi konnektore bitisik olmali (TI SLVA680A; sayi ikincil kaynak)"
+    pin:
+      kind: connector
+    partner:
+      kind: diode
+      ref: "^(D|TVS|ESD)"
+    max_distance_mm: 5.0
+    require_partner: false
+
+  # --- Sicaklik sensoru ---------------------------------------------------
+  # TI SNOA986A 3: sayisal deger veren NADIR kaynak.
+  #   0.1 uF bypass -> sensor  <= 5 mm  (garanti sarti)
+  #   I2C pull-up   -> sensor  >= 10 mm (direnclerin oz-isinmasi olcumu bozar)
+  - id: sensor-bypass-kondansatoru
+    type: proximity
+    severity: error
+    description: "Sicaklik sensorunun bypass kondansatoru <= 5 mm (TI SNOA986A)"
+    pin:
+      kind: ic
+      ref: "^(U|TMP|IC)"
+      pintype: power_in
+    partner:
+      kind: capacitor
+    max_distance_mm: 5.0
+    require_partner: false
+
+  # DIKKAT: bu kural "yaklastir" degil "UZAKLASTIR" der. Yerlestirici
+  # yalnizca HPWL kucultmeye calisirsa bunu ihlal eder.
+  - id: sensor-pullup-uzak-dursun
+    type: keep_apart
+    severity: error
+    description: "I2C pull-up direncleri sicaklik sensorunden >= 10 mm (TI SNOA986A: oz-isinma)"
+    a:
+      kind: resistor
+    b:
+      kind: ic
+      ref: "^(TMP|TEMP|LM7[45])"
+    min_distance_mm: 10.0
+
+  # --- Manyetik sensor ----------------------------------------------------
+  # NXP AN4247: B(r) = 0.2e-6 * I / r [T]. 1 A izden 10 mm'de 20 uT kalir.
+  # 0.5 uT hedefi 400 mm gerektirir - fiziksel olarak imkansiz, yazilim
+  # kalibrasyonu ZORUNLU. Buradaki 10 mm makul bir alt siniridir, cozum degil.
+  - id: manyetik-sensor-guc-izinden-uzak
+    type: keep_apart
+    description: "Manyetometre/IMU guc bilesenlerinden >= 10 mm (NXP AN4247; kalibrasyon yine de sart)"
+    a:
+      kind: ic
+      ref: "^(IMU|MAG|LSM|MPU|BM[IX])"
+    b:
+      kind: inductor
+    min_distance_mm: 10.0
+
+# ---------------------------------------------------------------------------
+# BU MOTORLA OLCULEMEYENLER
+#
+#   - ESD izi ENDUKTANSI (asil buyukluk). Iz uzunlugu x genislik gerektirir;
+#     Track verisi var, ama "konnektorden TVS'e giden yol" topoloji analizi
+#     ister.
+#   - TVS stub uzunlugu (0 mm - yasak). Iz topolojisi.
+#   - Sense direnci Kelvin baglantisi (TI SLVA959B 7.6) - diferansiyel cift
+#     rotasi kontrolu.
+#   - Termal bakir alani (1 W icin ~20 cm2, SOT-223 olculmus theta-JA egrisi).
+#     Zone okuma gerektirir.
+#   - Elektrolitik vent ustu bosluk (Nichicon: 2/3/5 mm cape gore) - 3B
+#     yukseklik bilgisi gerektirir.
+#   - Creepage slot genisligi (IEC 60664-1: PD1 0.25 / PD2 1.0 / PD3 1.5 mm) -
+#     kart kesikleri (Edge.Cuts ic hatlari) okunmuyor.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,116 @@
+# Yuksek hizli ve hassas sinyaller - yerlesim kurallari
+#
+# Kaynak: docs/tasarim-kurallari/03-yuksek-hiz-sinyal.md
+#
+# BU DOSYADAKI ESIKLERIN KAYNAK KALITESI ESIT DEGIL - her kuralin ustunde
+# yaziyor. Ozellikle KRISTAL mesafesi icin hicbir uretici (ST, Microchip, NXP,
+# Silabs) mm vermiyor; dolasan "5 mm / 10 mm" degerlerinin birincil kaynagi yok.
+
+version: 1
+
+defaults:
+  severity: warning
+  ignore_nets: ["GND", "AGND", "DGND", "/GND"]
+
+rules:
+  # --- Decoupling ---------------------------------------------------------
+  # TI SBAA113: < 0.25 inc = 6.35 mm. Kaynakli TEK sabit ust sinir.
+  # Bloglardaki "1-2 mm" degerinin birincil kaynagi YOK.
+  #
+  # Frekans bagimli dogru esik lambda/40 (Xilinx UG483):
+  #   100 MHz -> 38 mm | 500 MHz -> 7.6 mm | 1 GHz -> 3.8 mm | 2 GHz -> 1.9 mm
+  # Kondansatorun MONTAJLI rezonans frekansini biliyorsaniz asagidaki 6.35'i
+  # pcbqa.ipc2221.decoupling_max_distance_mm() ile hesaplayip degistirin.
+  - id: hs-decoupling-mesafesi
+    type: proximity
+    severity: error
+    description: "Her IC guc pininin yakininda kendi decoupling kondansatoru olmali (TI SBAA113: < 6.35 mm)"
+    pin:
+      kind: ic
+      pintype: power_in
+    partner:
+      kind: capacitor
+    max_distance_mm: 6.35
+    require_partner: true
+    exclusive: true
+
+  # --- Kristal ------------------------------------------------------------
+  # Kristal -> MCU mesafesi icin sayisal esik BULUNAMADI, o yuzden burada
+  # kural yok. Bunun yerine kaynakli olan ayrim kurallari var:
+  #
+  # Microchip AN15.17: kristal izleri diger izlerden 5 x iz genisligi uzakta.
+  # TI SPRAAR7E: saat/periyodik sinyal <-> diger sinyaller >= 1.27 mm.
+  - id: hs-kristal-yuk-kondansatoru
+    type: proximity
+    description: "Kristalin yuk kondansatorleri kristale yakin olmali (kaynak niteliksel: 'close to each other')"
+    pin:
+      kind: crystal
+    partner:
+      kind: capacitor
+    max_distance_mm: 5.0
+    require_partner: false
+
+  # ST AN2867 / TI SPRAAR7E: anahtarlamali regulator kristalden uzak tutulur.
+  # Sayisal degeri YOK; buradaki 15 mm bir MUHENDISLIK SECIMI, kaynak degil.
+  - id: hs-kristal-regulatorden-uzak
+    type: keep_apart
+    description: "Kristal anahtarlamali regulatorden uzak olmali (SAYISAL KAYNAK YOK - secim)"
+    a:
+      kind: crystal
+    b:
+      kind: inductor
+    min_distance_mm: 15.0
+
+  # --- I2C ----------------------------------------------------------------
+  # NXP UM10204: bus kapasitansi <= 400 pF. Pull-up KONUMU icin normatif
+  # kural YOK - spesifikasyon konum belirtmiyor.
+  - id: hs-i2c-pullup
+    type: require_on_net
+    description: "I2C hatlarinda pull-up direnci bekleniyor (NXP UM10204)"
+    net: "(SDA|SCL|I2C)"
+    partner:
+      kind: resistor
+
+  # --- Diferansiyel ciftler ----------------------------------------------
+  # USB 2.0 intra-pair: kaynaklar 2 / 50 / 100 / 150 mil veriyor (75 kat
+  # yayilim, TI kendi icinde tutarsiz). 50 mil = 1.27 mm en savunulabilir
+  # olan: 480 Mbps'de UI'nin %0.4'u.
+  - id: hs-usb-cift-eslestirme
+    type: length_match
+    severity: error
+    description: "USB D+/D- uzunluk eslestirmesi (TI SPRAAR7E: 50 mil = 1.27 mm MAX)"
+    groups:
+      - ["USB_DP", "USB_DM"]
+      - ["D+", "D-"]
+    tolerance_mm: 1.27
+
+  # Microchip DS00002054A: Ethernet intra-pair 50 mil, inter-pair 600 mil.
+  - id: hs-ethernet-cift-eslestirme
+    type: length_match
+    severity: error
+    description: "Ethernet MDI cift ici eslestirme (Microchip: 50 mil = 1.27 mm)"
+    groups:
+      - ["TRD0_P", "TRD0_N"]
+      - ["TRD1_P", "TRD1_N"]
+    tolerance_mm: 1.27
+
+  # Microchip DS00002054A: PHY <-> magnetics < 1 inc, toplam < 4 inc.
+  - id: hs-usb-net-uzunlugu
+    type: net_length
+    description: "USB 2.0 toplam iz uzunlugu (TI SPRAAR7E: max 12000 mil = 305 mm)"
+    net: "(USB_D|D\\+|D-)"
+    max_hpwl_mm: 305.0
+
+# ---------------------------------------------------------------------------
+# BU MOTORLA OLCULEMEYENLER
+#
+#   - 5W kurali (diff ciftler arasi >= 5 x iz genisligi). Yonlendirme
+#     geometrisi uzerinden iz-iz mesafesi gerektirir; clearance_voltage'in
+#     altyapisi var ama kural "ayni netten olmayan HER iz cifti" olarak
+#     kurulmali - buyuk kartlarda pahali.
+#   - Stub uzunlugu (USB: 0 adet, kacinilmazsa < 5.08 mm) - iz topolojisi
+#     analizi gerektirir.
+#   - Via stub / backdrill (< 0.381 mm) - katman yigini bilgisi gerektirir.
+#   - Referans duzlem surekliligi (TI SPRAAR7E) - zone okuma gerektirir.
+#   - lambda/40: kondansatorun montajli rezonans frekansi BOM'da yok.
+# ---------------------------------------------------------------------------

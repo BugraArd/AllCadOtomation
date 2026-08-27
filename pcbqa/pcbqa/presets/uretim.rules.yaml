@@ -1,0 +1,93 @@
+# Uretilebilirlik (fab + montaj) - her tasarimda gecerli kurallar
+#
+# Kaynak: docs/tasarim-kurallari/02-uretilebilirlik-ipc.md
+#
+# Buradaki degerler devre tipinden BAGIMSIZ: uretici sureci ve IPC-7351
+# montaj sinifi belirler. Bu yuzden bu on ayar cogu projede oldugu gibi
+# kullanilabilir - buck/yuksek-hiz on ayarlarindan farkli olarak.
+
+version: 1
+
+defaults:
+  severity: warning
+  ignore_nets: ["GND", "AGND", "DGND", "/GND", "earth"]
+
+rules:
+  # --- Montaj boslugu -----------------------------------------------------
+  # IPC-7351B courtyard excess: Level L 0.10 / Level N 0.25 / Level M 0.50 mm.
+  # Bilesenler arasi FIILI bosluk bunun iki katidir (her iki courtyard da
+  # kendi payini ekler): 0.20 / 0.50 / 1.00 mm.
+  #
+  # Varsayilan Level N (nominal, standart uretim). Yuksek yogunluklu
+  # tasarimda clearance_mm: 0.0 yapip Level L'ye gecin.
+  #
+  # NOT: IPC-7352 courtyard'i yalnizca SMD ve delikli diye ikiye ayirir;
+  # bilesen tipine gore (QFP/BGA/elektrolitik) resmi tablo YOK.
+  - id: uretim-courtyard-cakisma
+    type: courtyard_overlap
+    severity: error
+    description: "Bilesen courtyard'lari cakismamali (IPC-7351B Level N: 0.25 mm excess)"
+    clearance_mm: 0.0
+
+  # --- Kart kenari --------------------------------------------------------
+  # Eurocircuits: frezelenmis profil dis katman 0.25 mm, ic katman 0.40 mm,
+  # V-cut 0.45 mm. JLCPCB 0.20, OSH Park 0.381. Cogu ureticiyi karsilayan
+  # secim: routing 0.3 mm, V-score 0.5 mm.
+  #
+  # Konnektor ve montaj delikleri KASITLI olarak kenardadir - muaf.
+  - id: uretim-kart-kenari
+    type: edge_clearance
+    description: "Bilesenler kart kenarindan yeterince iceride olmali (0.3 mm routing / 0.5 mm V-score)"
+    min_distance_mm: 0.3
+    ignore_refs: ["^J", "^P", "^CON", "^MH", "^H\\d", "^SW", "^TP"]
+    max_findings: 15
+
+  # --- Gerilim acikligi ---------------------------------------------------
+  # IPC-2221B Tablo 6-1. Sinif secimi:
+  #   B1 ic katman | B2 dis kaplamasiz (<=3050 m) | B3 dis kaplamasiz (>3050 m)
+  #   B4 dis, polimer kaplamali
+  #
+  # ASAGIDAKI GERILIMLERI KENDI TASARIMINIZA GORE DOLDURUN. Bos birakilirsa
+  # kural hicbir sey olcmez (beyan edilmemis net = default_voltage).
+  #
+  # KRITIK: bu CLEARANCE'tir (hava araligi), CREEPAGE DEGIL. Sebeke
+  # izolasyonu icin IEC 60664-1/62368-1 gerekir: 230 VAC temel izolasyon
+  # 2.5 mm, takviyeli 5.0 mm creepage (PD2, Grup IIIa, tipik FR-4).
+  # Kural 250 V ustunde bulguya ayrica uyari koyar ama creepage'i OLCMEZ.
+  - id: uretim-gerilim-acikligi
+    type: clearance_voltage
+    severity: error
+    description: "Netler arasi bakir acikligi gerilime yetmeli (IPC-2221B Tablo 6-1)"
+    class: B2
+    default_voltage: 0
+    voltages:
+      # ornek - kendi net adlarinizla degistirin:
+      "^(VBUS|VCC|VDD|3V3|5V)$": 5.0
+
+  # --- Fab alt sinirlari --------------------------------------------------
+  # Standart havuz (her ureticide ek ucretsiz): 0.15 mm iz / 0.15 mm aciklik.
+  # Yaygin ucuz sinif (JLCPCB/PCBWay): 0.10 / 0.10. Gelismis: 0.09 / 0.09.
+  #
+  # Bu kural akimi degil FAB SINIRINI zorlar: current_a cok kucuk verilir,
+  # min_width_mm fab sinifini tasir.
+  - id: uretim-min-iz-genisligi
+    type: trace_width
+    severity: error
+    description: "Hicbir iz uretim minimumunun altinda olmamali (standart sinif: 0.15 mm)"
+    net: ".*"
+    current_a: 0.001
+    min_width_mm: 0.15
+    max_findings: 20
+
+# ---------------------------------------------------------------------------
+# BU MOTORLA OLCULEMEYENLER
+#
+#   - Annular ring (via pad - delik farki). Via.size ve Via.drill okunuyor,
+#     kural yazilabilir; henuz yok.
+#   - Delik-bakir, via-via mesafesi. clearance_voltage'in altyapisi uygun.
+#   - Maske koprusu (solder mask web) - maske katmani okunmuyor.
+#   - Creepage - yuzey mesafesi + slot/oluk geometrisi gerektirir.
+#   - Bakir agirlik toleransi: "1 oz" ic katmanda gercekte ~25 um, disda
+#     ~48-60 um. trace_width kurali NOMINAL degeri kullanir; ic katmanda
+#     bu ~%25 IYIMSER. Ic katman guc izlerinde copper_oz'u dusurun.
+# ---------------------------------------------------------------------------

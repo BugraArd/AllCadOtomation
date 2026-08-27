@@ -1,0 +1,150 @@
+# Anahtarlamali buck converter - yerlesim kurallari
+#
+# Kaynak: docs/tasarim-kurallari/01-anahtarlamali-guc.md
+# Sayisal esiklerin cogu ROHM 66AN015E kontrol listesinden gelir; TI/ADI/Richtek
+# app-note'lari bu konuda mm vermiyor ("as close as possible" diyorlar).
+#
+# KULLANIM: bu dosya oldugu gibi calismaz - ref/net desenlerini KENDI
+# tasariminiza gore duzenleyin. Varsayilan desenler yaygin adlandirmayi
+# hedefler (U1 = regulator, L1 = induktor, C1x = giris, C2x = cikis).
+#
+#   include:
+#     - presets/buck.rules.yaml
+#
+# TOPOLOJI UYARISI: bu kurallar BUCK icindir. Boost'ta giris kondansatoru
+# kesikli akim tasimaz; TI SLVA773 boost'ta VIN bakirinin buyuk olmasinin
+# sorun yaratmadigini soyler. Boost'ta kritik olan CIKIS kondansatorudur.
+
+version: 1
+
+defaults:
+  severity: warning
+  ignore_nets: ["GND", "AGND", "DGND", "PGND", "/GND"]
+
+rules:
+  # --- Oncelik 1: giris kondansatoru --------------------------------------
+  # ROHM 66AN015E: CIN'in VIN+PGND yolu toplam < 6 mm (her bacak ~3 mm).
+  # TI SLVA959B genel IC bypass icin < 5 mm der. Ikisi de ayni mertebede.
+  # Iz enduktansi 1 nH/mm - bu yuzden "1 mm bile kisaltmak" olculebilir fayda.
+  - id: buck-giris-kondansatoru
+    type: proximity
+    severity: error
+    description: "Giris kondansatoru regulatorun VIN pinine cok yakin olmali (ROHM: yol toplami < 6 mm)"
+    pin:
+      kind: ic
+      function: "^(VIN|PVIN|VCC|VDD)"
+    partner:
+      kind: capacitor
+    max_distance_mm: 3.0
+    require_partner: true
+
+  # --- Oncelik 2: anahtarlama dugumu --------------------------------------
+  # ROHM 66AN015E: IC -> L ve IC -> Di izleri her biri <= 4 mm.
+  # SW bakir alani <= 100 mm2 (bu kural motorda olculemiyor - bakir alani
+  # hesabi zone okumayi gerektirir; bkz. asagidaki "olculemeyenler").
+  - id: buck-sw-induktor
+    type: proximity
+    severity: error
+    description: "Induktor, IC'nin SW pinine yakin olmali (ROHM: <= 4 mm)"
+    pin:
+      kind: ic
+      function: "^(SW|PH|LX|VSW|PHASE)"
+    partner:
+      kind: inductor
+    max_distance_mm: 4.0
+    require_partner: true
+
+  # --- Oncelik 3: cikis kondansatoru --------------------------------------
+  - id: buck-cikis-kondansatoru
+    type: proximity
+    description: "Cikis kondansatoru induktore yakin olmali (ROHM: <= 4 mm)"
+    pin:
+      kind: inductor
+    partner:
+      kind: capacitor
+    max_distance_mm: 4.0
+    require_partner: false
+
+  # --- Geri besleme -------------------------------------------------------
+  # ROHM 66AN015E #4-2: FB bolucu direncleri FB pinine <= 4 mm.
+  - id: buck-fb-bolucu
+    type: proximity
+    severity: error
+    description: "Geri besleme bolucu direncleri FB pinine yakin olmali (ROHM: <= 4 mm)"
+    pin:
+      kind: ic
+      function: "^(FB|VFB|VSENSE|ADJ)"
+    partner:
+      kind: resistor
+    max_distance_mm: 4.0
+    require_partner: true
+
+  # ROHM 66AN015E #4-1: FB izi induktore ve serbest gecis diyoduna >= 10 mm.
+  # DIKKAT: bu kural "her seyi yaklastir" sezgisinin TERSI yonde. Yerlestirici
+  # yalnizca mesafe kucultmeye calisirsa bunu sessizce ihlal eder.
+  #
+  # Kural bilesen merkezleri arasi mesafeyi olcer, iz guzergahini degil -
+  # bu bir YAKLASIM: FB bolucu induktore yakinsa izi de yakin gecer.
+  - id: buck-fb-induktorden-uzak
+    type: keep_apart
+    severity: error
+    description: "Geri besleme bilesenleri induktorden uzak olmali (ROHM: >= 10 mm)"
+    a:
+      kind: resistor
+      ref: "^R"
+    b:
+      kind: inductor
+    min_distance_mm: 10.0
+    max_findings: 10
+
+  - id: buck-fb-diyottan-uzak
+    type: keep_apart
+    description: "Geri besleme bilesenleri serbest gecis diyodundan uzak olmali (ROHM: >= 10 mm)"
+    a:
+      kind: resistor
+      ref: "^R"
+    b:
+      kind: diode
+    min_distance_mm: 10.0
+    max_findings: 10
+
+  # --- Guc izleri: akima gore genislik ------------------------------------
+  # Bu kural YALNIZCA yonlendirilmis kartlarda calisir; yerlestirme asamasinda
+  # sessizce atlanir.
+  #
+  # current_a'yi KENDI tasariminiza gore ayarlayin - varsayilan 2 A yalnizca
+  # bir ornek. Yontem secimi (dokuman 1.7'deki 3.3x yayilim):
+  #   ipc2221    (varsayilan) 2 A / 1 oz / 10 C -> 0.78 mm
+  #   mm_per_amp (ROHM)       2 A / 1 oz        -> 2.00 mm
+  - id: buck-guc-izi-genisligi
+    type: trace_width
+    severity: error
+    description: "Guc izleri akimi tasiyacak genislikte olmali (IPC-2221B)"
+    net: "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$"
+    current_a: 2.0
+    delta_t_c: 10
+    copper_oz: 1.0
+    method: ipc2221
+
+  # TI SLVA773: guc yolunda amper basina 1 via. Via kapasitesi TI SLVA959B
+  # Tablo 3-1'den (IPC-2221'in namlu hesabindan ~2 kat muhafazakar).
+  - id: buck-guc-via-sayisi
+    type: via_current
+    description: "Guc yolunda katman degistiren via'lar akimi tasimali (TI: ~1 via/A)"
+    net: "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$"
+    current_a: 2.0
+
+# ---------------------------------------------------------------------------
+# BU MOTORLA OLCULEMEYENLER (arastirmada sayisal degeri var, kural yok)
+#
+#   - Sicak dongu ALANI (TI AN-2155: 6 mm2 iyi, 18 mm2 kotu). Dongu alani
+#     CIN + high-side + low-side anahtarin cevreledigi bakir alan; zone ve
+#     akim yonu bilgisi gerektirir.
+#   - SW bakir ALANI <= 100 mm2 (ROHM). Zone/dokum okuma gerekir.
+#   - Induktor altinda bakir olmamasi (ROHM, >= 3 mm temizlik). Zone gerekir.
+#   - CIN GND ile COUT GND arasi >= 10 mm (ROHM). Kondansatorun HANGI pininin
+#     GND oldugunu ayirt etmek gerekir; keep_apart bilesen merkezini olcer.
+#   - Termal via sayisi/araligi (TI SLMA002J: 5-9 via, ~1.2 mm aralik).
+#
+# Bunlar bakir dokum (zone) okuma eklendiginde uygulanabilir hale gelir.
+# ---------------------------------------------------------------------------
