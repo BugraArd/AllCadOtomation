@@ -9,6 +9,7 @@ Kurallar YAML ile tanimlanir, kod degistirmeden genisletilebilir.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,7 +17,7 @@ from typing import Any, Callable
 
 import yaml
 
-from . import geom
+from . import geom, ipc2221
 from .model import Design, PinRef
 
 SEVERITIES = ("error", "warning", "info")
@@ -476,6 +477,307 @@ def _check_same_net(design: Design, rule: Rule) -> list[Finding]:
     return []
 
 
+def _net_matcher(rule: Rule, key: str = "net"):
+    """Kuraldaki net secicisini derler."""
+    return _rx(rule.spec.get(key, ".*"))
+
+
+def _check_trace_width(design: Design, rule: Rule) -> list[Finding]:
+    """Yonlendirilmis izler, netin tasidigi akim icin yeterince genis mi?
+
+    Iki yontem: `ipc2221` (varsayilan, standardin formulu) ve `mm_per_amp`
+    (ROHM 60AN066E'nin pratik kurali - kendi olcum egrisinden ~4x
+    muhafazakar, ama ortam sicakligi ve komsu bilesen isisi icin marj birakir).
+
+    YONLENDIRILMEMIS KART SESSIZCE ATLANIR. Bu bilincli: pcbqa'nin asil isi
+    yerlestirme ve o asamada kartta hic bakir olmaz. Kartta hic iz yoksa kural
+    hicbir bulgu uretmez; kart yonlendirilmis ama SECILEN net yonlendirilmemisse
+    "info" verir - o gercekten anlamli bir bosluktur.
+    """
+    net_rx = _net_matcher(rule)
+    current_a = float(rule.spec.get("current_a", 0.0))
+    if current_a <= 0:
+        raise RuleError(f"{rule.id}: 'current_a' pozitif olmali")
+
+    delta_t = float(rule.spec.get("delta_t_c", ipc2221.DEFAULT_DELTA_T))
+    copper_oz = float(rule.spec.get("copper_oz", ipc2221.DEFAULT_COPPER_OZ))
+    method = rule.spec.get("method", "ipc2221")
+    if method not in ("ipc2221", "mm_per_amp"):
+        raise RuleError(f"{rule.id}: 'method' ipc2221 ya da mm_per_amp olmali")
+    floor_mm = float(rule.spec.get("min_width_mm", 0.0))
+
+    if not design.board.tracks:
+        return []  # kart yonlendirilmemis - olculecek bakir yok
+
+    findings: list[Finding] = []
+    for net_name in design.net_names():
+        if rule.net_ignored(net_name) or not net_rx.search(net_name):
+            continue
+        tracks = [t for t in design.board.tracks if t.net == net_name]
+        if not tracks:
+            # Tek pinli net (bagli olmayan pad) yonlendirilemez zaten - onu
+            # "eksik" diye raporlamak yalnizca gurultu uretir.
+            pins = design.pins_on_net(net_name)
+            if len(pins) >= 2:
+                findings.append(
+                    Finding(
+                        rule_id=rule.id,
+                        severity="info",
+                        message=f"{net_name} netinde yonlendirilmis iz yok",
+                        refs=sorted({p.ref for p in pins}),
+                    )
+                )
+            continue
+
+        narrowest = min(tracks, key=lambda t: t.width)
+        if method == "mm_per_amp":
+            required = ipc2221.rohm_width_mm(current_a, copper_oz)
+        else:
+            required = ipc2221.trace_width_mm(
+                current_a, delta_t, copper_oz, outer=narrowest.is_outer
+            )
+        required = max(required, floor_mm)
+
+        if narrowest.width + 1e-9 < required:
+            layer_note = "dis" if narrowest.is_outer else "ic"
+            findings.append(
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"{net_name}: en dar iz {narrowest.width:.3f} mm, "
+                        f"{current_a:g} A icin {required:.3f} mm gerekiyor "
+                        f"({layer_note} katman {narrowest.layer}, {method})"
+                    ),
+                    refs=sorted({p.ref for p in design.pins_on_net(net_name)}),
+                    measured=round(narrowest.width, 3),
+                    limit=round(required, 3),
+                )
+            )
+    findings.sort(key=lambda f: (f.limit or 0) - (f.measured or 0), reverse=True)
+    return findings
+
+
+def _check_via_current(design: Design, rule: Rule) -> list[Finding]:
+    """Netteki via'lar toplu olarak akimi tasiyabiliyor mu?
+
+    Via basina kapasite TI SLVA959B Tablo 3-1'den gelir; IPC-2221'in namlu
+    kesiti hesabindan ~2 kat muhafazakardir (bkz. dokuman 1.8).
+    """
+    net_rx = _net_matcher(rule)
+    current_a = float(rule.spec.get("current_a", 0.0))
+    if current_a <= 0:
+        raise RuleError(f"{rule.id}: 'current_a' pozitif olmali")
+
+    if not design.board.tracks and not design.board.vias:
+        return []  # yonlendirilmemis
+
+    findings: list[Finding] = []
+    for net_name in design.net_names():
+        if rule.net_ignored(net_name) or not net_rx.search(net_name):
+            continue
+        vias = [v for v in design.board.vias if v.net == net_name]
+        if not vias:
+            continue  # net katman degistirmiyorsa via kurali uygulanmaz
+        capacity = sum(ipc2221.via_current_a(v.drill) for v in vias)
+        if capacity + 1e-9 < current_a:
+            findings.append(
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"{net_name}: {len(vias)} via toplam {capacity:.2f} A tasiyor, "
+                        f"{current_a:g} A gerekiyor"
+                    ),
+                    refs=sorted({p.ref for p in design.pins_on_net(net_name)}),
+                    measured=round(capacity, 2),
+                    limit=current_a,
+                )
+            )
+    return findings
+
+
+def _check_keep_apart(design: Design, rule: Rule) -> list[Finding]:
+    """Iki bilesen kumesi birbirinden EN AZ N mm uzak olmali.
+
+    `proximity`nin tersi. Arastirmadaki sasirtici sayida kural bu bicimde:
+    FB izi -> induktor >= 10 mm (ROHM 66AN015E), I2C pull-up -> sicaklik
+    sensoru >= 10 mm (TI SNOA986A), CIN GND -> COUT GND >= 10 mm (ROHM),
+    Ethernet on ucu -> diger yuksek hizli izler >= 7.62 mm (Microchip).
+
+    Bu kural olmadan yerlestirici yalnizca "her seyi yaklastir" yonunde calisir
+    ve bu kisitlari sessizce ihlal eder.
+    """
+    a_sel = Selector(rule.spec.get("a"))
+    b_sel = Selector(rule.spec.get("b"))
+    min_mm = float(rule.spec.get("min_distance_mm", 0.0))
+    if min_mm <= 0:
+        raise RuleError(f"{rule.id}: 'min_distance_mm' pozitif olmali")
+
+    a_refs = [c.ref for c in design.board.components if a_sel.matches_component(design, c.ref)]
+    b_refs = [c.ref for c in design.board.components if b_sel.matches_component(design, c.ref)]
+    if not a_refs or not b_refs:
+        return []
+
+    findings: list[Finding] = []
+    seen: set[tuple[str, str]] = set()
+    for ref_a in a_refs:
+        comp_a = design.component(ref_a)
+        if comp_a is None:
+            continue
+        for ref_b in b_refs:
+            if ref_a == ref_b:
+                continue
+            key = (ref_a, ref_b) if ref_a < ref_b else (ref_b, ref_a)
+            if key in seen:
+                continue
+            seen.add(key)
+            comp_b = design.component(ref_b)
+            if comp_b is None:
+                continue
+            gap = math.hypot(comp_a.x - comp_b.x, comp_a.y - comp_b.y)
+            if gap + 1e-9 < min_mm:
+                findings.append(
+                    Finding(
+                        rule_id=rule.id,
+                        severity=rule.severity,
+                        message=(
+                            f"{ref_a} ile {ref_b} arasi {gap:.2f} mm, "
+                            f"en az {min_mm:g} mm olmali"
+                        ),
+                        refs=[ref_a, ref_b],
+                        measured=round(gap, 2),
+                        limit=min_mm,
+                    )
+                )
+    findings.sort(key=lambda f: f.measured or 0)
+    return findings
+
+
+def _copper_items(design: Design, net_name: str):
+    """Bir netin bakiri: (noktalar, sisme_yaricapi, katman) uculeri.
+
+    Uc sekil karisir ve hepsi ayni ifadeyle olculur:
+        aciklik = shape_distance(A, B) - rA - rB
+
+      * iz  -> merkez cizgisi (2 nokta) + yarim genislik
+      * via -> tek nokta + yaricap
+      * pad -> sekline gore (bkz. Pad.copper_shape): daire -> nokta + r,
+               oval -> parca + r, dortgen -> 4 kose
+
+    Pad'i once cevreleyen daireye, sonra kareye yuvarlamak gercek kartta
+    yanlis alarm uretiyordu; her iki yuvarlama da olculen acikligi bilesen
+    ayak izi mertebesinde (0.5 mm) kuculttugu icin saglam kartlar ihlal
+    veriyordu. Simdi daire ve oval TAM modelleniyor.
+    """
+    items: list[tuple[list[tuple[float, float]], float, str]] = []
+    for track in design.board.tracks:
+        if track.net == net_name:
+            items.append(
+                ([(track.x1, track.y1), (track.x2, track.y2)], track.width / 2.0, track.layer)
+            )
+    for via in design.board.vias:
+        if via.net == net_name:
+            items.append(([(via.x, via.y)], via.size / 2.0, "*"))
+    for comp in design.board.components:
+        for pad in comp.pads:
+            if pad.net != net_name:
+                continue
+            pts, radius = pad.copper_shape()
+            items.append((pts, radius, "*"))
+    return items
+
+
+def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
+    """Gerilim farkina gore minimum bakir acikligi (IPC-2221B Tablo 6-1).
+
+    `voltages` ile net adi desenlerine gerilim atanir; olculen aciklik, iki net
+    arasindaki gerilim FARKI icin gereken degerle karsilastirilir.
+
+    SINIRLAR (bilincli, gizlenmiyor):
+      - Daire ve oval pad'ler tam, roundrect/custom pad'ler dortgen olarak
+        alinir -> son ikisinde olcum bir miktar muhafazakar kalir.
+      - Via ve pad'ler tum katmanlarda varsayilir; izler kendi katmaninda.
+      - Poligon dokum (zone) okunmaz -> GND dokumu bu olcume girmez.
+      - Bu CLEARANCE'tir, CREEPAGE degil. Sebeke izolasyonuna yetmez; kural
+        250 V ustunde bulgu metnine ayrica uyari koyar.
+    """
+    voltages_spec = rule.spec.get("voltages") or {}
+    if not voltages_spec:
+        raise RuleError(f"{rule.id}: 'voltages' bos olamaz (net deseni -> gerilim)")
+    klass = rule.spec.get("class", "B2")
+    default_v = float(rule.spec.get("default_voltage", 0.0))
+
+    compiled = [(_rx(pattern), float(v)) for pattern, v in voltages_spec.items()]
+
+    def voltage_of(net_name: str) -> float:
+        for pattern, volts in compiled:
+            if pattern and pattern.search(net_name):
+                return volts
+        return default_v
+
+    net_names = [n for n in design.net_names() if not rule.net_ignored(n)]
+    declared = {n: voltage_of(n) for n in net_names}
+    # Yalnizca gerilim BEYAN EDILMIS netlerden basariz; aksi halde her net
+    # ciftini denemek buyuk kartlarda karesel patlar.
+    sources = [n for n in net_names if declared[n] != default_v]
+    if not sources:
+        return []
+
+    copper = {n: _copper_items(design, n) for n in net_names}
+    findings: list[Finding] = []
+    checked: set[tuple[str, str]] = set()
+
+    for net_a in sources:
+        for net_b in net_names:
+            if net_a == net_b:
+                continue
+            key = (net_a, net_b) if net_a < net_b else (net_b, net_a)
+            if key in checked:
+                continue
+            checked.add(key)
+
+            delta_v = abs(declared[net_a] - declared[net_b])
+            if delta_v <= 0:
+                continue
+            required = ipc2221.clearance_mm(delta_v, klass)
+
+            best = math.inf
+            for pts_a, r1, layer_a in copper[net_a]:
+                for pts_b, r2, layer_b in copper[net_b]:
+                    if layer_a != "*" and layer_b != "*" and layer_a != layer_b:
+                        continue
+                    gap = geom.shape_distance(pts_a, pts_b) - r1 - r2
+                    if gap < best:
+                        best = gap
+                        if best <= 0:
+                            break
+                if best <= 0:
+                    break
+            if best is math.inf:
+                continue
+
+            if best + 1e-9 < required:
+                note = ""
+                if delta_v > 250:
+                    note = " (DIKKAT: sebeke gerilimi - creepage ayrica gerekir)"
+                findings.append(
+                    Finding(
+                        rule_id=rule.id,
+                        severity=rule.severity,
+                        message=(
+                            f"{net_a} <-> {net_b}: aciklik {best:.3f} mm, "
+                            f"{delta_v:g} V icin {required:g} mm gerekiyor "
+                            f"(sinif {klass}){note}"
+                        ),
+                        measured=round(best, 3),
+                        limit=required,
+                    )
+                )
+    findings.sort(key=lambda f: (f.limit or 0) - (f.measured or 0), reverse=True)
+    return findings
+
+
 CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
     # baglanti niyeti + guc butunlugu
     "proximity": _check_proximity,
@@ -484,9 +786,15 @@ CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
     # sinyal butunlugu
     "net_length": _check_net_length,
     "length_match": _check_length_match,
+    # yerlesim kisitlari
+    "keep_apart": _check_keep_apart,
     # uretilebilirlik
     "courtyard_overlap": _check_courtyard_overlap,
     "edge_clearance": _check_edge_clearance,
+    # bakir: akim tasima ve gerilim acikligi (yalnizca yonlendirilmis kartlarda)
+    "trace_width": _check_trace_width,
+    "via_current": _check_via_current,
+    "clearance_voltage": _check_clearance_voltage,
 }
 
 
@@ -494,16 +802,48 @@ CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
 
 
 def load_rules(path: str | Path) -> list[Rule]:
-    """YAML kural dosyasini okur ve dogrular."""
-    path = Path(path)
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    """YAML kural dosyasini okur ve dogrular.
+
+    `include:` ile baska kural dosyalari dahil edilebilir (yollar dahil eden
+    dosyaya GORE cozulur). On ayar kutuphanesi (pcbqa/presets/) boylece
+    kopyala-yapistir olmadan kullanilir:
+
+        include:
+          - presets/buck.rules.yaml
+        rules:
+          - id: kendi-kuralim
+            ...
+
+    Dahil edilen kurallar once gelir; ayni `id` iki kez taniminca hata verir -
+    bu bilincli, cunku sessizce ezilen bir kural fark edilmeyen bir bosluktur.
+    """
+    return _load_rules(Path(path), seen_files=set(), seen_ids=set())
+
+
+def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[Rule]:
+    resolved = path.resolve()
+    if resolved in seen_files:
+        raise RuleError(f"dairesel include: {path}")
+    seen_files.add(resolved)
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuleError(f"kural dosyasi okunamadi: {path} ({exc})") from exc
+    data = yaml.safe_load(text) or {}
 
     defaults = data.get("defaults") or {}
     default_severity = defaults.get("severity", "warning")
     global_ignore = list(defaults.get("ignore_nets") or [])
 
     rules: list[Rule] = []
-    seen: set[str] = set()
+    seen = seen_ids
+
+    includes = data.get("include") or []
+    if isinstance(includes, str):
+        includes = [includes]
+    for item in includes:
+        rules.extend(_load_rules(path.parent / str(item), seen_files, seen))
 
     for raw in data.get("rules") or []:
         if not isinstance(raw, dict):
