@@ -23,6 +23,11 @@ from .model import Design, PinRef
 SEVERITIES = ("error", "warning", "info")
 DEFAULT_MAX_FINDINGS = 25
 
+# Orantili cezada carpanin varsayilan tavani. 3.0 secildi: bir ihlalin en fazla
+# uc kat agirlikta sayilmasi, "cok kotu" ile "biraz kotu"yu ayirmaya yetiyor
+# ama tek bir uc ornegin skoru yutmasina izin vermiyor.
+DEFAULT_SCALE_MAX = 3.0
+
 
 class RuleError(ValueError):
     """Hatali kural tanimi."""
@@ -53,6 +58,10 @@ class Finding:
     # gelen bulgular (KiCad ERC/DRC, sematik kontrolleri) eski davranisi korur.
     # `run_rules` merkezi olarak doldurur, tek tek kontroller ugrasmaz.
     weight: float | None = None
+    # Orantili ceza aciksa carpanin TAVANI; kapaliysa None. Iki bilgiyi tek
+    # alanda tutmak, "acik mi" ile "ne kadar" arasinda tutarsizligi imkansiz
+    # kilar. `run_rules` doldurur.
+    scale_max: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -66,6 +75,7 @@ class Finding:
             "measured": self.measured,
             "limit": self.limit,
             "weight": self.weight,
+            "scale_max": self.scale_max,
         }
 
 
@@ -145,6 +155,12 @@ class Rule:
     # "kaynaksiz bir muhendislik secimi"ni ayirt edemiyor - ikisi de 8 puan
     # yiyordu. Bkz. docs/yol-haritasi-skorlama.md
     weight: float | None = None
+    # Ceza ihlalin BUYUKLUGUNE gore olceklensin mi? Varsayilan kapali, cunku
+    # bu skor manzarasini degistirir ve yerlestirici o manzarayi optimize eder.
+    scale: bool = False
+    # Olcekleme carpaninin tavani. Tavan sart: `via_current`'ta kapasite sifira
+    # yaklasirsa oran patlar ve tek bulgu butun skoru yutar.
+    scale_max: float = DEFAULT_SCALE_MAX
 
     def net_ignored(self, net_name: str) -> bool:
         return any(re.fullmatch(p, net_name, re.IGNORECASE) for p in self.ignore_nets)
@@ -893,6 +909,8 @@ def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[R
                 "ignore_nets",
                 "max_findings",
                 "weight",
+                "scale",
+                "scale_max",
             }
         }
 
@@ -905,6 +923,23 @@ def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[R
             if weight < 0:
                 raise RuleError(f"{rule_id}: 'weight' negatif olamaz (gelen {weight})")
 
+        scale = raw.get("scale", False)
+        if not isinstance(scale, bool):
+            raise RuleError(f"{rule_id}: 'scale' true/false olmali, gelen: {scale!r}")
+
+        scale_max = raw.get("scale_max", DEFAULT_SCALE_MAX)
+        try:
+            scale_max = float(scale_max)
+        except (TypeError, ValueError):
+            raise RuleError(
+                f"{rule_id}: 'scale_max' sayi olmali, gelen: {scale_max!r}"
+            ) from None
+        if scale_max < 1.0:
+            raise RuleError(
+                f"{rule_id}: 'scale_max' 1.0'dan kucuk olamaz (gelen {scale_max}); "
+                "carpan cezayi azaltmak icin degil, buyutmek icindir"
+            )
+
         rules.append(
             Rule(
                 id=rule_id,
@@ -915,6 +950,8 @@ def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[R
                 ignore_nets=global_ignore + list(raw.get("ignore_nets") or []),
                 max_findings=int(raw.get("max_findings", DEFAULT_MAX_FINDINGS)),
                 weight=weight,
+                scale=scale,
+                scale_max=scale_max,
             )
         )
 
@@ -932,6 +969,7 @@ def run_rules(design: Design, rules: list[Rule]) -> list[Finding]:
         for finding in produced:
             finding.rule_type = rule.type
             finding.weight = rule.weight
+            finding.scale_max = rule.scale_max if rule.scale else None
         if len(produced) > rule.max_findings:
             extra = len(produced) - rule.max_findings
             produced = produced[: rule.max_findings]

@@ -661,6 +661,45 @@ kayıp) ile kaynaksız bir mühendislik seçimi aynı 8 puanı yiyordu.
   ağırlık bunlara uygulansaydı ağırlığı 24 olan bir kural hiçbir ihlal olmadan
   24 puan yazdırırdı.
 
+### Orantılı ceza
+
+İhlalin *ne kadar* büyük olduğu da cezaya yansıyabilir:
+
+```yaml
+- id: guc-izi-genisligi
+  type: trace_width
+  weight: 12.0
+  scale: true       # varsayılan false
+  scale_max: 3.0    # çarpan tavanı, varsayılan 3.0
+```
+
+```
+aşım   = |measured − limit| / |limit|
+çarpan = min(1 + aşım, scale_max)
+ceza   = weight × çarpan
+```
+
+Mutlak değer bilinçli: bazı kurallarda ihlal `measured > limit` (net uzunluğu),
+bazılarında `measured < limit` (iz genişliği). Tek ifade ikisini de doğru ölçer.
+
+Üç durumda ölçekleme **yapılmaz** (çarpan 1.0):
+
+- kural `scale` istememiş,
+- bulgu `measured`/`limit` taşımıyor — `require_on_net` ve `same_net` ikili
+  kurallardır, "ne kadar ihlal" diye bir şey yoktur; `scale: true` verilse bile
+  sessizce sabit ağırlığa düşer,
+- `limit == 0` — `courtyard_overlap`'te `clearance_mm: 0.0` yaygındır.
+
+**Tavan neden şart:** `via_current`'ta kapasite sıfıra yaklaşırsa oran patlar ve
+tek bir bulgu bütün skoru yutar.
+
+**Ölçüldü (2026-08-28):** Tezgah kartlarında ve `pic_programmer`da tüm kurallar
+`scale: true` yapılıp `auto` yeniden koşuldu; **yerleştirmede gerileme yok**,
+sonuçlar birebir aynı. Beklenen bir sonuç: ölçekleme *monotondur* — aynı bulgu
+kümesi için skor karşılaştırmasının işaretini değiştirmez, yalnızca büyüklüğünü.
+Sıralama ancak farklı bulgu kümeleri karşılaştırılırken (sayı ile büyüklük takas
+edilirken) değişir.
+
 Ağırlıkların kanıt gücüne göre nasıl seçileceği ve sıradaki adımlar:
 [docs/yol-haritasi-skorlama.md](docs/yol-haritasi-skorlama.md).
 

@@ -39,9 +39,36 @@ def penalty_of(finding: Finding) -> float:
     """
     if finding.severity == "info":
         return 0.0
-    if finding.weight is not None:
-        return finding.weight
-    return PENALTY.get(finding.severity, 0.0)
+    base = finding.weight if finding.weight is not None else PENALTY.get(finding.severity, 0.0)
+    return base * overshoot_factor(finding)
+
+
+def overshoot_factor(finding: Finding) -> float:
+    """Ihlalin BUYUKLUGUNE gore ceza carpani (Faz 1b).
+
+        asim   = |measured - limit| / |limit|
+        carpan = min(1 + asim, scale_max)
+
+    Mutlak deger bilincli: bazi kurallarda ihlal `measured > limit` (net
+    uzunlugu), bazilarinda `measured < limit` (iz genisligi). Tek ifade ikisini
+    de dogru olcer.
+
+    Uc durumda 1.0 doner (yani olcekleme yok):
+      * kural `scale` istememis
+      * bulgu `measured`/`limit` tasimiyor - `require_on_net` ve `same_net`
+        ikili kurallardir, "ne kadar ihlal" diye bir sey yoktur. `scale: true`
+        verilse bile sessizce sabit agirliga duser; hata degil.
+      * `limit == 0` - `courtyard_overlap`'te `clearance_mm: 0.0` yaygindir ve
+        sifira bolmek NaN uretirdi.
+    """
+    if finding.scale_max is None:
+        return 1.0
+    if finding.measured is None or finding.limit is None:
+        return 1.0
+    if finding.limit == 0:
+        return 1.0
+    overshoot = abs(finding.measured - finding.limit) / abs(finding.limit)
+    return min(1.0 + overshoot, finding.scale_max)
 
 _MARK = {"error": "HATA ", "warning": "UYARI", "info": "BILGI"}
 _COLOR = {"error": "\033[31m", "warning": "\033[33m", "info": "\033[36m"}

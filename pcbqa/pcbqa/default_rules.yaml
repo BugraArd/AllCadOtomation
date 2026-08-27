@@ -32,6 +32,11 @@ version: 1
 # Gerekcesi: olculmus etkisi olan bir kural ile kaynaksiz bir muhendislik
 # secimi ayni cezayi yememeli. Bkz. docs/yol-haritasi-skorlama.md
 #
+# `scale: true` eklenirse ceza ihlalin BUYUKLUGUNE gore olceklenir:
+#   asim = |measured - limit| / |limit|;  carpan = min(1 + asim, scale_max)
+# Varsayilan kapali; tavan (`scale_max`) varsayilan 3.0. Olcum tasimayan ikili
+# kurallarda (require_on_net, same_net) sessizce sabit agirliga duser.
+#
 # Secici alanlari (pin / partner):
 #   ref        referans uzerinde duzenli ifade      -> "^U"
 #   kind       bilesen turu                          -> ic, capacitor, resistor,
