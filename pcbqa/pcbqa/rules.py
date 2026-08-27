@@ -48,6 +48,11 @@ class Finding:
     # yeniden hesaplamaya yetmez, cunku SOIC-20'de bir pin merkeze 5 mm
     # uzakta olabilir - kuralin siniriyla ayni mertebede.
     pins: list[str] = field(default_factory=list)
+    # Bu bulgunun skora yazacagi ceza. None ise `report.PENALTY` uzerinden
+    # severity'den turetilir - yani agirlik BELIRTMEYEN kurallar ve disaridan
+    # gelen bulgular (KiCad ERC/DRC, sematik kontrolleri) eski davranisi korur.
+    # `run_rules` merkezi olarak doldurur, tek tek kontroller ugrasmaz.
+    weight: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -60,6 +65,7 @@ class Finding:
             "pins": self.pins,
             "measured": self.measured,
             "limit": self.limit,
+            "weight": self.weight,
         }
 
 
@@ -131,6 +137,14 @@ class Rule:
     spec: dict[str, Any] = field(default_factory=dict)
     ignore_nets: list[str] = field(default_factory=list)
     max_findings: int = DEFAULT_MAX_FINDINGS
+    # Bu kuraldan cikan her bulgunun skora yazacagi ceza (bkz. Finding.weight).
+    # None ise severity'den turetilir; boylece agirlik kullanmayan mevcut kural
+    # dosyalari birebir eski skoru uretir.
+    #
+    # Neden gerekli: severity tek basina "olculmus etkisi olan bir kural" ile
+    # "kaynaksiz bir muhendislik secimi"ni ayirt edemiyor - ikisi de 8 puan
+    # yiyordu. Bkz. docs/yol-haritasi-skorlama.md
+    weight: float | None = None
 
     def net_ignored(self, net_name: str) -> bool:
         return any(re.fullmatch(p, net_name, re.IGNORECASE) for p in self.ignore_nets)
@@ -870,8 +884,26 @@ def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[R
         spec = {
             k: v
             for k, v in raw.items()
-            if k not in {"id", "type", "severity", "description", "ignore_nets", "max_findings"}
+            if k
+            not in {
+                "id",
+                "type",
+                "severity",
+                "description",
+                "ignore_nets",
+                "max_findings",
+                "weight",
+            }
         }
+
+        weight = raw.get("weight")
+        if weight is not None:
+            try:
+                weight = float(weight)
+            except (TypeError, ValueError):
+                raise RuleError(f"{rule_id}: 'weight' sayi olmali, gelen: {weight!r}") from None
+            if weight < 0:
+                raise RuleError(f"{rule_id}: 'weight' negatif olamaz (gelen {weight})")
 
         rules.append(
             Rule(
@@ -882,6 +914,7 @@ def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[R
                 spec=spec,
                 ignore_nets=global_ignore + list(raw.get("ignore_nets") or []),
                 max_findings=int(raw.get("max_findings", DEFAULT_MAX_FINDINGS)),
+                weight=weight,
             )
         )
 
@@ -898,6 +931,7 @@ def run_rules(design: Design, rules: list[Rule]) -> list[Finding]:
         produced = CHECKS[rule.type](design, rule)
         for finding in produced:
             finding.rule_type = rule.type
+            finding.weight = rule.weight
         if len(produced) > rule.max_findings:
             extra = len(produced) - rule.max_findings
             produced = produced[: rule.max_findings]

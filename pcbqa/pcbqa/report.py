@@ -22,6 +22,27 @@ PENALTY = {"error": 8.0, "warning": 2.0, "info": 0.0}
 # bilesen sayisi bu degerin altina dusmus gibi islenmez.
 MIN_COMPONENTS_FOR_SCORE = 20
 
+
+def penalty_of(finding: Finding) -> float:
+    """Bir bulgunun skora yazacagi ceza.
+
+    Kural kendi `weight` degerini verdiyse o gecerlidir; vermediyse severity'den
+    turetilir (eski davranis). Boylece agirlik kullanmayan kural dosyalari ve
+    disaridan gelen bulgular (KiCad ERC/DRC, sematik kontrolleri) birebir ayni
+    skoru uretir.
+
+    `info` HER ZAMAN sifirdir, kuralin agirligi ne olursa olsun. Bunun somut bir
+    nedeni var: `max_findings` sinirina takilan kural sentetik bir "...ve N
+    benzer bulgu daha" bilgisi uretir ve `trace_width` yonlendirilmemis net icin
+    bilgi verir. Agirlik bunlara da uygulansaydi, agirligi 24 olan bir kural
+    hicbir ihlal olmadan 24 puan yazdirabilirdi.
+    """
+    if finding.severity == "info":
+        return 0.0
+    if finding.weight is not None:
+        return finding.weight
+    return PENALTY.get(finding.severity, 0.0)
+
 _MARK = {"error": "HATA ", "warning": "UYARI", "info": "BILGI"}
 _COLOR = {"error": "\033[31m", "warning": "\033[33m", "info": "\033[36m"}
 _RESET = "\033[0m"
@@ -68,7 +89,7 @@ class Report:
         Ustel egri kullanilir: skor hicbir zaman tam 0'a doymaz, yani 25 hatali
         bir kart ile 60 hatali bir kart hala ayirt edilebilir.
         """
-        penalty = sum(PENALTY.get(f.severity, 0.0) for f in self.findings)
+        penalty = sum(penalty_of(f) for f in self.findings)
         if penalty <= 0:
             return 100.0
         size = max(self.metrics.component_count, MIN_COMPONENTS_FOR_SCORE)

@@ -26,6 +26,12 @@ version: 1
 # Devre tipine gore hazir esikler icin pcbqa/presets/ altina bakin; kendi kural
 # dosyanizdan `include:` ile dahil edebilirsiniz.
 #
+# Her kural istege bagli bir `weight` alani tasiyabilir: o kuralin her
+# bulgusunun skora yazacagi ceza. Verilmezse severity'den turetilir
+# (hata 8, uyari 2, bilgi 0) - yani mevcut dosyalar birebir ayni skoru uretir.
+# Gerekcesi: olculmus etkisi olan bir kural ile kaynaksiz bir muhendislik
+# secimi ayni cezayi yememeli. Bkz. docs/yol-haritasi-skorlama.md
+#
 # Secici alanlari (pin / partner):
 #   ref        referans uzerinde duzenli ifade      -> "^U"
 #   kind       bilesen turu                          -> ic, capacitor, resistor,

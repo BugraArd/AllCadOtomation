@@ -626,13 +626,43 @@ budur.**
 ## Skor nasıl hesaplanır?
 
 ```
-ceza  = 8 × hata + 2 × uyarı
+ceza  = Σ bulgu_cezası
 skor  = 100 × e^(−ceza / bileşen_sayısı)
 ```
+
+Bir bulgunun cezası, kuralı `weight` belirtmişse odur; belirtmemişse
+severity'den türetilir — **hata 8, uyarı 2, bilgi 0**.
 
 Ceza bileşen sayısına bölündüğü için 40 bileşenli bir kartla 400 bileşenli bir
 kartın skorları karşılaştırılabilir. Üstel eğri sayesinde skor tam 0'a doymaz —
 25 hatalı kart ile 60 hatalı kart hâlâ ayırt edilebilir.
+
+### Kural bazlı ağırlık
+
+```yaml
+- id: sicak-dongu-alani
+  type: keep_apart
+  severity: error
+  weight: 24.0        # bu kuralın her bulgusu 24 puan yer
+```
+
+**Neden gerekli:** severity tek başına yeterli değil. Ölçülmüş etkisi olan bir
+kural (TI AN-2155'in sıcak döngü deneyi: 6 → 18 mm² alanda EMI marjı 1.6 dB
+kayıp) ile kaynaksız bir mühendislik seçimi aynı 8 puanı yiyordu.
+
+- `weight` **verilmezse** eski davranış birebir korunur; ağırlık kullanmayan
+  kural dosyaları aynı skoru üretir.
+- `weight: 0` → kural raporda görünür ama skoru etkilemez.
+- Yüksek ağırlıklı bir **uyarı**, varsayılan bir **hatayı** geçebilir. Bu
+  bilinçlidir: severity "ne kadar acil", ağırlık "ne kadar önemli" demektir.
+- `info` bulguları **her zaman** sıfırdır, kuralın ağırlığı ne olursa olsun.
+  Somut nedeni: `max_findings` sınırına takılan kural sentetik bir bilgi
+  bulgusu üretir, `trace_width` de yönlendirilmemiş net için bilgi verir —
+  ağırlık bunlara uygulansaydı ağırlığı 24 olan bir kural hiçbir ihlal olmadan
+  24 puan yazdırırdı.
+
+Ağırlıkların kanıt gücüne göre nasıl seçileceği ve sıradaki adımlar:
+[docs/yol-haritasi-skorlama.md](docs/yol-haritasi-skorlama.md).
 
 Bu skor bilinçli olarak geçicidir. Aşama 3'te otomatik yerleştirme motorunun
 küçülteceği **maliyet fonksiyonuna** dönüşecek; o yüzden ürettiği ara değerler
