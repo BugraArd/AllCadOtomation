@@ -96,7 +96,10 @@ rules:
     weight: 10   # ROHM 66AN015E #4-1 (sayisal); keep_apart merkez olcer, yaklasim
     a:
       kind: resistor
-      ref: "^R"
+    # KESINLIK ICIN SART: net filtresi olmadan kural KARTTAKI HER DIRENCI her
+    # induktorle karsilastiriyor. One-Air-Max'te olculdu - tek basina 10 yanlis
+    # bulgu. Kastedilen yalnizca FB netindeki direncler.
+    a_on_net: "^(FB|VFB|VSENSE)$"
     b:
       kind: inductor
     min_distance_mm: 10.0
@@ -108,7 +111,7 @@ rules:
     weight: 8   # ROHM 66AN015E #4-1 (sayisal), ikincil yol
     a:
       kind: resistor
-      ref: "^R"
+    a_on_net: "^(FB|VFB|VSENSE)$"
     b:
       kind: diode
     min_distance_mm: 10.0

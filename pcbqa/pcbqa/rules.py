@@ -644,8 +644,24 @@ def _check_keep_apart(design: Design, rule: Rule) -> list[Finding]:
     if min_mm <= 0:
         raise RuleError(f"{rule.id}: 'min_distance_mm' pozitif olmali")
 
-    a_refs = [c.ref for c in design.board.components if a_sel.matches_component(design, c.ref)]
-    b_refs = [c.ref for c in design.board.components if b_sel.matches_component(design, c.ref)]
+    # Net filtresi kesinlik icin SART. "FB bolucu induktorden uzak dursun"
+    # kurali `a: {kind: resistor}` ile yazilinca KARTTAKI HER DIRENCI her
+    # induktorle karsilastiriyor. Gercek bir kartta (One-Air-Max) bu tek
+    # basina 10 yanlis bulgu uretti; kastedilen yalnizca FB netindeki
+    # direnclerdi.
+    a_on = _refs_on_nets(design, rule, _rx(rule.spec.get("a_on_net")))
+    b_on = _refs_on_nets(design, rule, _rx(rule.spec.get("b_on_net")))
+
+    a_refs = [
+        c.ref
+        for c in design.board.components
+        if a_sel.matches_component(design, c.ref) and (a_on is None or c.ref in a_on)
+    ]
+    b_refs = [
+        c.ref
+        for c in design.board.components
+        if b_sel.matches_component(design, c.ref) and (b_on is None or c.ref in b_on)
+    ]
     if not a_refs or not b_refs:
         return []
 
@@ -682,6 +698,18 @@ def _check_keep_apart(design: Design, rule: Rule) -> list[Finding]:
                 )
     findings.sort(key=lambda f: f.measured or 0)
     return findings
+
+
+def _refs_on_nets(design: Design, rule: Rule, pattern) -> set[str] | None:
+    """Ada uyan netlere bagli bilesen referanslari. Desen yoksa None (=hepsi)."""
+    if pattern is None:
+        return None
+    refs: set[str] = set()
+    for net_name in design.net_names():
+        if rule.net_ignored(net_name) or not pattern.search(net_name):
+            continue
+        refs.update(p.ref for p in design.pins_on_net(net_name))
+    return refs
 
 
 def _bound(raw, name: str, rule_id: str) -> float | None:

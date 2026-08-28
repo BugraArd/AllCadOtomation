@@ -252,6 +252,63 @@ class KeepApartRuleTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
+    def test_net_filter_narrows_the_comparison(self):
+        """`a_on_net` olmadan kural HER direnci HER induktorle karsilastirir.
+
+        Gercek kartta olculdu (One-Air-Max): net filtresi olmayan
+        buck-fb-induktorden-uzak tek basina 10 yanlis bulgu uretiyordu.
+        Kastedilen yalnizca FB netindeki direnclerdi.
+        """
+        wide = run(
+            Boards.routed(),
+            "keep_apart",
+            {"a": {"kind": "resistor"}, "b": {"kind": "capacitor"}, "min_distance_mm": 500.0},
+        )
+        narrow = run(
+            Boards.routed(),
+            "keep_apart",
+            {
+                "a": {"kind": "resistor"},
+                "a_on_net": "^VCC$",
+                "b": {"kind": "capacitor"},
+                "min_distance_mm": 500.0,
+            },
+        )
+        self.assertTrue(wide, "genis kural bulgu uretmeliydi")
+        self.assertLess(len(narrow), len(wide), "net filtresi daraltmadi")
+        for f in narrow:
+            self.assertIn(f.refs[0], {p.ref for p in Boards.routed().pins_on_net("VCC")})
+
+    def test_net_filter_on_both_sides(self):
+        both = run(
+            Boards.routed(),
+            "keep_apart",
+            {
+                "a": {"kind": "resistor"},
+                "a_on_net": "^VCC$",
+                "b": {"kind": "capacitor"},
+                "b_on_net": "^VCC$",
+                "min_distance_mm": 500.0,
+            },
+        )
+        vcc = {p.ref for p in Boards.routed().pins_on_net("VCC")}
+        for f in both:
+            self.assertIn(f.refs[0], vcc)
+            self.assertIn(f.refs[1], vcc)
+
+    def test_net_filter_matching_nothing_is_silent(self):
+        findings = run(
+            Boards.routed(),
+            "keep_apart",
+            {
+                "a": {"kind": "resistor"},
+                "a_on_net": "^BOYLE_BIR_NET_YOK$",
+                "b": {"kind": "capacitor"},
+                "min_distance_mm": 500.0,
+            },
+        )
+        self.assertEqual(findings, [])
+
     def test_missing_distance_rejected(self):
         with self.assertRaises(RuleError):
             run(
