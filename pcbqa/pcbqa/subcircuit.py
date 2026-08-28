@@ -1,0 +1,168 @@
+"""Alt-devre tanima: karttaki bilinen devre bloklarini topolojiden bulur.
+
+Neden gerekli: kural on ayarlari simdiye kadar NET ADINA bakiyordu
+(`net: "^(FB|VFB|VSENSE)$"`). Gercek kartlarda bu yetmiyor - KiCad geri besleme
+netini `Net-(U2-FB{slash}VSET)` diye otomatik adlandiriyor ve hicbir desen
+tutmuyor. Ama IC'nin PIN ADI "FB/VSET" olarak duruyor. Yani dogru yol addan
+degil TOPOLOJIDEN gitmek: regulatorun FB pininden geriye izlemek.
+
+Ayni altyapi iki yeri birden aciyor:
+  * kurallarin kesinligi (hangi direnc FB bolucusu, hangi kondansator CIN)
+  * uretken tasarim (once tanimak, sonra uretmek)
+
+Su an yalnizca anahtarlamali regulator (buck) taniniyor. Imza minimal tutuldu:
+SW pini + o nette bir induktor. Daha fazlasini sart kosmak gercek kartlarda
+kaybettiriyor - bazi parcalarda VIN ile EN ayni nette, bazilarinda cikis
+"VOS" diye adlandirilmis.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from .model import Design
+
+# Pin ADI desenleri. Kismi eslesme bilincli: gercek parcalarda pin adi
+# "FB/VSET", "SW1", "PVIN" gibi bilesik olabiliyor.
+_SW = re.compile(r"^(SW|PH|LX|VSW|PHASE)\b|^SW\d*$", re.IGNORECASE)
+_FB = re.compile(r"^(FB|VFB|VSENSE|ADJ)", re.IGNORECASE)
+_VIN = re.compile(r"^(VIN|PVIN|VCC|VDD)\b|^P?VIN\d*$", re.IGNORECASE)
+_BOOT = re.compile(r"^(BOOT|BST|CB)\b", re.IGNORECASE)
+
+
+# KiCad sembollerinde pin adi BICIMLEME isaretlemesi tasiyabilir:
+#   V_{IN}  altsimge      ~{RESET}  ustcizgi      A^{2}  ustsimge
+# Gercek kartta gorildu: jetson'daki TPS564247'nin VIN pini "V_{IN}" yaziyor;
+# desen tutmadigi icin giris kondansatorleri bulunamiyordu.
+_MARKUP = re.compile(r"[~_^]\{|\}")
+
+
+def normalize_pin_name(name: str) -> str:
+    """Pin adindan bicimleme isaretlemesini atar: "V_{IN}" -> "VIN"."""
+    return _MARKUP.sub("", name or "")
+
+
+@dataclass
+class BuckConverter:
+    """Tanimis bir anahtarlamali regulator ve rolleri.
+
+    Alanlarin bir kismi None olabilir: gercek kartlarda her rol bulunamiyor
+    (ornegin cikis "VOS" pininden okunuyorsa `out_net` induktorden turetilir).
+    Kural motoru None rolleri sessizce atlamalidir.
+    """
+
+    ic: str
+    sw_net: str
+    inductor: str | None = None
+    out_net: str | None = None
+    vin_net: str | None = None
+    fb_net: str | None = None
+    boot_net: str | None = None
+    # "buck" ya da "buck-boost". Ikincisinde induktor IKI anahtarlama dugumu
+    # arasindadir ve `out_net` bu yolla belirlenemez.
+    topology: str = "buck"
+    cin: list[str] = field(default_factory=list)
+    cout: list[str] = field(default_factory=list)
+    fb_resistors: list[str] = field(default_factory=list)
+
+    def describe(self) -> str:
+        parts = [f"IC={self.ic}", f"tip={self.topology}", f"SW={self.sw_net}"]
+        if self.inductor:
+            parts.append(f"L={self.inductor}")
+        if self.vin_net:
+            parts.append(f"VIN={self.vin_net}")
+        if self.fb_net:
+            parts.append(f"FB={self.fb_net}")
+        return " ".join(parts)
+
+
+def _pins_by_ref(design: Design) -> dict[str, list]:
+    """ref -> o bilesenin pinleri. Net dongusunu bir kez doner."""
+    out: dict[str, list] = {}
+    for net_name in design.net_names():
+        for pin in design.pins_on_net(net_name):
+            out.setdefault(pin.ref, []).append(pin)
+    return out
+
+
+def _first_net(pins, pattern) -> str | None:
+    for pin in pins:
+        if pin.function and pattern.search(normalize_pin_name(pin.function)):
+            return pin.net
+    return None
+
+
+def _switch_nets(pins) -> set[str]:
+    """IC'nin TUM anahtarlama dugumu netleri (buck-boost'ta iki tane olur)."""
+    return {
+        pin.net
+        for pin in pins
+        if pin.function and _SW.search(normalize_pin_name(pin.function)) and pin.net
+    }
+
+
+def _components_on(design: Design, net: str | None, kind: str) -> list[str]:
+    if not net:
+        return []
+    return sorted({p.ref for p in design.pins_on_net(net) if design.kind_of(p.ref) == kind})
+
+
+def find_buck_converters(design: Design) -> list[BuckConverter]:
+    """Karttaki anahtarlamali regulatorleri topolojiden bulur.
+
+    Imza: bir IC'nin SW pini + o nette bir induktor. Bu iki sey bir arada
+    baska bir devrede pratikte gorulmez.
+
+    Cikis neti induktorun DIGER ucundan turetilir; IC'nin cikis pini
+    ("VOS", "VOUT", "FB") parcadan parcaya degisiyor ve guvenilir degil.
+    """
+    pins_by_ref = _pins_by_ref(design)
+    found: list[BuckConverter] = []
+
+    for comp in design.board.components:
+        if design.kind_of(comp.ref) != "ic":
+            continue
+        pins = pins_by_ref.get(comp.ref, [])
+        sw_net = _first_net(pins, _SW)
+        if not sw_net:
+            continue
+
+        inductors = _components_on(design, sw_net, "inductor")
+        if not inductors:
+            continue  # SW adli pin var ama anahtarlama dugumu degil
+
+        buck = BuckConverter(ic=comp.ref, sw_net=sw_net, inductor=inductors[0])
+        buck.vin_net = _first_net(pins, _VIN)
+        buck.fb_net = _first_net(pins, _FB)
+        buck.boot_net = _first_net(pins, _BOOT)
+
+        # Cikis: induktorun SW olmayan ucu.
+        #
+        # AMA once topolojiyi ayirmak gerek: BUCK-BOOST ve sarj denetleyicilerde
+        # (or. TI BQ25672) induktor IKI anahtarlama dugumu ARASINDADIR. Orada
+        # "diger uc" cikis degil, ikinci anahtardir. Gercek kartta gorildu -
+        # One-Air-Max U5: SW1 -> L1 -> SW2 - ve out_net yanlislikla SW2 cikiyordu.
+        switch_nets = _switch_nets(pins)
+        ind_nets = {
+            p.net for p in pins_by_ref.get(buck.inductor, []) if p.net and p.net != sw_net
+        }
+        other = ind_nets - switch_nets
+        if ind_nets and not other:
+            buck.topology = "buck-boost"
+            buck.out_net = None
+        else:
+            buck.out_net = sorted(other)[0] if other else None
+
+        buck.cin = _components_on(design, buck.vin_net, "capacitor")
+        buck.cout = _components_on(design, buck.out_net, "capacitor")
+        buck.fb_resistors = _components_on(design, buck.fb_net, "resistor")
+        found.append(buck)
+
+    return found
+
+
+# ad -> bulucu. Ileride boost/LDO eklenirse buraya girer.
+DETECTORS = {
+    "buck": find_buck_converters,
+}
