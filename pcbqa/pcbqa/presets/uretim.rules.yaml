@@ -91,15 +91,24 @@ rules:
   #
   # Bu kural akimi degil FAB SINIRINI zorlar: current_a cok kucuk verilir,
   # min_width_mm fab sinifini tasir.
+  # ESIK 0.15 DEGIL 0.10 - korpusla olculdu (2026-08-28, iz netleri ilk kez
+  # dogru okundugunda): dort profesyonel kart 0.10-0.13 mm iz kullaniyor
+  # (jetson 0.100, vme-wren 0.100, CM5_MINIMA 0.130, Feather 0.100) ve bunlar
+  # empedans kontrollu diferansiyel ciftler - bilincli tasarim, uretim hatasi
+  # degil. 0.15 esigi CM5'i 1.4 puana dusuruyordu; profesyonel karta 1.4
+  # veriyorsak yanlis olan kart degil ESIKTIR (1d ilkesi). Hicbir kart
+  # 0.10'un altina inmiyor; 0.10 ayni zamanda yaygin ucuz sinifin gercek
+  # siniri. Daha siki fab kullaniyorsaniz min_width_mm'i kendi sinifiniza
+  # gore yukseltin.
   - id: uretim-min-iz-genisligi
     type: trace_width
     severity: error
-    description: "Hicbir iz uretim minimumunun altinda olmamali (standart sinif: 0.15 mm)"
+    description: "Hicbir iz uretim minimumunun altinda olmamali (yaygin ucuz sinif: 0.10 mm)"
     weight: 20   # fab siniri: ihlal = kart URETILEMEZ; surekli, olceklenir
     scale: true
     net: ".*"
     current_a: 0.001
-    min_width_mm: 0.15
+    min_width_mm: 0.10
     max_findings: 20
 
 # ---------------------------------------------------------------------------

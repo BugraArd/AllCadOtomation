@@ -70,6 +70,12 @@ class BuckConverter:
     external_switches: list[str] = field(default_factory=list)
     # Ayrik tasarimda anahtar rolleri - TOPOLOJIDEN, pin adindan degil.
     # Ust kol: VIN ve SW'de pad'i olan. Alt kol: SW ve GND'de pad'i olan.
+    # Adaylarin TAMAMI: yuksek akimli tasarimlarda alt kol PARALEL birden fazla
+    # FET olabilir. Secimi hot_loop_polygon yapar (en kucuk dongu).
+    high_sides: list[str] = field(default_factory=list)
+    low_sides: list[str] = field(default_factory=list)
+    # Raporlama kolayligi icin ilk adaylar; olculen cift dongunun kendisinden
+    # okunur (hot_loop_polygon'un dondurdugu HotLoop).
     high_side: str | None = None
     low_side: str | None = None
     cin: list[str] = field(default_factory=list)
@@ -168,36 +174,50 @@ def find_buck_converters(design: Design) -> list[BuckConverter]:
         # AYRIK MI? SW dugumunde harici FET ya da diyot varsa anahtarlama
         # IC'nin DISINDA oluyor. Diyot da sayilir: asenkron buck'ta alt kol
         # diyottur ve donus yolu yine IC'nin disindan gecer.
+        def _on(ref: str, net: str | None) -> bool:
+            return bool(net) and any(
+                pin.ref == ref for pin in design.pins_on_net(net)
+            )
+
+        # GERCEK KARTTA GORULDU (LM5116, Si7850): MOSFET'ler "Q" degil "U"
+        # referansi tasiyabiliyor - kind filtresi tek basina onlari kacirir.
+        # Bu yuzden SW dugumundeki DIGER IC'ler de adaydir, ama yalnizca
+        # anahtar gibi BAGLANANLAR: (VIN ve SW) ya da (SW ve GND). Kosulsuz
+        # eklemek olmaz - gate surucusu gibi IC'ler SW'de durabilir. Tur
+        # genislemesi yalnizca "ic": snubber kondansatoru da SW+GND kosulunu
+        # saglar, kind filtresi onu disarida tutmaya devam etmeli.
+        switch_like_ics = [
+            r
+            for r in _components_on(design, sw_net, "ic")
+            if r != comp.ref
+            and (
+                (_on(r, buck.vin_net) and _on(r, sw_net))
+                or (_on(r, sw_net) and _on(r, buck.gnd_net))
+            )
+        ]
         buck.external_switches = sorted(
             _components_on(design, sw_net, "transistor")
             + _components_on(design, sw_net, "diode")
+            + switch_like_ics
         )
 
         if buck.external_switches:
             # Roller BAGLANTIDAN cikarilir, pin adindan DEGIL: ayrik FET
             # sembollerinde pin adlari "D/G/S", "1/2/3" ya da bos olabiliyor.
             # Bootstrap diyodu bu testi gecemez - GND'de pad'i yoktur.
-            def _on(ref: str, net: str | None) -> bool:
-                return bool(net) and any(
-                    pin.ref == ref for pin in design.pins_on_net(net)
-                )
 
-            buck.high_side = next(
-                (
-                    r
-                    for r in buck.external_switches
-                    if _on(r, buck.vin_net) and _on(r, sw_net)
-                ),
-                None,
-            )
-            buck.low_side = next(
-                (
-                    r
-                    for r in buck.external_switches
-                    if r != buck.high_side and _on(r, sw_net) and _on(r, buck.gnd_net)
-                ),
-                None,
-            )
+            buck.high_sides = [
+                r
+                for r in buck.external_switches
+                if _on(r, buck.vin_net) and _on(r, sw_net)
+            ]
+            buck.low_sides = [
+                r
+                for r in buck.external_switches
+                if r not in buck.high_sides and _on(r, sw_net) and _on(r, buck.gnd_net)
+            ]
+            buck.high_side = buck.high_sides[0] if buck.high_sides else None
+            buck.low_side = buck.low_sides[0] if buck.low_sides else None
 
         buck.cin = _components_on(design, buck.vin_net, "capacitor")
         buck.cout = _components_on(design, buck.out_net, "capacitor")
@@ -260,27 +280,39 @@ def hot_loop_polygon(design: Design, buck: BuckConverter):
         return None
 
     if buck.external_switches:
-        if not (buck.high_side and buck.low_side):
+        if not (buck.high_sides and buck.low_sides):
             return None  # rol cozulemedi - kural bunu "OLCULEMEDI" diye yazar
-        mid = [
-            _pad_xy(design, buck.high_side, buck.vin_net),
-            _pad_xy(design, buck.high_side, buck.sw_net),
-            _pad_xy(design, buck.low_side, buck.sw_net),
-            _pad_xy(design, buck.low_side, buck.gnd_net),
-        ]
-        if any(pt is None for pt in mid):
-            return None
+
+        # Yuksek akimli tasarimlarda alt kol PARALEL birden fazla FET olabilir.
+        # Aday ciftlerin hepsi denenip EN KUCUK dongu secilir - CIN secimiyle
+        # ayni gerekce: hizli di/dt'yi tasiyan en kisa yoldur (Richtek AN045).
+        # Keyfi bir "ilk FET" secimi, FET'ler birbirinden uzaksa alani kartin
+        # okunma sirasina bagli hale getirirdi.
         best = None
-        for ref in buck.cin:
-            cap_vin = _pad_xy(design, ref, buck.vin_net)
-            cap_gnd = _pad_xy(design, ref, buck.gnd_net)
-            if cap_vin is None or cap_gnd is None:
+        for high in buck.high_sides:
+            h_vin = _pad_xy(design, high, buck.vin_net)
+            h_sw = _pad_xy(design, high, buck.sw_net)
+            if h_vin is None or h_sw is None:
                 continue
-            poly = [cap_vin, *mid, cap_gnd]
-            a = geom.area(poly)
-            if best is None or a < best[0]:
-                best = (a, ref, poly)
-        return None if best is None else (best[2], best[1])
+            for low in buck.low_sides:
+                l_sw = _pad_xy(design, low, buck.sw_net)
+                l_gnd = _pad_xy(design, low, buck.gnd_net)
+                if l_sw is None or l_gnd is None:
+                    continue
+                for ref in buck.cin:
+                    cap_vin = _pad_xy(design, ref, buck.vin_net)
+                    cap_gnd = _pad_xy(design, ref, buck.gnd_net)
+                    if cap_vin is None or cap_gnd is None:
+                        continue
+                    poly = [cap_vin, h_vin, h_sw, l_sw, l_gnd, cap_gnd]
+                    a = geom.area(poly)
+                    if best is None or a < best[0]:
+                        best = (a, ref, poly, high, low)
+        if best is None:
+            return None
+        # Olculen cift raporlanacak olandir; aday listesindeki ilk eleman degil.
+        buck.high_side, buck.low_side = best[3], best[4]
+        return (best[2], best[1])
 
     ic_vin = _pad_xy(design, buck.ic, buck.vin_net)
     ic_gnd = _pad_xy(design, buck.ic, buck.gnd_net)

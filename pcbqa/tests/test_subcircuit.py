@@ -449,7 +449,8 @@ class SyntheticDiscreteBuckTests(unittest.TestCase):
     # x=4 uzerindeki uc nokta dogrusal; alan 4 x 3 dikdortgeni = 12 mm2.
     EXPECTED_AREA = 12.0
 
-    def build(self, *, low_side=True, bootstrap_diode=False):
+    def build(self, *, low_side=True, bootstrap_diode=False, sw_pin_name="SW",
+              snubber=False, parallel_low=False, fet_prefix="Q"):
         from pcbqa.model import build_design
         from pcbqa.netlist import netlist_from_board
         from pcbqa.pcb import Board, Component, Pad
@@ -473,17 +474,31 @@ class SyntheticDiscreteBuckTests(unittest.TestCase):
         comps = [
             # Denetleyici: SW pini + VIN + GND. Ayrik tasarimda anahtarlar
             # DISARIDA, ama IC yine SW dugumunu surer.
-            comp("U1", "CTRL", [("SW", 8.0, 1.5, "SW"),
+            comp("U1", "CTRL", [("SW", 8.0, 1.5, sw_pin_name),
                                 ("VIN", 8.0, 0.0, "VIN"),
                                 ("GND", 8.0, 3.0, "GND")]),
             # Induktor SW'de - taninmanin sarti
             comp("L1", "10uH", [("SW", 6.0, 1.5, ""), ("VOUT", 6.0, 5.0, "")]),
-            comp("Q1", "FET_H", [("VIN", 4.0, 0.0, ""), ("SW", 4.0, 1.0, "")]),
+            comp(fet_prefix + "1" if fet_prefix != "Q" else "Q1", "FET_H",
+                 [("VIN", 4.0, 0.0, ""), ("SW", 4.0, 1.0, "")]),
             comp("C1", "10uF", [("VIN", 0.0, 0.0, ""), ("GND", 0.0, 3.0, "")]),
         ]
         if low_side:
-            comps.append(comp("Q2", "FET_L", [("SW", 4.0, 2.0, ""),
-                                              ("GND", 4.0, 3.0, "")]))
+            comps.append(comp(fet_prefix + "2" if fet_prefix != "Q" else "Q2",
+                              "FET_L", [("SW", 4.0, 2.0, ""),
+                                        ("GND", 4.0, 3.0, "")]))
+        if parallel_low:
+            # Ikinci alt kol FET'i, birincisinden UZAGA konuyor. Keyfi secim
+            # yapan bir uygulama bunu secebilir ve alan iki katina cikardi.
+            comps.append(comp("Q3", "FET_L2", [("SW", 4.0, 12.0, ""),
+                                               ("GND", 4.0, 13.0, "")]))
+        if snubber:
+            # RC snubber SW dugumunde durur ama anahtar DEGILDIR. Direnc ve
+            # kondansator zaten transistor/diyot olmadigi icin elenmeli.
+            comps.append(comp("R9", "10R", [("SW", 3.0, 1.5, ""),
+                                            ("SNUB", 3.0, 2.0, "")]))
+            comps.append(comp("C9", "1nF", [("SNUB", 3.0, 2.5, ""),
+                                            ("GND", 3.0, 3.0, "")]))
         if bootstrap_diode:
             # BOOT <-> SW: GND'de pad'i YOK, alt kol sanilmamali.
             comps.append(comp("D1", "BOOT", [("SW", 5.0, 1.0, ""),
@@ -537,6 +552,66 @@ class SyntheticDiscreteBuckTests(unittest.TestCase):
         self.assertEqual(buck.high_side, "Q1")
         self.assertIsNone(buck.low_side)
         self.assertIsNone(hot_loop_area_mm2(design, buck))
+
+    def test_controller_phase_pin_is_recognised_like_sw(self):
+        """Ayrik denetleyicilerde faz pini cogu zaman "SW" YAZMAZ.
+
+        Intersil/Renesas "PHASE", TI "PH", Torex "LX" der. Bu adlar `_SW`
+        deseninde zaten var; test onlarin gercekten ayrik yolu actigini
+        sabitliyor - yoksa ayrik kart hic TANINMAZ ve kural sessiz kalirdi.
+        """
+        for name in ("PHASE", "PH", "LX", "VSW"):
+            with self.subTest(pin=name):
+                design, buck = self.build(sw_pin_name=name)
+                self.assertEqual(buck.high_side, "Q1")
+                self.assertEqual(buck.low_side, "Q2")
+                self.assertAlmostEqual(
+                    hot_loop_area_mm2(design, buck), self.EXPECTED_AREA, places=6
+                )
+
+    def test_snubber_on_the_switch_node_is_not_a_switch(self):
+        """RC snubber SW'dedir ama anahtar degildir - rol almamali."""
+        design, buck = self.build(snubber=True)
+        self.assertNotIn("R9", buck.external_switches)
+        self.assertNotIn("C9", buck.external_switches)
+        self.assertEqual(buck.low_side, "Q2")
+        self.assertAlmostEqual(
+            hot_loop_area_mm2(design, buck), self.EXPECTED_AREA, places=6
+        )
+
+    def test_parallel_low_side_fets_pick_the_smallest_loop(self):
+        """Yuksek akimda alt kol paralel FET olabilir.
+
+        Q3 bilerek uzaga konuldu. Keyfi ("siralamada ilk") bir secim kartin
+        okunma sirasina bagli bir alan uretirdi; en kucuk dongu secilmeli -
+        CIN secimiyle ayni gerekce (hizli di/dt en kisa yoldan gider).
+        """
+        design, buck = self.build(parallel_low=True)
+        self.assertEqual(sorted(buck.low_sides), ["Q2", "Q3"])
+        area = hot_loop_area_mm2(design, buck)
+        self.assertAlmostEqual(area, self.EXPECTED_AREA, places=6)
+        self.assertEqual(buck.low_side, "Q2", "uzaktaki paralel FET secildi")
+
+    def test_u_referenced_mosfets_are_still_recognised_as_switches(self):
+        """GERCEK KARTTA GORULDU (LM5116 + Si7850): FET'ler "U" referansli.
+
+        `ref_kind("U2")` "ic" der, "transistor" degil - tur filtresi tek
+        basina onlari kacirir ve ayrik kart entegre sanilirdi. Anahtar-gibi
+        BAGLANAN IC'ler (VIN+SW ya da SW+GND) aday sayilmali. U9x secildi ki
+        denetleyici U1 ile karismasin.
+        """
+        design, buck = self.build(fet_prefix="U9")
+        self.assertEqual(buck.external_switches, ["U91", "U92"])
+        self.assertEqual(buck.high_side, "U91")
+        self.assertEqual(buck.low_side, "U92")
+        self.assertAlmostEqual(
+            hot_loop_area_mm2(design, buck), self.EXPECTED_AREA, places=6
+        )
+
+    def test_the_controller_itself_is_never_a_switch_candidate(self):
+        # Denetleyici de SW dugumundedir; kendini anahtar sanmamali.
+        _, buck = self.build()
+        self.assertNotIn("U1", buck.external_switches)
 
     def test_rule_reports_the_discrete_loop_and_names_both_fets(self):
         design, _ = self.build()

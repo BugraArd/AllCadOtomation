@@ -2141,7 +2141,55 @@ Altı gerçek entegre regülatörün ölçümü **birebir değişmedi** (0.73 / 
 görülmesi. Sentetik kartla eşik doğrulamak 1d'nin "korpusa uydurma" yasağına
 girerdi.
 
-### 21.16 Testler
+### 21.16 İki P0: dosya sürümü körlüğü ve sayısal iz netleri
 
-`python -m unittest discover -s tests` → **473 test**, hepsi geçiyor
+Ayrık buck referans kartı ararken (Kicad-xpi) indirilen gerçek bir kart
+(LM5116, KiCad 5.1) iki P0 hata buldu — doğrulama işi, doğrulamaya
+başlayamadan ayrıştırıcıyı düzeltti.
+
+**1) KiCad 5 kartları sessizce boş okunuyordu.** KiCad 5 footprint düğümüne
+`(module ...)` der ve referansı `(fp_text reference U1 ...)` içinde tutar;
+ayrıştırıcı yalnızca `footprint` + `property` tanıyordu. 43 modüllü gerçek
+kart **0 bileşenle** okunuyor, `parse_warnings` 0 kalıyor ve `uretim` ön ayarı
+**skor 100.0** veriyordu — "kartınız kusursuz". Sessiz hata sınıfının beşinci
+ve en geniş örneği. Düzeltme: `module` düğümleri de okunuyor, `fp_text`
+geri düşümü eklendi, ve **gürültülü başarısızlık**: dosyada footprint var ama
+hiçbiri okunamadıysa `BoardParseError` — sessiz boş kart olmaz.
+
+**2) İz ve via netleri numara olarak okunuyordu — KiCad 9'da da.** Segment ve
+via düğümleri neti yalnızca numarayla taşır (`(net 2)`); ad kökteki tabloda.
+`_node_net` son elemanı aldığı için iz netleri `"2"` oluyordu. Ölçüldü
+(video.kicad_pcb, 7932 iz): iz ve via netlerinin **%100'ü** sayısaldı. Sonuç:
+`trace_width` ve `via_current` **hiçbir gerçek kartta hiç çalışmamıştı** ve
+`copper_area`'nın track kaynağı hep 0 dönüyordu. Düzeltme: kökteki
+`(net N "AD")` tablosu okunuyor, sayısal referans oradan çözülüyor.
+
+**Düzeltme kalibrasyonu değiştirdi ve 1d ilkesi hemen çalıştı.**
+`uretim-min-iz-genisligi` ilk kez gerçekten koşunca üç profesyonel kartı
+çökertti (CM5_MINIMA 80.7→1.4, jetson 88→50.5, Feather 71→3.5): 0.13 mm
+izler DPHY/HDMI/Ethernet **empedans kontrollü çiftleri**, üretim hatası değil.
+Korpusla ölçüldü: dört profesyonel kart 0.10–0.13 kullanıyor, hiçbiri 0.10'un
+altına inmiyor. Eşik 0.15 → **0.10** (yaygın ucuz sınıfın gerçek sınırı, ön
+ayarın kendi yorumundaki değer). Kalibrasyon eski hâline döndü: medyan 95.9,
+çeyrekler 80.7/95.9/100.0.
+
+### 21.17 Gerçek ayrık kart: FET'ler "U" referanslı olabilir
+
+LM5116 kartında MOSFET'ler (Si7850) **U2/U3** referansı taşıyor —
+`ref_kind` onlara "ic" der, `external_switches`'in tür filtresi
+(transistor+diode) onları kaçırırdı. Düzeltme: SW düğümündeki, denetleyici
+olmayan ve anahtar gibi **bağlanan** (VIN∧SW ya da SW∧GND) IC'ler de aday.
+Tür genişlemesi yalnızca "ic" — snubber kondansatörü de SW+GND koşulunu
+sağlar, tür filtresi onu dışarıda tutmaya devam ediyor. Altı entegre
+regülatörde yanlış pozitif yok, ölçümler birebir aynı.
+
+Kalan sınır (Kicad-xpi hâlâ açık): KiCad 5 pad'lerinde `pinfunction` yok —
+tanıma SW pinini pin adından bulduğu için bu kartta hiç başlayamıyor. Kartın
+lisansı da yok, korpusa eklenemez. Pin adı olmayan kartta net adına
+(`SW`/`HO`/`LO`) geri düşmek bir seçenek ama net-adı-güvenilmez kararıyla
+çelişmeden tasarlanmalı; xpi'de not olarak duruyor.
+
+### 21.18 Testler
+
+`python -m unittest discover -s tests` → **485 test**, hepsi geçiyor
 (oturum başında 214). KiCad demolarına bağlı testler kurulum yoksa atlanır.

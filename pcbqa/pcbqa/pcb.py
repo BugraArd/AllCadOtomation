@@ -468,6 +468,17 @@ def _read_footprint(node) -> Component | None:
         elif prop[1] == "Value":
             val = prop[2]
     if not ref:
+        # KiCad 5: referans `property` degil `(fp_text reference U1 ...)`.
+        # Bu geri dusum olmadan KiCad 5 karti SIFIR bilesenle okunuyordu ve
+        # skor 100 cikiyordu - butun kurallar sessizce susuyordu.
+        for txt in children(node, "fp_text"):
+            if len(txt) < 3:
+                continue
+            if txt[1] == "reference":
+                ref = txt[2]
+            elif txt[1] == "value":
+                val = txt[2]
+    if not ref:
         return None
 
     comp = Component(
@@ -541,15 +552,39 @@ def _read_outline(root) -> tuple[float, float, float, float] | None:
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def _node_net(node) -> str:
-    """(net "VCC") ve eski (net 5 "VCC") bicimlerinin ikisi de: ad son elemandir."""
+def _read_net_table(root) -> dict[str, str]:
+    """Kartin kokundeki net tablosu: numara -> ad.
+
+    NEDEN GEREKLI: iz/via/arc dugumleri neti yalnizca NUMARA ile tasir
+    ("(net 2)"); ad kartin kokundedir ("(net 2 \"+3.3V\")"). Pad'ler ise adi
+    kendi icinde tasir. Bu tablo olmadan iz netleri "2" gibi sayisal metinlere
+    dusuyordu ve net ADINA gore filtreleyen kurallar (trace_width, via_current
+    ve copper_area'nin "track" kaynagi) HICBIR kartta eslesmiyordu - 7932 izli
+    bir kartta "yonlendirilmis iz yok" deniyordu.
+    """
+    table: dict[str, str] = {}
+    for n in children(root, "net"):
+        if len(n) >= 3:
+            table[str(n[1])] = str(n[2])
+    return table
+
+
+def _node_net(node, net_table: dict[str, str] | None = None) -> str:
+    """Iz/via/zone dugumunun net ADI.
+
+    "(net "VCC")" ve "(net 5 "VCC")" bicimlerinde ad son elemandir. "(net 5)"
+    biciminde ad YOKTUR ve kok tablosundan cozulur.
+    """
     n = child(node, "net")
     if n is None or len(n) < 2:
         return ""
-    return str(n[-1])
+    raw = str(n[-1])
+    if net_table and len(n) == 2 and raw.isdigit():
+        return net_table.get(raw, raw)
+    return raw
 
 
-def _read_tracks(root) -> list[Track]:
+def _read_tracks(root, net_table: dict[str, str] | None = None) -> list[Track]:
     """Ust duzey (segment ...) ve (arc ...) dugumleri.
 
     KiCad bakir izleri kart kokunde tutar (footprint icindekiler degil).
@@ -567,7 +602,7 @@ def _read_tracks(root) -> list[Track]:
                 continue
             tracks.append(
                 Track(
-                    net=_node_net(node),
+                    net=_node_net(node, net_table),
                     width=as_float(width[1]) if len(width) > 1 else 0.0,
                     layer=str(value(node, "layer", default="") or ""),
                     x1=as_float(start[1]),
@@ -579,7 +614,7 @@ def _read_tracks(root) -> list[Track]:
     return tracks
 
 
-def _read_vias(root) -> list[Via]:
+def _read_vias(root, net_table: dict[str, str] | None = None) -> list[Via]:
     vias: list[Via] = []
     for node in children(root, "via"):
         at = child(node, "at")
@@ -591,7 +626,7 @@ def _read_vias(root) -> list[Via]:
         layers = tuple(str(x) for x in layers_node[1:]) if layers_node else ()
         vias.append(
             Via(
-                net=_node_net(node),
+                net=_node_net(node, net_table),
                 x=as_float(at[1]),
                 y=as_float(at[2]),
                 size=as_float(size[1]) if size and len(size) > 1 else 0.0,
@@ -622,7 +657,7 @@ def _zone_layers(node) -> tuple[str, ...]:
     return (str(single),) if single else ()
 
 
-def _read_zones(root) -> list[Zone]:
+def _read_zones(root, net_table: dict[str, str] | None = None) -> list[Zone]:
     zones: list[Zone] = []
     for node in children(root, "zone"):
         # Zone'da net ADI ayri bir alanda: (net 1) (net_name "GND")
@@ -642,18 +677,35 @@ def _read_zones(root) -> list[Zone]:
     return zones
 
 
+class BoardParseError(RuntimeError):
+    """Kart dosyasi okunamadi. Sessizce bos kart dondurmekten YEGDIR:
+    bos kart butun kurallari susturur ve skoru 100 gosterir."""
+
+
 def read_board(path: str | Path) -> Board:
     """Bir .kicad_pcb dosyasini okur."""
     path = Path(path)
     root, stray = sexpr.parse_with_stats(path.read_text(encoding="utf-8"))
 
     board = Board(path=path, parse_warnings=stray)
-    for node in children(root, "footprint"):
+    # KiCad 5 footprint dugumune "module" der; 6+ "footprint". Ikisi de
+    # okunur - yapilari pad duzeyinde ayni.
+    fp_nodes = list(children(root, "footprint")) + list(children(root, "module"))
+    for node in fp_nodes:
         comp = _read_footprint(node)
         if comp is not None:
             board.components.append(comp)
+    if fp_nodes and not board.components:
+        # SESSIZ BOS KART OLMAZ. Dosyada footprint VAR ama hicbiri
+        # okunamadiysa bu bir ayristirici hatasidir; sessizce bos kart
+        # dondurmek TUM kurallari susturur ve skoru 100 yapar.
+        raise BoardParseError(
+            f"{path.name}: {len(fp_nodes)} footprint/module dugumu var ama "
+            "hicbiri okunamadi - ayristirici bu dosya surumunu tanimiyor"
+        )
     board.outline = _read_outline(root)
-    board.tracks = _read_tracks(root)
-    board.vias = _read_vias(root)
-    board.zones = _read_zones(root)
+    net_table = _read_net_table(root)
+    board.tracks = _read_tracks(root, net_table)
+    board.vias = _read_vias(root, net_table)
+    board.zones = _read_zones(root, net_table)
     return board

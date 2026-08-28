@@ -52,15 +52,59 @@ Oncelik 2 "induktor SW pinine <= 4 mm" verilmisken, #4-1'in istedigi
 One-Air-Max U6'da pin ayrimi 1.20 mm -> ust sinir 9.20 mm < 10.
 Bu yuzden fb_inductor_min_mm on ayarda VERILMEDI.
 
+## Evre 2 tamamlandi (2026-08-28)
+
+Yol haritasinin Evre 2 tablosundaki ALTI satirin altisi da kapandi:
+i2c_pullup, crystal_load, fb_divider (component_value ile), via_current
+(zaten vardi), thermal, decoupling_count. 16 kural tipi.
+
+- `thermal` (Richtek AN044): esik yerine HESAP. Sabit "en az N mm2"
+  savunulamaz - ayni 1 W 25 C'de ~148 mm2, 70 C'de ~1885 mm2 ister.
+  Modul olculen egri disina cikmayi REDDEDER.
+- `decoupling_count` (TI SPRABV2): seramik IC basina (6.35 mm), bulk NET
+  basina (mesafe siniri yok - TI vermiyor). `bulk_min_power_pins: 10` altinda
+  bulk hic sorulmaz; ceil(n/10) tek pinde bile bulk isterdi ama TI'in birimi
+  "~10 guc topu". Korpusta olculdu: esiksiz %47 atesliyordu, esikle %11.
+- Ayrik (harici FET) sicak dongu OLCULUYOR: roller topolojiden (ust kol
+  VIN+SW, alt kol SW+GND), dongu ALTIGEN. Bootstrap diyodu alt kol sanilmaz.
+
+## Sessiz hata sinifi - DORT ornek
+
+Bu projenin tekrar eden kusuru: yazilmis ama BAGLANMAMIS / sessizce etkisiz
+kod. Dordu de gercek bulgu kaybettiriyordu:
+1. netlist_from_board pinfunction'i bos birakiyordu (HANDOFF 21.6)
+2. learned'in model yolu bayatlamisti - Faz C'den beri etkisiz (21.10)
+3. circuit.decoupling_counts() yazilmis, test edilmis, HICBIR KURAL
+   cagirmiyordu (21.13)
+4. ayrik regulatorde sicak dongu YANLIS olculuyordu ve hata yonu iyimserdi -
+   IC'ye bitisik dort pad kucuk alan verir, sorunlu kart temiz gorunurdu
+   (21.14)
+Ayrica `thermal_pin` yazim hatasi kurali sessizce etkisiz birakiyordu.
+
+DERS: bir hesap modulu yazildiginda "hangi kural bunu cagiriyor?" diye
+grep'le dogrula. Modul basina tarama yapildi; baska bosluk yok
+(current_capacity_a trace_width_mm'in kullanilmayan tersi,
+i2c_needs_current_source bos aralik yolu tarafindan kapsaniyor).
+
 ## Test durumu
 
-418 test geciyor (oturum basinda 214). KiCad demolarina bagli testler kurulum
-yoksa atlanir.
+473 test geciyor (oturum basinda 214). KiCad demolarina bagli testler kurulum
+yoksa atlanir. `uretim` kalibrasyonu: medyan 95.9, ceyrekler 80.7/95.9/100.0.
 
 ## Kalan is
 
-- Ayrik (harici FET) tasarimlarda sicak dongu - korpusta test verisi YOK
-- Yonlendirme kapsam disi (dis otomatik yonlendirici + bizim bakir kurallarimiz)
+- Kicad-xpi (P3, BLOKE): ayrik sicak dongu tanimasini GERCEK bir ayrik kartta
+  dogrula. Uygulama bitti, geometri analitik sinandi (12 mm2); dogrulanmayan
+  sey taniyicinin gercek kartta calistigi. Korpusta ayrik regulator yok -
+  alti regulatorun altisi entegre, sistemde baska .kicad_pcb yok (arandi).
+- Yonlendirme kapsam disi (dis otomatik yonlendirici + bizim bakir kurallar).
+- EVRE 3 (asil hedef, yol haritasinda FAZ OLARAK YAZILMAMIS): uretken tasarim.
+  Skor artik uygunluk fonksiyonu olacak olgunlukta; eksik olan niyet -> topoloji
+  karari.
+- Kalan kural fikirleri on ayarlarin "BU MOTORLA OLCULEMEYENLER" bloklarinda
+  listeli; cogu okunmayan veri istiyor (maske katmani, katman yigini, 3B
+  yukseklik, Edge.Cuts ic hatlari). Veri gerektirmeyen ikisi: annular ring ve
+  delik-delik mesafesi (uretim on ayari) - altyapi hazir, kural yok.
 (learned vs auto olcumu YAPILDI - asagi bak.)
 
 ## ML: olculdu, sonuc degismedi, ama yolda sessiz bir hata bulundu
