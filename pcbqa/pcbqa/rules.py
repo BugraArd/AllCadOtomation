@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 import yaml
 
-from . import circuit, geom, ipc2221
+from . import circuit, geom, ipc2221, subcircuit
 from .model import Design, PinRef
 
 SEVERITIES = ("error", "warning", "info")
@@ -700,6 +700,176 @@ def _check_keep_apart(design: Design, rule: Rule) -> list[Finding]:
     return findings
 
 
+def _pin_xy(design: Design, ref: str, net: str | None):
+    """Bir bilesenin BELIRLI bir netteki pininin konumu.
+
+    Bilesen merkezini kullanmak yaniltici olurdu: SOIC-16'da bir pin merkeze
+    5 mm uzakta olabilir ve ROHM'un esikleri 3-4 mm mertebesinde.
+    """
+    if not net:
+        return None
+    for pin in design.pins_on_net(net):
+        if pin.ref == ref and pin.placed:
+            return (pin.x, pin.y)
+    return None
+
+
+def _pin_gap(design: Design, ref_a: str, ref_b: str, net: str | None) -> float | None:
+    """Iki bilesenin AYNI netteki pinleri arasindaki mesafe."""
+    a = _pin_xy(design, ref_a, net)
+    b = _pin_xy(design, ref_b, net)
+    if a is None or b is None:
+        return None
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
+    """Anahtarlamali regulator yerlesimi - ROHM 66AN015E kontrol listesi.
+
+    Diger kurallardan farki: bilesenleri NET ADINDAN degil TOPOLOJIDEN buluyor
+    (bkz. `pcbqa/subcircuit.py`). Gercek kartlarda FB neti
+    "Net-(U2-FB{slash}VSET)" diye adlandirilmis olabiliyor ve hicbir ad deseni
+    tutmuyor; ama IC'nin FB pini duruyor.
+
+    Her esik istege baglidir. Verilmeyen esik olculmez; tespit edilemeyen rol
+    de SESSIZCE atlanir - "bu kartta CIN bulunamadi" diye bulgu uretmek,
+    tanimanin sinirlarini tasarimin hatasi gibi gosterirdi.
+    """
+    limits = {
+        "cin_max_mm": rule.spec.get("cin_max_mm"),
+        "sw_max_mm": rule.spec.get("sw_max_mm"),
+        "cout_max_mm": rule.spec.get("cout_max_mm"),
+        "fb_max_mm": rule.spec.get("fb_max_mm"),
+        "fb_inductor_min_mm": rule.spec.get("fb_inductor_min_mm"),
+        "sw_area_max_mm2": rule.spec.get("sw_area_max_mm2"),
+    }
+    if all(v is None for v in limits.values()):
+        raise RuleError(
+            f"{rule.id}: en az bir esik verilmeli "
+            f"({', '.join(sorted(limits))})"
+        )
+
+    findings: list[Finding] = []
+
+    def add(msg: str, refs: list[str], measured: float, limit: float) -> None:
+        findings.append(
+            Finding(
+                rule_id=rule.id,
+                severity=rule.severity,
+                message=msg,
+                refs=refs,
+                measured=round(measured, 2),
+                limit=float(limit),
+            )
+        )
+
+    for buck in subcircuit.find_buck_converters(design):
+        tag = f"{buck.ic} ({buck.topology})"
+
+        # Oncelik 1 - giris kondansatoru VIN pinine yakin
+        limit = limits["cin_max_mm"]
+        if limit is not None and buck.cin:
+            gaps = [
+                (g, ref)
+                for ref in buck.cin
+                if (g := _pin_gap(design, buck.ic, ref, buck.vin_net)) is not None
+            ]
+            if gaps:
+                best, ref = min(gaps)
+                if best > float(limit):
+                    add(
+                        f"{tag}: en yakin giris kondansatoru {ref} "
+                        f"{best:.2f} mm uzakta (ROHM: <= {float(limit):g} mm)",
+                        [buck.ic, ref],
+                        best,
+                        limit,
+                    )
+
+        # Oncelik 2 - IC'den induktore SW izi kisa
+        limit = limits["sw_max_mm"]
+        if limit is not None and buck.inductor:
+            gap = _pin_gap(design, buck.ic, buck.inductor, buck.sw_net)
+            if gap is not None and gap > float(limit):
+                add(
+                    f"{tag}: induktor {buck.inductor} SW pininden {gap:.2f} mm "
+                    f"uzakta (ROHM: <= {float(limit):g} mm)",
+                    [buck.ic, buck.inductor],
+                    gap,
+                    limit,
+                )
+
+        # Oncelik 3 - cikis kondansatoru induktore yakin
+        limit = limits["cout_max_mm"]
+        if limit is not None and buck.inductor and buck.cout:
+            gaps = [
+                (g, ref)
+                for ref in buck.cout
+                if (g := _pin_gap(design, buck.inductor, ref, buck.out_net)) is not None
+            ]
+            if gaps:
+                best, ref = min(gaps)
+                if best > float(limit):
+                    add(
+                        f"{tag}: en yakin cikis kondansatoru {ref} induktorden "
+                        f"{best:.2f} mm uzakta (ROHM: <= {float(limit):g} mm)",
+                        [buck.inductor, ref],
+                        best,
+                        limit,
+                    )
+
+        # #4-2 - FB bolucu FB pinine yakin
+        limit = limits["fb_max_mm"]
+        if limit is not None and buck.fb_resistors:
+            gaps = [
+                (g, ref)
+                for ref in buck.fb_resistors
+                if (g := _pin_gap(design, buck.ic, ref, buck.fb_net)) is not None
+            ]
+            if gaps:
+                best, ref = min(gaps)
+                if best > float(limit):
+                    add(
+                        f"{tag}: FB bolucu {ref} FB pininden {best:.2f} mm "
+                        f"uzakta (ROHM: <= {float(limit):g} mm)",
+                        [buck.ic, ref],
+                        best,
+                        limit,
+                    )
+
+        # #4-1 - FB bilesenleri induktorden UZAK
+        limit = limits["fb_inductor_min_mm"]
+        if limit is not None and buck.inductor and buck.fb_resistors:
+            ind = design.component(buck.inductor)
+            for ref in buck.fb_resistors:
+                comp = design.component(ref)
+                if ind is None or comp is None:
+                    continue
+                gap = math.hypot(ind.x - comp.x, ind.y - comp.y)
+                if gap < float(limit):
+                    add(
+                        f"{tag}: FB bileseni {ref} induktore {gap:.2f} mm "
+                        f"yakinlikta (ROHM: >= {float(limit):g} mm)",
+                        [ref, buck.inductor],
+                        gap,
+                        limit,
+                    )
+
+        # Oncelik 2 - SW bakir alani
+        limit = limits["sw_area_max_mm2"]
+        if limit is not None:
+            area = design.board.copper_area_mm2(buck.sw_net)
+            if area > float(limit):
+                add(
+                    f"{tag}: SW bakir alani {area:.1f} mm2 "
+                    f"(ROHM: <= {float(limit):g} mm2)",
+                    [buck.ic],
+                    area,
+                    limit,
+                )
+
+    return findings
+
+
 def _refs_on_nets(design: Design, rule: Rule, pattern) -> set[str] | None:
     """Ada uyan netlere bagli bilesen referanslari. Desen yoksa None (=hepsi)."""
     if pattern is None:
@@ -1054,6 +1224,8 @@ CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
     "copper_area": _check_copper_area,
     # devre dogrulugu (bilesen DEGERI)
     "component_value": _check_component_value,
+    # alt-devre farkindalikli yerlesim (net adina DEGIL topolojiye bakar)
+    "buck_layout": _check_buck_layout,
 }
 
 
