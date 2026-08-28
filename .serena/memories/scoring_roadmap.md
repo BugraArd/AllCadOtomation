@@ -1,71 +1,99 @@
-# Skorlama yol haritasi (Evre 1) ve Evre 2 devri
+# Skorlama yol haritasi - TAMAMLANDI + sonrasi (2026-08-28)
 
-Tam metin: `pcbqa/docs/yol-haritasi-skorlama.md`. Bu hafiza ozet + karar
-gerekceleridir; ayrinti dokumanda.
+Tam metin: `pcbqa/docs/yol-haritasi-skorlama.md`, `pcbqa/HANDOFF.md` 21.
 
 ## Nihai hedef (kullanicinin koydugu)
 
-Uretken tasarim: sistem kendi bilesenini ekleyip baglayip PCB uretsin.
-Sonrasinda binlerce gercek PCB/sematikle egitim, KiCad uzerinden test,
-birden fazla model. Uzmanlasma hedefi once **STM32**, sonra genel CPU devreleri.
+Uretken tasarim: sistem kendi bilesenini ekleyip baglayip PCB uretsin. Sonra
+binlerce gercek kartla egitim, KiCad uzerinden test, birden fazla model.
+Uzmanlasma once STM32, sonra genel CPU devreleri.
 
-**Uretim zincirinin mekanigi ZATEN VAR:** `sch_add.py` sembol ekler,
-`sch_wire.py` baglar, `pcb_sync.py` karta yansitir, `auto` yerlestirir.
-Eksik olan iki uc: (1) niyet -> topoloji karari, (2) yonlendirme (kapsam disi).
+Uretim zincirinin MEKANIGI zaten var (sch_add / sch_wire / pcb_sync / auto).
+Eksik olan KARAR katmani. Skor uretimin uygunluk fonksiyonudur.
 
-**Skor, uretimin uygunluk fonksiyonudur** - yargilayamadigimizi uretemeyiz.
-Bu yuzden "once skor" karari iki hedefe birden hizmet ediyor.
+## Evre 1 - BITTI (dort faz)
 
-## Neden agirlikli skor
+- 1a agirlik mekanizmasi: Rule.weight / Finding.weight / report.penalty_of()
+- 1b orantili ceza: carpan = min(1 + |m-l|/|l|, scale_max), opt-in, tavan 3.0
+- 1c 28 on ayar kuralina kanit gucune gore agirlik
+- 1d korpus kalibrasyonu: harness --score-only, 19 KiCad demo karti
 
-`report.py`: `PENALTY = {error: 8.0, warning: 2.0, info: 0.0}`,
-`MIN_COMPONENTS_FOR_SCORE = 20`, `score = 100*exp(-penalty/max(n,20))`.
+Kalibrasyon IKI GERCEK KUSUR yakaladi:
+  1. Pad katmanlari okunmuyordu -> kart kenari konnektorlerinde 0.000 mm
+     aciklik. interf_u skoru 1.6 -> 72.6.
+  2. uretim on ayari projenin kendi kararindan sapmisti (courtyard error/16
+     yerine warning/6 olmaliydi).
+Medyan skor 88.9 -> 95.9.
 
-Yalnizca severity sayiliyor. Olculmus etkisi olan bir kural (TI AN-2155 sicak
-dongu) ile kaynaksiz bir muhendislik secimi ayni 8 puani yiyor. Ayrica ceza
-IKILI: 0.01 mm ihlal ile 2 mm ihlal esit.
+## Sonrasinda yapilanlar
 
-## Olculen zemin (2026-08-28)
+- Zone okuma + copper_area kurali. Tahmin fazla iyimserdi: uc kuraldan biri
+  acildi, biri kismen, ikisi baska veri istiyor.
+- Evre 2: circuit.py (parse_value, i2c_pullup, crystal_load, fb_divider) +
+  component_value kural tipi.
+- SESSIZ HATA BULUNDU: netlist_from_board pinfunction'i bos birakiyordu ve
+  docstring "yalnizca sematikten gelir" diyordu. YANLISTI - 19 kartin hepsinde
+  pad'lerde var. function: seciciSini kullanan TUM kurallar hicbir zaman
+  eslesmiyordu. Duzeltince uc gercek buck converter gorunur oldu.
+- subcircuit.py: regulatorleri TOPOLOJIDEN bulma (SW pini + o nette induktor).
+  Net adi ise yaramiyor - KiCad FB netini "Net-(U2-FB{slash}VSET)" adlandiriyor.
+- buck_layout kurali: ROHM listesi tespit edilen rollere karsi.
+  Kesinlik: CM5_MINIMA 19 bulgu -> 1, One-Air-Max 32 -> 4.
+  On ayar 9 kuraldan 4'e indi, yerlesim icin uyarlama gerektirmiyor.
+- Sicak dongu alani OLCULEBILIYOR (entegre regulatorlerde): dongu
+  CIN.VIN -> IC.VIN -> IC.GND -> CIN.GND dortgeni. Anahtarlarin IC ici
+  baglantisini bilmeye gerek yok. Olculdu: 0.73-1.13 mm2 (TI'in "iyi" degeri 6).
 
-11 kural tipinden **9'u** `measured`/`limit` dolduruyor. Doldurmayan ikisi
-(`require_on_net`, `same_net`) zaten ikili kurallar - orantili ceza onlara
-uygulanmaz, sabit agirlik alirlar. Veri modeli bu ise hazir.
+## Kanitlanan celiski
 
-## Fazlar
+ROHM 66AN015E kendi icinde tutarsiz: #4-2 "FB direnci FB pinine <= 4 mm" ve
+Oncelik 2 "induktor SW pinine <= 4 mm" verilmisken, #4-1'in istedigi
+"FB izi induktorden >= 10 mm" ucgen esitsizligiyle SAGLANAMAZ.
+One-Air-Max U6'da pin ayrimi 1.20 mm -> ust sinir 9.20 mm < 10.
+Bu yuzden fb_inductor_min_mm on ayarda VERILMEDI.
 
-- **1a** Agirlik mekanizmasi: `Rule.weight`, `Finding.weight`, `run_rules`
-  merkezi doldurur (rule_type gibi), `report.score` kullanir. Verilmezse
-  severity'den turetilir -> 279 test degismeden gecmeli.
-- **1b** Orantili ceza: `asim = |measured-limit|/limit`,
-  `carpan = clamp(1+asim, 1, scale_max)`, varsayilan tavan 3.0. Opt-in
-  (`scale: true`). `limit == 0` korumasi sart (courtyard_overlap'te yaygin).
-- **1c** Kaynakli agirliklar: kanit gucu agirligi belirler. Olculmus etki
-  (16-24) > standart/sayisal app-note (8-16) > kaynakli ama nitel (4-8) >
-  muhendislik secimi (1-2). Guvenlik (clearance_voltage, sebeke) en yuksek.
-- **1d** Korpus kalibrasyonu: `harness.py`'a `--score-only` kipi.
-  Ilke: sahaya cikmis bir karta skorumuz dusuk veriyorsa yanlis olan SKORDUR.
-  Capa olcumu: KiCad pic_programmer demosu kendi kuraliyla **82.7**.
+## Test durumu
 
-## IKI GERCEK RISK (1b'de)
+418 test geciyor (oturum basinda 214). KiCad demolarina bagli testler kurulum
+yoksa atlanir.
 
-1. **Yerlestirici bu skoru optimize ediyor.** Manzara degisince `auto` farkli
-   davranabilir. `harness --all --suite` zaten "GERILEME" isaretliyor -
-   degisiklikten ONCE ve SONRA kosulup karsilastirilmali.
-2. **ML egitim verisi skora bagli.** `ml/collect.py` ornekleri
-   `d_score = after.score - current.score` ile etiketliyor. Skor degisirse
-   `.work/moves*.jsonl` icindeki 49.699 ornek BAYATLAR, yeniden toplanmali.
+## Kalan is
 
-## Evre 2 (skorlamadan sonra)
+- Ayrik (harici FET) tasarimlarda sicak dongu - korpusta test verisi YOK
+- Yonlendirme kapsam disi (dis otomatik yonlendirici + bizim bakir kurallarimiz)
+(learned vs auto olcumu YAPILDI - asagi bak.)
 
-`pcbqa/circuit.py` - devre DOGRULUGU kural ailesi. `ipc2221.py` deseni.
-Kaynakli hesaplanabilir kurallar: I2C pull-up boyutlandirma (NXP UM10204),
-kristal yuk kondansatoru (Microchip AN826), FB bolucu akimi (Richtek AN033),
-decoupling adedi (TI SPRABV2), termal bakir alani (Richtek AN044).
-Yeni kural tipi `component_value` + ayri test edilebilir deger ayristirici
-(`4k7`, `4.7k`, `100n`, `10uF`, `1R0`, `DNP`).
+## ML: olculdu, sonuc degismedi, ama yolda sessiz bir hata bulundu
 
-Dikkat: bu kurallarin cogu tasarim dosyasinda OLMAYAN bilgi ister (bus
-kapasitansi, besleme gerilimi, FB bias akimi). Kural YAML'inda beyan edilmeli;
-beyan yoksa kural SESSIZCE atlanmali, varsayilan uydurulmamali.
+`learned` hala `auto`yu gecmiyor: bench_bad 16.5=16.5, pic_programmer 3.0=3.0,
+jetson (1125 bilesen) 64.3=64.3, vme-wren (1508 bilesen) 86.7=86.7.
 
-Tam devir promptu dokumanin sonunda.
+CURUYEN IKI HIPOTEZ:
+1. "Skor zenginlesince auto zorlanir, siralamanin degeri artar" - hayir.
+   Zenginlesen skor auto'yu zorlamadi TAKTI ve nedeni gradyan degil MALIYET idi
+   (clearance_voltage 8.9 -> 467 ms, butce ~900 denemeden ~17'ye dustu).
+2. "learned'in degeri degerlendirmenin pahali oldugu buyuk kartlarda gorunur" -
+   hayir. vme-wren'de tek olcum 2983 ms; 45 s butcede ~15 deneme kaliyor ve o
+   kadar denemede ne auto ne learned bir sey yapabiliyor.
+
+SESSIZ HATA (commit 673fb3c): learned'in DEFAULT_MODEL_PATH'i "move-v2.json"
+diyordu, diskteki tek model move-v3.json. Model bulunamayinca sinif sessizce
+auto gibi davraniyor -> learned FAZ C'DEN BERI ETKISIZDI. Yol artik oznitelik
+SURUMUNDEN turetiliyor (move-v{FEATURE_VERSION}.json) ve
+test_learned_actually_invokes_the_ranker ranker'in gercekten cagrildigini
+dogruluyor.
+
+DERS: beklenen sonucu dogrulayan bir olcum, olcumun kendisinin bozuk oldugunu
+GIZLEYEBILIR. Ayni +0.0'i uc kez gorup "siralamanin degeri yok" diye
+yorumladim; dorduncude "birebir AYNI olmasi supheli" deyip modele baktim.
+"Sonuc beklendigi gibi cikti" bir dogrulama degil, bir uyaridir.
+
+## Iki performans/anlam duzeltmesi (commit 75e95c4)
+
+1. apply_placement yalnizca bilesenleri tasiyordu; iz/via/dokum yerinde
+   kaliyordu, yani bakir kurallari TASINMIS pad'lerle SABIT izleri
+   karsilastiriyordu - fiziksel olarak anlamsiz. Artik bir bilesen gercekten
+   oynadiysa bakir temizleniyor.
+2. clearance_voltage'a sinir kutusu on filtresi: 467 -> 74.8 ms (6.2x), skor
+   degismedi. Profil kalan maliyetin filtrenin KENDISI oldugunu gosterdi
+   (81 bin kutu karsilastirmasi, 2.3 bin gercek sekil hesabi).
