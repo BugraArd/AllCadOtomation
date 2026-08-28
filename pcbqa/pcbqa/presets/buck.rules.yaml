@@ -53,8 +53,12 @@ rules:
     #
     # Dongu ENTEGRE regulator varsayar: CIN.VIN -> IC.VIN -> IC.GND -> CIN.GND.
     # Harici FET'li ayrik tasarimlarda dongu FET'lerin uzerinden gecer ve bu
-    # olcum yanlis olur; tanima harici FET'i gormedigi icin oyle bir kart
-    # "entegre" gibi gorunur. Bilinen sinir.
+    # dortgen o donguyu modellemez.
+    #
+    # Bu artik SESSIZ bir sinir DEGIL: SW dugumunde harici FET ya da diyot
+    # varsa kural alan hesaplamaz, "OLCULEMEDI" diye bir `info` yazar. Eskiden
+    # dort pad yine olculuyordu ve sonuc yanlis YONDE kucuk cikiyordu - ayrik
+    # bir kart sessizce temiz gorunurdu.
     hot_loop_max_mm2: 6.0
     #
     # fb_inductor_min_mm BILEREK VERILMEDI. ROHM #4-1 "FB izi induktorden
@@ -147,9 +151,11 @@ rules:
 #   - Sicak dongu alani AYRIK tasarimlarda (harici FET'ler). Entegre
 #     regulatorlerde olculuyor (hot_loop_max_mm2) cunku akim IC'ye VIN'den
 #     girip GND'den cikiyor ve anahtarlarin IC ICI baglantisini bilmeye gerek
-#     kalmiyor. Harici FET'li tasarimda dongu FET'lerin uzerinden gecer;
-#     tanima harici FET'i gormedigi icin oyle bir kart yanlislikla "entegre"
-#     sayilir ve olcum yanlis olur.
+#     kalmiyor. Ayrik tasarim artik TANINIYOR (SW dugumundeki FET/diyot) ve
+#     olcum REDDEDILIYOR: rapora "OLCULEMEDI" info'su duser. Yani sinir hala
+#     var ama artik SESSIZ degil. Olcmek icin akim yolu topolojisi gerekiyor
+#     (CIN -> ust FET -> alt FET -> CIN) ve korpusta test edilecek ayrik kart
+#     yok - alti regulatorun altisi da entegre.
 #   - Induktor altinda bakir olmamasi (ROHM, >= 3 mm temizlik). Zone poligonu
 #     ile bilesen courtyard'inin KESISIMI gerekir; copper_area yalnizca toplam
 #     alani olcer, nerede oldugunu degil.

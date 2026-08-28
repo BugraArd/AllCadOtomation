@@ -308,5 +308,125 @@ class HotLoopTests(unittest.TestCase):
         self.assertIn("sicak dongu", tight[0].message)
 
 
+
+@unittest.skipUnless(demos_available(), "KiCad demolari kurulu degil")
+class DiscreteBuckTests(unittest.TestCase):
+    """AYRIK (harici FET'li) tasarim: olcmek yerine SUSMAK.
+
+    Entegre regulatorde giris dongusu IC'nin dort pad'inden gecer. Harici
+    FET'lerde GECMEZ - dongu FET'lerin uzerinden dolasir. Eski davranis o
+    durumda yine dort pad'i olcuyordu ve sonuc yanlis yonde kucuk cikiyordu:
+    ayrik bir kart SESSIZCE temiz gorunurdu. Bu projede ayni hata sinifi
+    (sessizce etkisiz/yanlis kural) dorduncu kez.
+
+    Korpusta ayrik regulator YOK - alti regulatorun altisi da entegre. Bu
+    yuzden gercek bir kartin uzerine bir FET EKLENIYOR: taban kart gercek,
+    yalnizca tek bilesen sentetik. Boylece hem tanima hem reddetme gercek
+    veriyle sinaniyor.
+    """
+
+    BOARD = "One-Air-Max.kicad_pcb"
+    IC = "U6"
+
+    def base(self):
+        path = find_demo(self.BOARD)
+        self.assertIsNotNone(path, f"{self.BOARD} bulunamadi")
+        design = load_design(path)
+        found = {b.ic: b for b in find_buck_converters(design)}
+        self.assertIn(self.IC, found, "taban kartta buck taninmadi")
+        return design, found[self.IC]
+
+    def with_external_fet(self):
+        """Ayni karta SW dugumunde bir FET ekler ve tasarimi yeniden kurar."""
+        from pcbqa.harness import load_design as _load
+        from pcbqa.model import build_design
+        from pcbqa.netlist import netlist_from_board
+        from pcbqa.pcb import Component, Pad
+
+        path = find_demo(self.BOARD)
+        design = _load(path)
+        buck = {b.ic: b for b in find_buck_converters(design)}[self.IC]
+        gnd = buck.gnd_net
+        self.assertTrue(gnd, "taban kartta GND neti bulunamadi")
+
+        ic = design.component(self.IC)
+        q = Component(
+            ref="Q99",
+            value="SYNTH_FET",
+            footprint_id="test:SOT-23",
+            x=ic.x + 5.0,
+            y=ic.y + 5.0,
+            rotation=0.0,
+            layer=ic.layer,
+            pads=[
+                Pad(number="1", net=buck.sw_net, x=ic.x + 5.0, y=ic.y + 5.0,
+                    size_x=0.5, size_y=0.5),
+                Pad(number="2", net=gnd, x=ic.x + 6.0, y=ic.y + 5.0,
+                    size_x=0.5, size_y=0.5),
+            ],
+        )
+        design.board.components.append(q)
+        rebuilt = build_design(
+            design.board, netlist_from_board(design.board), project_name="synth"
+        )
+        found = {b.ic: b for b in find_buck_converters(rebuilt)}
+        self.assertIn(self.IC, found, "FET eklenince buck taninmaz oldu")
+        return rebuilt, found[self.IC]
+
+    # --- taban durum: yanlis pozitif olmamali ---------------------------------
+
+    def test_integrated_regulator_has_no_external_switches(self):
+        _, buck = self.base()
+        self.assertEqual(buck.external_switches, [])
+
+    def test_integrated_regulator_is_still_measured(self):
+        design, buck = self.base()
+        self.assertIsNotNone(hot_loop_area_mm2(design, buck), "entegre olcum bozuldu")
+
+    # --- ayrik durum ---------------------------------------------------------
+
+    def test_external_fet_on_the_switch_node_is_detected(self):
+        _, buck = self.with_external_fet()
+        self.assertEqual(buck.external_switches, ["Q99"])
+
+    def test_measurement_is_refused_instead_of_being_wrong(self):
+        design, buck = self.with_external_fet()
+        self.assertIsNone(
+            hot_loop_area_mm2(design, buck),
+            "ayrik tasarimda alan hesaplandi - sessizce yanlis olurdu",
+        )
+
+    def test_the_refusal_is_visible_in_the_report(self):
+        """Susmak YETMEZ - gorunmez bir bosluk yine sessiz hatadir."""
+        design, _ = self.with_external_fet()
+        findings = CHECKS["buck_layout"](
+            design,
+            Rule(id="t", type="buck_layout", severity="warning",
+                 spec={"hot_loop_max_mm2": 6.0}),
+        )
+        notes = [f for f in findings if "OLCULEMEDI" in f.message and self.IC in f.message]
+        self.assertEqual(len(notes), 1, "olculemedigi raporlanmadi")
+        self.assertEqual(notes[0].severity, "info", "kapsam disiligi ihlal degildir")
+        self.assertIn("Q99", notes[0].message)
+
+    def test_the_note_costs_no_score(self):
+        """`info` cezasi sifirdir; kapsam disiligi kartin skorunu dusurmemeli."""
+        from pcbqa.report import penalty_of
+
+        design, _ = self.with_external_fet()
+        notes = [
+            f
+            for f in CHECKS["buck_layout"](
+                design,
+                Rule(id="t", type="buck_layout", severity="warning",
+                     spec={"hot_loop_max_mm2": 6.0}),
+            )
+            if "OLCULEMEDI" in f.message
+        ]
+        self.assertTrue(notes)
+        self.assertEqual(penalty_of(notes[0]), 0.0)
+
+
+
 if __name__ == "__main__":
     unittest.main()

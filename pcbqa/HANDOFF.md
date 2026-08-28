@@ -2066,7 +2066,39 @@ sayılsaydı gereken adet **iki katına** çıkardı. TI güç *toplarını* say
 `uretim` ön ayarı etkilenmedi — kural `yuksek-hiz`e eklendi ve 1d kalibrasyonu
 birebir aynı: medyan 95.9, çeyrekler 80.7/95.9/100.0.
 
-### 21.14 Testler
+### 21.14 Ayrık regülatör: yanlış ölçmektense ölçmemek
 
-`python -m unittest discover -s tests` → **459 test**, hepsi geçiyor
+§21.13'ün sonunda yaptığım tarama, "yazılmış ama bağlanmamış" başka bir kod
+bulmadı (`current_capacity_a` `trace_width_mm`'in kullanılmayan tersi,
+`hot_loop_area_mm2` test tarafı sarmalayıcı, `i2c_needs_current_source` boş
+aralık yolu tarafından zaten kapsanıyor). Ama Kicad-z1d'nin açık bıraktığı
+kısım aynı ailenin dördüncü üyesiydi — bu kez **sessizce yanlış ölçüm**.
+
+Sıcak döngü dörtgeni `CIN.VIN -> IC.VIN -> IC.GND -> CIN.GND` **entegre**
+regülatör varsayar. Harici FET'li ayrık tasarımda döngü FET'lerin üzerinden
+dolaşır ve bu dört pad onu temsil etmez. Kritik olan, hatanın **yönü**: IC'ye
+bitişik dört pad **küçük** bir alan verir, yani ayrık ve sorunlu bir kart
+TI'ın 6 mm² eşiğini rahatça geçip temiz görünürdü.
+
+Artık `find_buck_converters` SW düğümündeki harici anahtarlama elemanlarını
+(`BuckConverter.external_switches`) buluyor ve doluysa `hot_loop_polygon`
+**None** dönüyor. Diyot da sayılıyor: asenkron buck'ta alt kol diyottur ve
+dönüş yolu yine IC'nin dışından geçer.
+
+Susmak tek başına yeterli olmazdı — görünmez bir boşluk yine sessiz hatadır.
+Kural bu durumda `info` seviyesinde "giriş sıcak döngüsü ÖLÇÜLEMEDİ" yazıyor;
+cezası sıfır (kapsam dışılık bir ihlal değil), ama raporda görünüyor.
+
+**Korpusta ayrık regülatör yok** — altı regülatörün altısı da entegre, yani
+gerçek ölçüm hâlâ yapılamıyor. Test bu yüzden gerçek bir kartın (One-Air-Max
+U6) üzerine tek bir sentetik FET ekliyor: taban kart gerçek, yalnızca o bileşen
+uydurma. Hem tanıma hem reddetme böyle sınanıyor, ayrıca taban kartta yanlış
+pozitif olmadığı ve entegre ölçümün bozulmadığı korunuyor.
+
+Kalan iş değişmedi: ayrık döngüyü gerçekten ölçmek akım yolu topolojisi
+(CIN → üst FET → alt FET → CIN) ve test edilecek gerçek bir ayrık kart ister.
+
+### 21.15 Testler
+
+`python -m unittest discover -s tests` → **465 test**, hepsi geçiyor
 (oturum başında 214). KiCad demolarına bağlı testler kurulum yoksa atlanır.

@@ -871,6 +871,26 @@ def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
         # TI AN-2155'in OLCTUGU buyukluk: 6 mm2 iyi, 18 mm2 kotu
         limit = limits["hot_loop_max_mm2"]
         if limit is not None:
+            # AYRIK tasarim: dongu harici FET'lerin uzerinden geciyor ve IC'nin
+            # dort pad'i onu modellemiyor. Eskiden burada KUCUK bir alan
+            # hesaplanip sessizce geciliyordu - sorunlu kart temiz gorunuyordu.
+            # Artik olcemedigimizi SOYLUYORUZ. `info` cunku bu bir ihlal degil
+            # kapsam disiligi; ceza 0, ama raporda gorunur.
+            if buck.external_switches:
+                findings.append(
+                    Finding(
+                        rule_id=rule.id,
+                        severity="info",
+                        message=(
+                            f"{tag}: giris sicak dongusu OLCULEMEDI - SW "
+                            f"dugumunde harici anahtarlama elemani var "
+                            f"({', '.join(buck.external_switches)}). Ayrik "
+                            f"tasarimda dongu bu elemanlarin uzerinden geciyor; "
+                            f"IC pad'lerinden hesaplanan alan yaniltici olurdu"
+                        ),
+                        refs=[buck.ic, *buck.external_switches],
+                    )
+                )
             loop = subcircuit.hot_loop_polygon(design, buck)
             if loop is not None:
                 poly, cap = loop

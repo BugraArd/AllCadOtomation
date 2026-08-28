@@ -65,6 +65,9 @@ class BuckConverter:
     # arasindadir ve `out_net` bu yolla belirlenemez.
     topology: str = "buck"
     gnd_net: str | None = None
+    # SW dugumundeki HARICI anahtarlama elemanlari (FET / diyot). Bos degilse
+    # regulator AYRIKTIR ve giris sicak dongusu IC'nin dort pad'inden GECMEZ.
+    external_switches: list[str] = field(default_factory=list)
     cin: list[str] = field(default_factory=list)
     cout: list[str] = field(default_factory=list)
     fb_resistors: list[str] = field(default_factory=list)
@@ -158,6 +161,14 @@ def find_buck_converters(design: Design) -> list[BuckConverter]:
         else:
             buck.out_net = sorted(other)[0] if other else None
 
+        # AYRIK MI? SW dugumunde harici FET ya da diyot varsa anahtarlama
+        # IC'nin DISINDA oluyor. Diyot da sayilir: asenkron buck'ta alt kol
+        # diyottur ve donus yolu yine IC'nin disindan gecer.
+        buck.external_switches = sorted(
+            _components_on(design, sw_net, "transistor")
+            + _components_on(design, sw_net, "diode")
+        )
+
         buck.cin = _components_on(design, buck.vin_net, "capacitor")
         buck.cout = _components_on(design, buck.out_net, "capacitor")
         buck.fb_resistors = _components_on(design, buck.fb_net, "resistor")
@@ -189,13 +200,22 @@ def hot_loop_polygon(design: Design, buck: BuckConverter):
     Dort pad'in cevreledigi dortgen. Anahtarlarin IC ICI baglantisini bilmeye
     gerek yok; akim IC'ye VIN'den girip GND'den cikiyor.
 
-    AYRIK tasarimlarda (harici FET'ler) bu YANLIS olur - orada dongu FET'lerin
-    uzerinden geciyor. `find_buck_converters` harici FET'leri tanimadigi icin
-    boyle bir kart zaten "entegre" gibi gorunur; bu bilinen sinir.
+    AYRIK tasarimlarda (harici FET'ler) bu dortgen YANLIS olur - orada dongu
+    FET'lerin uzerinden geciyor ve dort pad'in cevreledigi alan gercek donguyu
+    temsil etmez. Ustelik yanlis yonde: IC'ye yakin duran dort pad KUCUK bir
+    alan verir, yani sorunlu bir kart SESSIZCE gecerdi.
+
+    Bu yuzden `external_switches` doluysa None doneriz. Olcemedigimiz bir seye
+    sayi UYDURMAYIZ - `thermal`in olculen egri disina cikmayi reddetmesiyle
+    ayni ilke. Ayrik dongunun kendisi akim yolu topolojisi ister (CIN -> ust
+    FET -> alt FET -> CIN) ve elimizdeki korpusta test edilecek ayrik kart
+    yok; olculemeyeni olculmus gibi gostermektense susmayi seciyoruz.
 
     En KUCUK dongulu giris kondansatoru secilir: AC akimi tasiyan odur
     (Richtek AN045 "en kucuk paket en yakina" der).
     """
+    if buck.external_switches:
+        return None  # ayrik tasarim - bu dortgen o donguyu modellemiyor
     if not (buck.vin_net and buck.gnd_net and buck.cin):
         return None
     ic_vin = _pad_xy(design, buck.ic, buck.vin_net)
