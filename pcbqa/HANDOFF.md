@@ -41,6 +41,7 @@ geçmiyor — üretim yerleştiricisi hâlâ `auto`.
 | 6/F | `polish`e yakınsama ölçütü (skor sabrı) | ✅ Bitti (§16) |
 | 6/G | `auto` bütçe bölüşümü: sert tavan + artık devri + 75/25 | ✅ Bitti (§17) |
 | 7 | Devre tipine göre kural kütüphanesi + bakır okuma/kuralları | ✅ Bitti (§20) |
+| 8 | Ağırlıklı skorlama, korpus kalibrasyonu, alt-devre tanıma | ✅ Bitti (§21) |
 
 ---
 
@@ -1769,3 +1770,153 @@ En değerli olanlar davranışı değil **sessizliği** koruyanlar:
 `test_sound_board_at_logic_voltage_is_silent` ve
 `test_manufacturing_preset_is_silent_on_sound_board` — ikisi de geliştirme
 sırasında gerçekten kırıldı ve pad şekli hatasını yakaladı.
+## 21. Aşama 8 — ağırlıklı skorlama, kalibrasyon, alt-devre tanıma (2026-08-28)
+
+### 21.1 Neden
+
+Skor `8 × hata + 2 × uyarı` idi: **yalnızca severity sayılıyordu.** Ölçülmüş
+etkisi olan bir kural (TI AN-2155'in sıcak döngü deneyi) ile kaynaksız bir
+mühendislik seçimi aynı 8 puanı yiyordu. Ayrıca ceza **ikiliydi** — 0.01 mm dar
+bir iz ile 2 mm dar bir iz eşitti.
+
+Nihai hedef üretken tasarım: sistemin kendi bileşenini ekleyip bağlayıp PCB
+üretmesi. Zincirin mekaniği zaten var (`sch_add`, `sch_wire`, `pcb_sync`,
+`auto`); eksik olan **karar**. Skor bunun uygunluk fonksiyonudur —
+yargılayamadığımızı üretemeyiz. Bu yüzden önce skor.
+
+Yol haritası: `docs/yol-haritasi-skorlama.md`.
+
+### 21.2 Evre 1 — ağırlıklı skor (dört faz)
+
+| Faz | Ne | Sonuç |
+|---|---|---|
+| 1a | `Rule.weight` / `Finding.weight`, `report.penalty_of()` | Geriye uyumlu; ağırlıksız dosya birebir eski skoru üretir |
+| 1b | Orantılı ceza: `çarpan = min(1 + \|m−l\|/\|l\|, scale_max)` | Opt-in; gerileme koşumu yapıldı, **gerileme yok** |
+| 1c | 28 ön ayar kuralına kanıt gücüne göre ağırlık | Her ağırlığın yanında kaynağı; testle korunuyor |
+| 1d | Korpus kalibrasyonu (`harness --score-only`) | **İki gerçek kusur yakalandı** |
+
+**1b'nin gerileme koşumu neden önemsizdi:** ölçekleme *monotondur* — aynı bulgu
+kümesi için skor karşılaştırmasının işaretini değiştirmez. Risk gerçekti ama
+yapısal olarak hafif çıktı.
+
+**1c'de benimsenen ilke:** kaynak belirsizliği ağırlığı **düşürür**.
+`hs-usb-cift-eslestirme` 8 aldı çünkü TI'ın dört dokümanı aynı eşik için 75 kat
+farklı değer veriyor.
+
+### 21.3 Kalibrasyonun yakaladığı iki kusur
+
+> Sahaya çıkmış bir karta skorumuz düşük veriyorsa **yanlış olan skordur.**
+
+19 KiCad demo kartı, `uretim` ön ayarıyla:
+
+| Ölçüm | İlk koşum | Sonra |
+|---|---|---|
+| Medyan | 88.9 | **95.9** |
+| Çeyrekler | 40.6/88.9/100 | **80.7/95.9/100** |
+
+**1) Pad katmanları okunmuyordu.** `interf_u`'da `BUS1.29` (VCC) ve `BUS1.60`
+(/PC-A2) aynı koordinatta, aralarında **0.000 mm** açıklık ölçülüyordu — gerçek
+bir kartta kısa devre demek. Sebep: kart-kenarı konnektörü, pad'ler ön ve arka
+yüzde. `Pad.copper_layers` eklendi. Kartın skoru **1.6 → 72.6**.
+
+**2) Ön ayar projenin kendi kararından sapmıştı.** `courtyard` kuralı
+`error`/16 yazılmıştı; `default_rules.yaml` **warning** diyor ve gerekçesini
+yazmış (StickHub'ı adıyla anarak). Korpus sayısallaştırdı: 19 kartın 5'inde
+(%26) çakışma var. Düşük kesinlikli kural ağır ağırlık taşımamalı → `warning`/6.
+
+### 21.4 Zone okuma — tahmin fazla iyimserdi
+
+`Zone`/`ZoneFill` + `Board.copper_area_mm2()` + `copper_area` kuralı eklendi.
+"Zone okuma üç kritik kuralı birden açar" demiştim; gerçekte:
+
+| Hedef | Sonuç |
+|---|---|
+| SW bakır alanı ≤ 100 mm² | ✅ açıldı |
+| Termal bakır alanı | ⚠️ kural yazılabilir, eşik güç dissipasyonu beyanı istiyor |
+| Sıcak döngü alanı | ❌ hâlâ kapalı — netin alanı değil, **akım yolunun çevrelediği** alan |
+| İndüktör altında bakır | ❌ zone ∩ courtyard kesişimi gerek |
+
+**Ders:** alan ölçmek ile geometrik ilişki ölçmek farklı şeyler.
+
+### 21.5 Evre 2 — devre doğruluğu (`circuit.py`)
+
+Motorun ilk **değer** kuralları. `parse_value` (IEC 60062 RKM: `4k7` = 4.7k) +
+`i2c_pullup` (NXP UM10204) + `crystal_load` (Microchip AN826) + `fb_divider`
+(Richtek AN033) + yeni kural tipi `component_value`.
+
+**Bağımsız doğrulama:** formüller kaynağın kendi sonucunu üretti. 400 pF
+fast-mode'da `Rp(min)` = 967 Ω > `Rp(max)` = 885 Ω — düz dirençle çözüm yok.
+UM10204 tam bunu söylüyor. Kural bunu "kabul aralığı **boş**" diye bildirir.
+
+İki farklı "eksik" bilinçli ayrıldı: bileşenin değeri çözülemiyorsa **sessizce
+atlanır** (tasarım özelliği), kuralın beyanı eksikse **hata** verilir
+(yapılandırma hatası).
+
+### 21.6 Sessiz hata: pin adları hiç okunmuyordu
+
+`netlist_from_board` `pinfunction`'ı boş bırakıyordu ve docstring'i "yalnızca
+şematikten gelir" diyordu. **Yanlıştı** — 19 demo kartın hepsinde pad'lerde
+pinfunction var (vme-wren'de 6828 tane).
+
+Etkisi sessizdi: `function:` seçicisini kullanan **tüm** kurallar hiçbir zaman
+eşleşmiyordu ve bu "temiz kart" gibi görünüyordu.
+
+**Nasıl bulundu:** alt-devre tanıma için korpusta buck converter aranırken
+hiçbiri bulunamadı. Önce "demolarda buck yok" sandım; taramayı gevşetince pin
+adlarının tamamen boş olduğu ortaya çıktı. Yani bir varsayımı sınamak başka bir
+hatayı açtı.
+
+### 21.7 Alt-devre tanıma — ad değil topoloji
+
+`subcircuit.py`: imza = bir IC'nin SW pini + o nette bir indüktör. Roller
+çıkarılır (CIN, COUT, indüktör, FB dirençleri). Üç gerçek kartta **altı
+regülatör** doğrulandı.
+
+Gerçek veri iki kusuru gösterdi; ikisi de sentetik kartta görünmezdi:
+
+- **Pin adında biçimleme:** jetson'daki TPS564247'nin VIN pini `V_{IN}` yazıyor.
+  Desen tutmuyordu, CIN listesi boş kalıyordu. `normalize_pin_name()` eklendi;
+  jetson'da CIN **0 → 16**.
+- **Buck-boost buck sanıldı:** One-Air-Max U5 (BQ25672) indüktörü **iki**
+  anahtarlama düğümü arasında. "Diğer uç çıkıştır" varsayımı orada yanlış.
+
+`buck_layout` kuralı ROHM'un listesini bu rollere karşı çalıştırır:
+
+| kart | ad desenli | topolojik |
+|---|---|---|
+| CM5_MINIMA_3 | 19 bulgu, 19.0 | **1 bulgu, 85.2** |
+| One-Air-Max | 32 bulgu, 20.4 | **4 bulgu, 70.3** |
+| jetson | — | **0 bulgu, 100.0** |
+
+Buck ön ayarı 9 kuraldan 4'e indi ve yerleşim kuralları için **artık uyarlama
+gerektirmiyor.**
+
+### 21.8 ROHM'un kontrol listesi kendi içinde çelişiyor (kanıtlandı)
+
+```
+#4-2       FB direnci IC'nin FB pinine  <= 4 mm
+Öncelik 2  İndüktör  IC'nin SW pinine   <= 4 mm
+=>  üçgen eşitsizliği:  FB<->L  <=  4 + (IC içi SW-FB pin ayrımı) + 4
+```
+
+Ölçüldü: One-Air-Max U6'da pin ayrımı 1.20 mm → **üst sınır 9.20 mm**. Yani
+#4-1'in istediği "≥ 10 mm" **matematiksel olarak sağlanamaz**. Üç gerçek kartın
+üçünde de, sekiz FB direncinin sekizinde de ihlal çıkıyordu.
+
+Bu yüzden `fb_inductor_min_mm` ön ayarda **verilmedi**; gerekçe hem YAML'a hem
+teste yazıldı.
+
+### 21.9 Kalan sınırlar
+
+- **Sıcak döngü alanı** hâlâ ölçülemiyor. Zone okuma ve alt-devre tanıma
+  eklendi ama yetmedi: anahtarların **IC içi** bağlantısını bilmek gerekiyor.
+  Bead: `Kicad-*` (akım yolu topolojisi).
+- **Yönlendirme** kapsam dışı; gerçekçi yol dış bir otomatik yönlendiriciyi
+  çağırıp çıktısını bizim bakır kurallarımızla denetlemek.
+- **`learned` hâlâ `auto`yu geçmiyor.** Skor zenginleşti; bu ölçüm tekrar
+  yapılmalı — henüz yapılmadı.
+
+### 21.10 Testler
+
+`python -m unittest discover -s tests` → **411 test**, hepsi geçiyor
+(277 → 411). KiCad demolarına bağlı testler kurulum yoksa atlanır.

@@ -478,7 +478,7 @@ Güvenlik davranışı:
 
 ## Kurallar
 
-Kurallar YAML ile tanımlanır, kod değiştirmek gerekmez. On bir tip var:
+Kurallar YAML ile tanımlanır, kod değiştirmek gerekmez. On dört tip var:
 
 | Tip | Alan | Ne kontrol eder |
 |---|---|---|
@@ -493,9 +493,35 @@ Kurallar YAML ile tanımlanır, kod değiştirmek gerekmez. On bir tip var:
 | `trace_width` | bakır | İz genişliği akımı taşımaya yetiyor mu (IPC-2221B) |
 | `via_current` | bakır | Netteki via'lar akımı taşıyabiliyor mu |
 | `clearance_voltage` | bakır | İki net arası açıklık gerilim farkına yetiyor mu |
+| `copper_area` | bakır | Bir netin toplam bakır alanı aralıkta mı (SW alanı, termal) |
+| `component_value` | devre | Bileşen **değeri** hesaplanan aralıkta mı |
+| `buck_layout` | alt-devre | Regülatör yerleşimi — bileşenleri **topolojiden** bulur |
 
-Son üçü **yalnızca yönlendirilmiş kartlarda** çalışır; yerleştirme aşamasında
-(kartta bakır yokken) sessizce atlanırlar.
+`trace_width` / `via_current` / `clearance_voltage` **yalnızca yönlendirilmiş
+kartlarda** çalışır; yerleştirme aşamasında (kartta bakır yokken) sessizce
+atlanırlar.
+
+### `buck_layout` — ad değil topoloji
+
+Diğer kurallar bileşeni **net adından** bulur (`net: "^(FB|VFB)$"`). Gerçek
+kartlarda bu yetmiyor: KiCad geri besleme netini `Net-(U2-FB{slash}VSET)` diye
+otomatik adlandırıyor ve hiçbir desen tutmuyor. Ama IC'nin **pin adı** "FB/VSET"
+olarak duruyor.
+
+`pcbqa/subcircuit.py` regülatörü topolojiden bulur — imza: bir IC'nin SW pini +
+o nette bir indüktör — ve rolleri çıkarır (CIN, COUT, indüktör, FB dirençleri).
+`buck_layout` ROHM'un kontrol listesini bu rollere karşı çalıştırır.
+
+Gerçek KiCad demo kartlarında ölçüldü:
+
+| kart | ad desenli | topolojik |
+|---|---|---|
+| CM5_MINIMA_3 | 19 bulgu, skor 19.0 | **1 bulgu, 85.2** |
+| One-Air-Max | 32 bulgu, skor 20.4 | **4 bulgu, 70.3** |
+| jetson | — | **0 bulgu, 100.0** |
+
+Bulgular parçayı adıyla söylüyor: *"U702 (buck): indüktör L701 SW pininden
+4.32 mm uzakta (ROHM: <= 4 mm)"*.
 
 `keep_apart`, `proximity`nin tersidir ve gerçek bir boşluğu kapatır: üretici
 kurallarının şaşırtıcı bir kısmı "yaklaştır" değil **"uzaklaştır"** der —
