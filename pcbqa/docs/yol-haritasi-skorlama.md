@@ -275,6 +275,28 @@ oturuma verilebilir.
 
 ---
 
+## Evre 2 uygulanırken değişen bir karar
+
+Yukarıdaki devir promptu "beyan yoksa kural **sessizce atlanmalı**" diyor.
+Bu, `component_value` ailesinde (`i2c_pullup`, `crystal_load`, `fb_divider`)
+uygulandı — o kurallar ön ayarda **açık** durur ve beyansız kart için susmaları
+gerekir.
+
+`thermal`da **tersi yapıldı**: beyan eksikse `RuleError` atılır. Sebep, kuralın
+ön ayarda **kapalı** (yorum satırında) olması. Kullanıcı onu bilerek açıyor;
+o noktada sessizce atlamak, kuralı açtığını sanan birine görünmez biçimde
+etkisiz bir kural bırakırdı. Bu projede aynı sınıf hata üç kez oldu
+(HANDOFF §21.6 pin adları, §21.10 bayat model yolu, §21.13 bağlanmamış
+`decoupling_counts`).
+
+Ayrım tek cümlede: **varsayılan açık kural beyansız susar, varsayılan kapalı
+kural beyansız bağırır.**
+
+`decoupling_count` hiç beyan istemez (güç pinleri ve kondansatör değerleri
+tasarım dosyasındadır), bu yüzden ayrımın dışındadır.
+
+---
+
 ## Kayıtlar
 
 - Beads: Evre 1 fazları ve Evre 2 devir promptu bead olarak kayıtlı.

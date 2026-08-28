@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 import yaml
 
-from . import circuit, geom, ipc2221, subcircuit
+from . import circuit, geom, ipc2221, subcircuit, thermal
 from .model import Design, PinRef
 
 SEVERITIES = ("error", "warning", "info")
@@ -1012,6 +1012,310 @@ def _check_component_value(design: Design, rule: Rule) -> list[Finding]:
     return findings
 
 
+def _check_decoupling_count(design: Design, rule: Rule) -> list[Finding]:
+    """IC'nin guc pini SAYISINA gore yeterli decoupling kondansatoru var mi.
+
+    NEDEN AYRI BIR KURAL: `proximity` (hs-decoupling-mesafesi) MESAFE sorar -
+    "kondansator yeterince yakin mi". ADET sormaz. 20 guc pinli bir FPGA'nin
+    tek kondansatoru 2 mm otede olabilir ve mesafe kurali SUSAR; TI SPRABV2
+    ise o kart icin 10 adet 0.1 uF ister. Iki kural birbirini tamamlar.
+
+    SERAMIK PER IC, BULK PER NET - bu ayrim kaynagin kendisinden geliyor:
+      * Seramik (0.1 uF) yuksek frekansta calisir ve ancak YAKINSA is gorur,
+        yani her yongaya kendi kondansatoru gerekir. TI SBAA113'un 6.35 mm
+        siniri icinde, IC BASINA sayilir.
+      * Bulk (>= 15 uF) dusuk frekansta calisir, bir RAYI besler ve kart
+        genelinde paylasilir. NET BASINA, mesafe siniri ARANMADAN sayilir -
+        TI bulk icin mesafe VERMIYOR, uydurmuyoruz.
+      Bulk'u IC basina saymak ayni ray uzerindeki uc yonga icin ayni eksigi uc
+      kez bildirirdi ve tek pinli her yongaya ayrik bulk dayatirdi; ikisi de
+      kaynagin soyledigi sey degil.
+      Bulk ayrica `bulk_min_power_pins` (varsayilan 10) ALTINDA hic sorulmaz:
+      TI'in birimi "~10 guc topu"dur ve ceil(n/10) tek pinde bile 1 bulk
+      isterdi - o sayi kaynagin degil tavan fonksiyonunun urunu.
+
+    UC BILINCLI YANLILIK, ucu de IYIMSER (yani gercek kart daha kotudur) -
+    cunku bu projede yanlis alarm, kacirilan bulgudan pahalidir:
+      1. Degeri COZULEMEYEN kondansator HER IKI kovaya da sayilir. KiCad deger
+         alanlari duzensizdir: pic_programmer'da "22uF/25V" cozulemiyor ve o
+         gercek bir bulk kondansatorudur. Yalnizca seramige saysaydik ayni
+         parca bulk eksigi uydururdu - yani yanlilik yon degistirirdi.
+      2. Bir kondansator birden fazla guc netinde sayilabilir (ayrik degil).
+      3. Guc pini `pintype` ile bulunur; pintype yoksa bilesen SESSIZCE atlanir.
+
+    OLCULMUS SINIR (1. yanliligin bedeli): jetson-agx-thor-baseboard deger
+    alanina "C_100n_0402" yaziyor - bir 100 nF seramik, ama `parse_value`
+    cozemiyor, yani bulk da sayiliyor. O kartta bulk denetimi seramiklerle
+    doluyor ve etkisiz kaliyor. Bilincli kabul: alternatif, deger alanindan
+    paket adi ayristirmaya calismakti ve yanlis tahmin gercek bir bulk
+    kondansatorunu yok sayip UYDURMA bir eksik uretirdi.
+
+    TOPRAK PINLERI `ignore_nets` ile disarida kalmali - toprak pinleri de
+    `power_in` tasir ve sayilsalardi gereken adet iki katina cikardi. On
+    ayarlarin defaults blogu GND/AGND/DGND'yi zaten eliyor.
+
+    Beyan gerektirmez: guc pinleri de kondansator degerleri de tasarim
+    dosyasindadir. `thermal`dan farki bu - orada beyan yoktu, burada var.
+    """
+    select = Selector(rule.spec.get("select"))
+    pin_sel = Selector(rule.spec.get("pin") or {"pintype": "power_in"})
+    partner_sel = Selector(rule.spec.get("partner") or {"kind": "capacitor"})
+    max_mm = float(rule.spec.get("max_distance_mm", 6.35))
+    bulk_min_uf = float(rule.spec.get("bulk_min_uf", 15.0))
+    if bulk_min_uf <= 0:
+        raise RuleError(f"{rule.id}: 'bulk_min_uf' pozitif olmali (gelen {bulk_min_uf})")
+    check_bulk = bool(rule.spec.get("check_bulk", True))
+    bulk_min_f = bulk_min_uf * 1e-6
+    # TI'in bulk birimi "~10 guc topu". ceil(n/10) matematiksel olarak 1 guc
+    # pininde bile 1 bulk ister - ama kaynak bunu SOYLEMIYOR; o sayi tavan
+    # fonksiyonunun artifakti. Korpusta olculdu: esiksiz hali 19 kartin
+    # 9'unda atesliyordu (%47), esikle 2'sinde. Kaynagin konustugu yerin
+    # altina inmiyoruz - `thermal`in olculen egri disina cikmayi reddetmesiyle
+    # ayni ilke.
+    bulk_floor = int(rule.spec.get("bulk_min_power_pins", circuit.DECOUPLING_POWER_PINS_PER_BULK))
+
+    def buckets(net_name: str, near_to: list[PinRef]) -> tuple[set[str], set[str]]:
+        """(o nette 6.35 mm icindeki seramikler, nette HERHANGI bir yerdeki bulk)."""
+        ceramic: set[str] = set()
+        bulk: set[str] = set()
+        for cand in design.pins_on_net(net_name):
+            if not partner_sel.matches_component(design, cand.ref):
+                continue
+            farads = circuit.parse_value(design.value_of(cand.ref))
+            if farads is None or farads >= bulk_min_f:
+                bulk.add(cand.ref)
+                if farads is not None:
+                    continue  # kesin bulk; seramik kovasina girmez
+            if not cand.placed:
+                continue
+            if any(
+                (d := cand.distance_to(t)) is not None and d <= max_mm for t in near_to
+            ):
+                ceramic.add(cand.ref)
+        return ceramic, bulk
+
+    findings: list[Finding] = []
+    net_pins: dict[str, int] = {}       # net -> o nete bagli guc pini sayisi
+    net_refs: dict[str, set[str]] = {}  # net -> o nete bagli IC'ler
+
+    for comp in design.board.components:
+        if not select.matches_component(design, comp.ref):
+            continue
+        power_pins = [
+            p
+            for p in design.pins_of(comp.ref)
+            if pin_sel.matches_pin(design, p)
+            and p.placed
+            and p.net
+            and not rule.net_ignored(p.net)
+        ]
+        if not power_pins:
+            continue  # guc pini isaretlenmemis - sessiz (yukaridaki yanlilik 3)
+
+        ceramic: set[str] = set()
+        for net_name in {p.net for p in power_pins}:
+            on_net = [p for p in power_pins if p.net == net_name]
+            net_pins[net_name] = net_pins.get(net_name, 0) + len(on_net)
+            net_refs.setdefault(net_name, set()).add(comp.ref)
+            ceramic |= buckets(net_name, on_net)[0]
+
+        need_ceramic, _ = circuit.decoupling_counts(len(power_pins))
+        if len(ceramic) < need_ceramic:
+            nets_txt = ", ".join(sorted({p.net for p in power_pins}))
+            findings.append(
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"{comp.ref}: {len(power_pins)} guc pini ({nets_txt}) icin "
+                        f"{need_ceramic} adet seramik decoupling gerekiyor, "
+                        f"{max_mm:g} mm icinde {len(ceramic)} adet var "
+                        f"(TI SPRABV2 6: 2 guc pinine 1 x 0.1 uF)"
+                    ),
+                    refs=[comp.ref],
+                    measured=len(ceramic),
+                    limit=need_ceramic,
+                )
+            )
+
+    if check_bulk:
+        for net_name in sorted(net_pins):
+            if net_pins[net_name] < bulk_floor:
+                continue  # kaynagin birimi altinda - sessiz, uydurmuyoruz
+            _, need_bulk = circuit.decoupling_counts(net_pins[net_name])
+            have = len(buckets(net_name, [])[1])
+            if have >= need_bulk:
+                continue
+            refs = sorted(net_refs[net_name])
+            findings.append(
+                Finding(
+                    rule_id=rule.id,
+                    severity=rule.severity,
+                    message=(
+                        f"{net_name}: rayda {net_pins[net_name]} IC guc pini var "
+                        f"({', '.join(refs)}), {need_bulk} adet bulk "
+                        f"(>= {bulk_min_uf:g} uF) gerekiyor, {have} adet bulundu "
+                        f"(TI SPRABV2 6: ~10 guc pinine 1 x bulk)"
+                    ),
+                    refs=refs,
+                    measured=have,
+                    limit=need_bulk,
+                )
+            )
+
+    findings.sort(key=lambda f: (f.limit or 0) - (f.measured or 0), reverse=True)
+    return findings
+
+
+def _check_thermal(design: Design, rule: Rule) -> list[Finding]:
+    """Termal bakir alanindan jonksiyon sicakligini hesaplar (Richtek AN044).
+
+    NEDEN ESIK DEGIL HESAP: sabit bir "en az N mm2" esigi savunulamaz. Ayni
+    1 W'lik regulator 25 C ortamda ~150 mm2 ile, 70 C ortamda ~1885 mm2 ile
+    ayni jonksiyon sicakligina ulasir. Bu yuzden kural alan degil SICAKLIK
+    olcer: measured = Tj, limit = tj_max_c.
+
+    Termal pad'in secimi: aksi belirtilmedikce bilesenin EN BUYUK pad'i.
+    SOT-223, DPAK, D2PAK gibi paketlerde isiyi tasiyan tab zaten acik ara en
+    buyuk pad'dir. `thermal_pin` ile acikca verilebilir.
+
+    UC AYRI "EKSIK" AYRILIR:
+      * Beyan eksikse (power_w / ambient_c / tj_max_c) HATA - yapilandirma
+        hatasidir, sessiz gecmek kurali gorunmez bicimde etkisiz birakir.
+      * Bilesen eslesmiyorsa, termal pad'in neti yoksa ya da o nette olculebilir
+        bakir yoksa SESSIZ - dokum yapilmamis kartta yanlis alarm uretmemeli.
+      * Paketin alan bagimliligi olculmemisse (SOT-23, SO-8, DFN-8) sicaklik
+        yine hesaplanir ama bulgu "bakir ekleyin" DEMEZ; o oneriyi destekleyen
+        olcum yok.
+
+    UC BILINCLI YANLILIK, ucu de IYIMSER yonde (yani gercek kart daha
+    sicaktir):
+      1. `copper_area_mm2` ustuste binen bakiri iki kez sayar, yani alani fazla
+         tahmin eder.
+      2. Hesap tek isi kaynagi varsayar; komsu bilesenlerin isitmasi girmez.
+      3. Egri tek katli JESD51 kartinda olculdu; cok katli kartta ve termal
+         via'lar varsa gercek theta_JA daha iyi olabilir.
+    Bu yuzden bulgu bir ALT SINIRDIR ve bulgu metninde boyle yazar.
+    """
+    select = Selector(rule.spec.get("select"))
+
+    package = rule.spec.get("package")
+    if package is None:
+        raise RuleError(
+            f"{rule.id}: 'package' verilmeli; gecerli: "
+            f"{', '.join(sorted(thermal.THETA_JA_CURVES))}"
+        )
+    package = str(package).lower()
+    if package not in thermal.THETA_JA_CURVES:
+        raise RuleError(
+            f"{rule.id}: '{package}' icin olculmus theta_JA verisi yok; gecerli: "
+            f"{', '.join(sorted(thermal.THETA_JA_CURVES))}"
+        )
+
+    missing = [k for k in ("power_w", "ambient_c", "tj_max_c") if rule.spec.get(k) is None]
+    if missing:
+        raise RuleError(
+            f"{rule.id}: {', '.join(missing)} beyan edilmeli - "
+            "bu degerler tasarim dosyasinda YOKTUR, varsayilani uydurulmaz"
+        )
+    power_w = float(rule.spec["power_w"])
+    ambient_c = float(rule.spec["ambient_c"])
+    tj_max_c = float(rule.spec["tj_max_c"])
+    if power_w <= 0:
+        raise RuleError(f"{rule.id}: 'power_w' pozitif olmali (gelen {power_w})")
+    if tj_max_c <= ambient_c:
+        raise RuleError(
+            f"{rule.id}: 'tj_max_c' ({tj_max_c:g}) ortam sicakligindan "
+            f"({ambient_c:g}) buyuk olmali - aksi halde butce negatif"
+        )
+
+    thermal_pin = rule.spec.get("thermal_pin")
+    thermal_pin = str(thermal_pin) if thermal_pin is not None else None
+    sources = tuple(rule.spec.get("sources") or ("zone", "track", "pad"))
+    unknown = set(sources) - {"zone", "track", "pad"}
+    if unknown:
+        raise RuleError(f"{rule.id}: bilinmeyen 'sources' degeri: {sorted(unknown)}")
+    layer_spec = rule.spec.get("layer")
+
+    source_note = thermal.SOURCES.get(package, package)
+    findings: list[Finding] = []
+    # `thermal_pin` yazim hatasi kurali SESSIZCE etkisiz birakmasin (bkz.
+    # docstring): secilen hicbir bilesende o pad yoksa bu bir yapilandirma
+    # hatasidir. Bir bilesende bulunup digerinde bulunmamasi normaldir -
+    # heterojen bir secici (or. ^U) 2 pinli bir parcayi da kapsayabilir.
+    selected_any = False
+    thermal_pin_seen = False
+    for comp in design.board.components:
+        if not select.matches_component(design, comp.ref):
+            continue
+        selected_any = True
+
+        if thermal_pin is not None:
+            pads = [p for p in comp.pads if p.number == thermal_pin or p.function == thermal_pin]
+            if pads:
+                thermal_pin_seen = True
+        else:
+            # En buyuk pad = tab. Esitlik durumunda pad numarasi belirleyici
+            # olsun ki sonuc kartin okunma sirasindan bagimsiz olsun.
+            pads = sorted(comp.pads, key=lambda p: (-p.area_mm2, p.number))[:1]
+        pad = next((p for p in pads if p.net), None)
+        if pad is None:
+            continue  # termal pad bulunamadi ya da nete bagli degil - sessiz
+        if rule.net_ignored(pad.net):
+            continue
+
+        # Katman: pad tek bakir katmandaysa ONUN katmani. Richtek egrisi tek
+        # katli kartta olculdu; tum katmanlari toplamak, isinin via'sizca
+        # yayildigini varsaymak olurdu.
+        layer = layer_spec
+        if layer is None and len(pad.copper_layers) == 1:
+            layer = pad.copper_layers[0]
+
+        area = design.board.copper_area_mm2(pad.net, layer=layer, sources=sources)
+        if area <= 0:
+            continue  # dokum yapilmamis / yonlendirilmemis kart - sessiz
+
+        theta = thermal.theta_ja_c_per_w(package, area)
+        tj = thermal.junction_temp_c(package, area, power_w, ambient_c)
+        if tj <= tj_max_c:
+            continue
+
+        hint = ""
+        if thermal.is_area_dependent(package):
+            need = thermal.required_area_mm2(package, power_w, ambient_c, tj_max_c)
+            if need is None:
+                hint = (
+                    "; olculen en buyuk alanda bile yetmiyor - cozum bakir degil "
+                    "paket/soguturucu"
+                )
+            else:
+                hint = f"; gereken alan ~{need:.0f} mm2"
+
+        findings.append(
+            Finding(
+                rule_id=rule.id,
+                severity=rule.severity,
+                message=(
+                    f"{comp.ref} ({package}, pad {pad.number} -> {pad.net}): "
+                    f"termal bakir {area:.0f} mm2 -> theta_JA ~{theta:.0f} C/W; "
+                    f"{power_w:g} W ve {ambient_c:g} C ortamda Tj EN AZ {tj:.0f} C, "
+                    f"sinir {tj_max_c:g} C ({source_note}){hint}"
+                ),
+                refs=[comp.ref],
+                measured=round(tj, 1),
+                limit=tj_max_c,
+            )
+        )
+    if thermal_pin is not None and selected_any and not thermal_pin_seen:
+        raise RuleError(
+            f"{rule.id}: 'thermal_pin' {thermal_pin!r} secilen hicbir bilesende "
+            "yok - pad numarasi ya da pin adi olmali (or. '2'). Sessiz gecmek "
+            "kurali gorunmez bicimde etkisiz birakirdi"
+        )
+    findings.sort(key=lambda f: (f.measured or 0) - (f.limit or 0), reverse=True)
+    return findings
+
+
 def _check_copper_area(design: Design, rule: Rule) -> list[Finding]:
     """Bir netin bakir alani belirtilen araliktan cikmamali.
 
@@ -1282,8 +1586,12 @@ CHECKS: dict[str, Callable[[Design, Rule], list[Finding]]] = {
     "via_current": _check_via_current,
     "clearance_voltage": _check_clearance_voltage,
     "copper_area": _check_copper_area,
+    # termal: bakir alani -> theta_JA -> jonksiyon sicakligi
+    "thermal": _check_thermal,
     # devre dogrulugu (bilesen DEGERI)
     "component_value": _check_component_value,
+    # decoupling ADEDI (mesafe degil): TI SPRABV2
+    "decoupling_count": _check_decoupling_count,
     # alt-devre farkindalikli yerlesim (net adina DEGIL topolojiye bakar)
     "buck_layout": _check_buck_layout,
 }

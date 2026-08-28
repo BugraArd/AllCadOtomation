@@ -125,6 +125,8 @@ korunuyor (`test_scaling_only_where_the_source_is_a_formula`).
 | `keep_apart` | İki bileşen kümesi arası **minimum** mesafe | 01 §1.4, 04 §4.0 |
 | `copper_area` | Bir netin toplam bakır alanı belirtilen aralıkta mı | 01 §1.3 (ROHM), 04 §4.2 (Richtek AN044) |
 | `component_value` | Bileşen **değeri** hesaplanan aralıkta mı | 03 §3.8 (NXP UM10204), 03 §3.2 (Microchip AN826), 01 §1.4 (Richtek AN033) |
+| `thermal` | Bakır alanından hesaplanan **jonksiyon sıcaklığı** sınırın altında mı | 04 §4.2 (Richtek AN044) |
+| `decoupling_count` | IC'nin güç pini **sayısına** göre yeterli decoupling var mı | 03 §3.1 (TI SPRABV2) |
 
 `component_value`, motorun ilk **devre doğruluğu** kuralı: geometriyi değil
 devrenin kendisini yargılıyor. Hesaplar `pcbqa/circuit.py` içinde:
@@ -134,6 +136,54 @@ devrenin kendisini yargılıyor. Hesaplar `pcbqa/circuit.py` içinde:
 | `i2c_pullup` | `Rp(max) = tr/(0.8473·Cb)`, `Rp(min) = (VDD−VOL)/IOL` | NXP UM10204 §7.1 |
 | `crystal_load` | `C = 2(CL − Cstray)`, stray 2–5 pF | Microchip AN826 |
 | `fb_divider` | `R2 ≤ Vfb/(100·Ibias)` | Richtek AN033 |
+
+`thermal`, eşik yerine **hesap** koyan ikinci kural. `pcbqa/thermal.py`
+Richtek AN044'ün SOT-223 için ölçülmüş θJA eğrisini taşır (16 mm² → 135 °C/W,
+100 → 107, 2500 → 50, 3600 → 45) ve `Tj = TA + P·θJA(alan)` verir. Ara değerler
+`log10(alan)` üzerinde doğrusal — ölçülen dört nokta on yıllık bir alan
+aralığına yayılıyor ve aralarındaki eğim decade başına neredeyse sabit
+(−35, −41, −32 °C/W); doğrusal alan üzerinde ara değer almak 100–2500 arasını
+aşırı iyimser gösterirdi.
+
+Neden sabit bir "en az N mm²" eşiği **yazılmadı**: aynı 1 W'lık regülatör
+25 °C ortamda ~148 mm² ile, 70 °C ortamda ~1885 mm² ile aynı jonksiyon
+sıcaklığına ulaşır. Tek bir sayı ikisine birden uyamaz — bu yüzden bu kural
+`copper_area`'nın yorumda bırakılmış termal varyantının yerini aldı.
+
+Doğrulama, sayıyı belgeden alıp bağımsız üretiyor: 16 mm²'lik standart
+footprint'te 0.741 W, TA=25 °C'de tam olarak Tj=125 °C veriyor — AN044'ün
+kendi PD değeri.
+
+Modül **ölçülen aralığın dışına çıkmayı reddeder.** İki uçta da clamp var ve
+öneri veremeyeceği durumu açıkça söyler: SOT-223'te 85 °C ortamda 1 W için
+gereken θJA 40 °C/W'tır, ölçülen en iyi değerin (45) **altında**. O koşulda
+kural "çözüm bakır değil paket/soğutucu" der ve bir alan uydurmaz.
+
+`decoupling_count`, `hs-decoupling-mesafesi`nin **kardeşi**: o mesafe sorar
+("kondansatör yeterince yakın mı"), bu adet sorar ("yeterince kondansatör
+var mı"). 20 güç pinli bir parçanın tek kondansatörü 2 mm ötede olabilir ve
+mesafe kuralı susar; TI SPRABV2 o parça için 10 adet 0.1 µF ister.
+
+İki kova, iki farklı mesafe politikası — ayrım kaynağın kendisinden geliyor:
+
+| Kova | Sayım birimi | Mesafe | Neden |
+|---|---|---|---|
+| Seramik 0.1 µF | **IC başına** | ≤ 6.35 mm (TI SBAA113) | Yüksek frekansta ancak yakınsa iş görür |
+| Bulk ≥ 15 µF | **Net başına** | sınır **yok** | Bir rayı besler, kart genelinde paylaşılır; TI bulk için mesafe vermiyor |
+
+Bulk, `bulk_min_power_pins` (varsayılan 10) **altında hiç sorulmaz**. Sebebi
+`thermal`ınkiyle aynı ilke: `ceil(n/10)` matematiksel olarak tek güç pininde
+bile 1 bulk ister, ama TI'ın birimi "~10 güç topu"dur — o sayı kaynağın değil
+tavan fonksiyonunun ürünü. Korpusta ölçüldü: eşiksiz hâli 19 kartın 9'unda
+ateşliyordu (%47), eşikle 2'sinde (%11). Kalan iki bulgu da sağlam:
+29 güç pinli bir 3.3 V rayında 2 bulk (3 gerekiyor) ve 63 güç pinli bir 5 V
+rayında 2 bulk (7 gerekiyor).
+
+Ölçülmüş sınır: `jetson-agx-thor-baseboard` değer alanına `C_100n_0402`
+yazıyor. `parse_value` bunu çözemediği için kondansatör **her iki kovaya** da
+sayılıyor ve o kartta bulk denetimi seramiklerle dolup etkisiz kalıyor. Bu
+bilinçli: çözülemeyeni yalnızca seramiğe saymak, gerçek bir bulk kondansatörünü
+yok sayıp uydurma bir eksik üretirdi — yani yanlılık yön değiştirirdi.
 
 Formüller kaynağın kendi sonucunu bağımsız olarak üretiyor: 400 pF fast-mode'da
 `Rp(min)` = 967 Ω > `Rp(max)` = 885 Ω çıkıyor — yani düz dirençle çözüm yok.

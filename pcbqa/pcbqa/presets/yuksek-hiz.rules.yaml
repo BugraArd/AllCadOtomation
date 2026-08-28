@@ -35,6 +35,35 @@ rules:
     require_partner: true
     exclusive: true
 
+  # Mesafe kurali "yeterince YAKIN mi" sorar, "yeterince VAR MI" sormaz.
+  # 20 guc pinli bir parcanin tek kondansatoru 2 mm otede olabilir ve yukaridaki
+  # kural susar. TI SPRABV2 6 adet ister: 2 guc pinine 1 x 0.1 uF, ~10 guc
+  # pinine 1 x bulk. Iki kural birbirini tamamlar; ayni kartta ikisi de
+  # ateslerse sebep farklidir.
+  #
+  # ignore_nets (yukarida GND/AGND/DGND) burada KRITIKTIR: toprak pinleri de
+  # pintype power_in tasir ve sayilsalardi gereken adet iki katina cikardi.
+  # TI guc TOPLARINI sayiyor, topragi degil.
+  - id: hs-decoupling-adedi
+    type: decoupling_count
+    severity: warning
+    description: "IC'nin guc pini sayisina gore yeterli decoupling olmali (TI SPRABV2 6)"
+    weight: 10   # TI SPRABV2: sayisal app-note (8-16 bandi). Seramik orani
+                 # kesin, bulk orani TI'in kendi "~" hedge'ini tasiyor -> bandin
+                 # alt yarisi. scale YOK: bu bir ORAN degil tavan fonksiyonu
+                 # (ceil), surekli bir formul degil; Faz 1c ilkesi geregi
+                 # yalnizca formuller olceklenir.
+    select:
+      kind: ic
+    max_distance_mm: 6.35   # seramik icin; TI SBAA113 (yukaridakiyle ayni)
+    bulk_min_uf: 15.0       # TI SPRABV2 6: bulk >= 15 uF
+    # Bulk NET basina sorulur (ray paylasilir), seramik IC basina.
+    # bulk_min_power_pins: 10   # TI'in birimi "~10 guc topu". Bunun ALTINDA
+                 # bulk hic sorulmaz: ceil(n/10) tek pinde bile 1 bulk isterdi
+                 # ve o sayi kaynagin degil tavan fonksiyonunun urunu. Korpusta
+                 # olculdu: esiksiz %47 atesliyordu, esikle %11.
+    # check_bulk: false     # bulk'u kart genelinde yonetiyorsaniz kapatin
+
   # --- Kristal ------------------------------------------------------------
   # Kristal -> MCU mesafesi icin sayisal esik BULUNAMADI, o yuzden burada
   # kural yok. Bunun yerine kaynakli olan ayrim kurallari var:

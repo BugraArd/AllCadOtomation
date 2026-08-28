@@ -113,8 +113,10 @@ Katmanlar (her katman yalnızca altındakini bilir):
 1. **Ayrıştırma** — `sexpr.py` (bağımlılıksız s-expression), `pcb.py`
    (`.kicad_pcb`: bileşen, pad, iz, via), `schematic.py`, `netlist.py`
 2. **Model** — `model.py` (`Design`, `PinRef`), `geom.py`. **KiCad'i bilmez.**
-3. **Kurallar** — `rules.py` (11 kural tipi, YAML), `ipc2221.py` (IPC-2221B
-   hesapları), `presets/` (kaynaklı eşik kütüphanesi)
+3. **Kurallar** — `rules.py` (16 kural tipi, YAML), `ipc2221.py` (IPC-2221B
+   hesapları), `circuit.py` (bileşen değeri hesapları), `thermal.py`
+   (θJA eğrisi → jonksiyon sıcaklığı), `subcircuit.py` (topolojiden regülatör
+   tanıma), `presets/` (kaynaklı eşik kütüphanesi)
 4. **Yerleştirme** — `placement/` (`auto` üretim yerleştiricisi)
 5. **Yazma** — `ipc_apply.py` (IPC), `sch_*.py`, `pcb_sync.py`
 6. **ML** — `ml/` (model karar vermez, hamle sırası önerir)

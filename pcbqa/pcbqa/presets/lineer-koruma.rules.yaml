@@ -147,28 +147,47 @@ rules:
       kind: inductor
     min_distance_mm: 10.0
 
-  # --- Termal bakir alani (KAPALI - beyan gerektirir) -----------------------
-  # Richtek AN044, SOT-223 icin OLCULMUS theta-JA egrisi:
-  #    16 mm2 -> 135 C/W | 100 mm2 -> 107 C/W | 2500 mm2 -> 50 C/W
+  # --- Termal: jonksiyon sicakligi (KAPALI - beyan gerektirir) -------------
+  # `thermal` kurali esik degil HESAP kullanir (pcbqa/thermal.py):
+  #    bakir alani -> theta_JA -> Tj = TA + P * theta_JA
   #
-  # HESAP (dokuman 4.2): TA=25 C ve TJ<=125 C ise 1 W icin ~1.2-1.5 cm2 yeter;
-  # ama TA=70 C'de ayni 1 W icin ~20-22 cm2 gerekir. Yani esik ORTAMA ve GUC
-  # DISSIPASYONUNA baglidir ve ikisi de tasarim dosyasinda yoktur.
+  # Richtek AN044, SOT-223 icin OLCULMUS egri (JESD51, tek kat):
+  #    16 mm2 -> 135 C/W | 100 -> 107 | 2500 -> 50 | 3600 -> 45
   #
-  # Bu yuzden kural KAPALI: min_mm2'yi uydurmak yanlis guven verirdi. Kendi
-  # tasariminizin dissipasyonunu hesaplayip acin.
+  # Neden sabit bir "en az N mm2" esigi VERILMEDI: ayni 1 W'lik regulator
+  # 25 C ortamda ~148 mm2 ile, 70 C ortamda ~1885 mm2 ile ayni jonksiyon
+  # sicakligina ulasir. Tek bir sayi ikisine birden uyamaz.
   #
-  # DIKKAT: alan olcumu FAZLA TAHMINDIR (ustuste binen bakir iki kez sayilir).
-  # Ust sinirda bu guvenli yondedir ama ALT sinirda DEGILDIR - yetersiz bakiri
-  # yeterli gosterebilir. Buraya pay birakin.
+  # Kurali burada ACIK BIRAKAMAYIZ cunku power_w / ambient_c / tj_max_c
+  # tasarim dosyasinda YOKTUR; beyan edilmeden kural hata verir (bilincli -
+  # sessiz gecmek kurali gorunmez bicimde etkisiz birakirdi). Kendi
+  # tasariminizin dissipasyonunu hesaplayip asagidakini kopyalayin.
   #
-  # - id: termal-bakir-alani
-  #   type: copper_area
+  # UC BILINCLI YANLILIK, ucu de IYIMSER (gercek kart daha sicaktir):
+  #   1. Alan olcumu FAZLA TAHMINDIR - ustuste binen bakir iki kez sayilir.
+  #   2. Hesap tek isi kaynagi varsayar; komsu bilesenlerin isitmasi girmez.
+  #   3. Egri tek katli JESD51 kartinda olculdu; termal via'lariniz varsa
+  #      gercek theta_JA daha iyi olabilir (bu yonde muhafazakar degiliz).
+  # Bu yuzden bulgu "Tj EN AZ ..." der. Paya ihtiyaciniz var.
+  #
+  # OLCULEN SINIR: SOT-223'te 85 C ortamda 1 W, olculen en buyuk alanda
+  # (3600 mm2, 45 C/W) bile Tj=130 C verir. O kosulda kural "cozum bakir
+  # degil paket/soguturucu" der ve alan ONERMEZ - cunku oneriyi destekleyen
+  # olcum yok.
+  #
+  # - id: regulator-jonksiyon-sicakligi
+  #   type: thermal
   #   severity: warning
-  #   description: "Regulator cikisinda termal bakir alani yeterli olmali (Richtek AN044)"
-  #   weight: 10
-  #   net: "^(VOUT|VO|3V3|5V)$"
-  #   min_mm2: 2000        # ~20 cm2: 1 W @ TA=70 C, TJ<=125 C
+  #   description: "Regulatorun jonksiyon sicakligi sinirin altinda kalmali (Richtek AN044)"
+  #   weight: 14           # olculmus egri; kanit sinifi "olculmus" (16-24) alt ucu
+  #   scale: true          # 5 C asim ile 60 C asim ayni cezayi yememeli
+  #   select:
+  #     ref: "^(U|VR|IC)"
+  #   package: sot223      # gecerli: sot223 | sot23 | so8 | dfn8
+  #   power_w: 1.0         # BEYAN: (Vin - Vout) * Iout
+  #   ambient_c: 70.0      # BEYAN: muhafaza ici sicaklik, oda degil
+  #   tj_max_c: 125.0      # BEYAN: datasheet mutlak sinir; pay icin 110 alin
+  #   # thermal_pin: "2"   # verilmezse EN BUYUK pad (tab) secilir
 
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER

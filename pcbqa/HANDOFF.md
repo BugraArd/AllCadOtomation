@@ -1915,7 +1915,7 @@ teste yazıldı.
   çağırıp çıktısını bizim bakır kurallarımızla denetlemek.
 - **`learned` hâlâ `auto`yu geçmiyor** — bu kez gerçekten ölçüldü (§21.11).
 
-### 21.11 ML ölçümü ve içinden çıkan sessiz hata
+### 21.10 ML ölçümü ve içinden çıkan sessiz hata
 
 Skor zenginleştiği için `learned` vs `auto` ölçümü tekrarlandı. **Sonuç
 değişmedi** — ama yol boyunca iki hipotez çürüdü ve bir hata bulundu.
@@ -1955,7 +1955,7 @@ Gerçek ölçüm (model yüklenmiş, `ModelRanker` 8 s'de 31 kez çağrılıyor)
 `vme-wren` 86.7=86.7. HANDOFF §11'in sonucu **doğru çıktı**, ama artık
 artefaktla değil gerçek ölçümle destekleniyor.
 
-### 21.12 İki performans/anlam düzeltmesi
+### 21.11 İki performans/anlam düzeltmesi
 
 **1) Yerleştirme yönlendirmeyi geçersiz kılar — ama etmiyordu.**
 `apply_placement` yalnızca bileşenleri taşıyordu; izler, via'lar ve dökümler
@@ -1971,7 +1971,102 @@ büyükse gerçek şekil mesafesi de büyüktür, yani atlamak **güvenli**.
 *kendisi* olduğunu gösterdi (81 bin kutu karşılaştırması, yalnızca 2.3 bin
 gerçek şekil hesabı) — yani filtre işini yapıyor.
 
-### 21.10 Testler
+### 21.12 Termal: eşik yerine hesap
 
-`python -m unittest discover -s tests` → **418 test**, hepsi geçiyor
+`copper_area`'nın termal varyantı ön ayarda **yorum satırında** duruyordu ve
+sebebi haklıydı: sabit bir "en az N mm²" eşiği savunulamaz. Aynı 1 W'lık
+regülatör 25 °C ortamda ~148 mm² ile, 70 °C ortamda ~1885 mm² ile aynı
+jonksiyon sıcaklığına ulaşır. Tek bir sayı ikisine birden uyamaz.
+
+Çözüm eşiği düzeltmek değil, **eşiği kaldırmak** oldu. `pcbqa/thermal.py`
+Richtek AN044'ün SOT-223 için ölçülmüş θJA eğrisini taşıyor (16 mm² → 135 °C/W,
+100 → 107, 2500 → 50, 3600 → 45) ve yeni `thermal` kuralı `Tj = TA + P·θJA`
+hesaplıyor. `measured` artık **sıcaklık**, `limit` ise `tj_max_c`.
+
+Ara değerler `log10(alan)` üzerinde doğrusal: dört nokta on yıllık bir alan
+aralığına yayılıyor ve aralarındaki eğim decade başına neredeyse sabit
+(−35, −41, −32 °C/W). Doğrusal alan üzerinde ara değer almak 100–2500 arasını
+aşırı iyimser gösterirdi. Eğri ölçülen noktalardan **tam** geçiyor; yeni bir
+fonksiyon uydurulmadı.
+
+Bağımsız doğrulama: 16 mm²'lik standart footprint'te 0.741 W, TA=25 °C'de tam
+olarak Tj=125 °C veriyor — AN044'ün kendi PD değeri. Belgedeki iki serbest
+hesap da tutuyor: 1 W @ 25 °C → 148 mm² (belge "~120–150"), 1 W @ 70 °C →
+1885 mm² (belge "~2000–2200", elle okuma).
+
+**Modül ölçülen aralığın dışına çıkmayı reddediyor.** SOT-223'te 85 °C ortamda
+1 W için gereken θJA 40 °C/W'tır — ölçülen en iyi değerin (3600 mm²'de 45)
+*altında*. Kural o koşulda "çözüm bakır değil paket/soğutucu" der ve bir alan
+**önermez**; öneriyi destekleyen ölçüm yok. Aynı sebeple SOT-23 / SO-8 / DFN-8
+tek noktalı verilerle (MaxLinear ANP-02) tutuluyor ama onlarda kural asla
+"bakır ekleyin" demiyor — alan bağımlılıkları ölçülmemiş.
+
+**Termal pad seçimi** beyan gerektirmiyor: bileşenin en büyük pad'i alınıyor.
+SOT-223, DPAK, D2PAK gibi paketlerde ısıyı taşıyan tab zaten açık ara en büyük
+pad. Gerçek kartta doğrulandı — `tiny_tapeout` demosundaki TLV1117LV33'ün
+tab'ı (pin 2 → +3V3, 101 mm²) söylenmeden bulunuyor.
+
+Tersi de doğrulandı: `pic_programmer`'ın 7805'inde (TO-220 tabdown) en büyük
+pad tab'dır ama **netliste bağlı değildir**. Termal yol tanımsız, kural susuyor.
+İkinci büyük pad'e düşmek yanlış olurdu — o VI pini.
+
+Üç bilinçli yanlılık, üçü de **iyimser** yönde, yani gerçek kart daha sıcaktır:
+alan ölçümü üst üste binen bakırı iki kez sayar; hesap tek ısı kaynağı varsayar;
+eğri tek katlı JESD51 kartında ölçüldü. Bu yüzden bulgu "Tj **EN AZ** …" diyor.
+
+Kural ön ayarda yine **kapalı** — ama artık sebebi farklı: `power_w`,
+`ambient_c`, `tj_max_c` tasarım dosyasında yoktur ve beyan edilmeden kural
+hata verir. Bu bilinçli: sessizce geçmek kuralı görünmez biçimde etkisiz
+bırakırdı (bkz. §21.6, §21.10 — bu projede aynı hata iki kez oldu).
+
+### 21.13 Decoupling: mesafe değil ADET
+
+`circuit.decoupling_counts()` (TI SPRABV2) yazılmış ve test edilmişti ama
+**hiçbir kural onu çağırmıyordu** — grep ile doğrulandı. Yol haritasının Evre 2
+tablosundaki son doldurulmamış satır buydu ve bu projede aynı sınıf hata
+üçüncü kez ortaya çıktı (bkz. §21.6 pin adları, §21.10 bayat model yolu):
+yazılmış ama bağlanmamış kod sessizce etkisizdir.
+
+Yeni kural `decoupling_count`, `hs-decoupling-mesafesi`nin kardeşi. O mesafe
+sorar, bu adet sorar. Aradaki fark somut: 20 güç pinli bir parçanın tek
+kondansatörü 2 mm ötede olabilir — mesafe kuralı **susar**, TI ise 10 adet
+ister.
+
+**Seramik IC başına, bulk NET başına.** Ayrım kaynaktan geliyor: seramik
+yüksek frekansta çalışır ve ancak yakınsa (6.35 mm, TI SBAA113) iş görür, yani
+her yongaya kendi kondansatörü gerekir; bulk bir *rayı* besler, kart genelinde
+paylaşılır ve TI onun için mesafe **vermez** — biz de aramıyoruz. İlk sürüm
+bulk'u IC başına sayıyordu ve aynı ray üzerindeki üç yonga için aynı eksiği üç
+kez bildiriyordu.
+
+**Kaynağın birimi altına inilmedi.** `ceil(n/10)` matematiksel olarak tek güç
+pininde bile 1 bulk ister, ama TI'ın birimi "~10 güç topu"dur; o sayı kaynağın
+değil tavan fonksiyonunun ürünü. Korpus bunu sayısallaştırdı: eşiksiz hâl
+19 kartın 9'unda ateşliyordu (%47) — 1d'nin "çoğunlukta ateşleyen kural
+şüphelidir" ölçütünü ihlal ediyordu. `bulk_min_power_pins: 10` ile %11'e
+düştü ve kalan iki bulgu da sağlam çıktı: kit-dev-coldfire'ın 29 güç pinli
+3.3 V rayında 2 bulk var, 3 gerekiyor; video'nun 63 güç pinli 5 V rayında
+2 var, 7 gerekiyor. Bu, `thermal`ın ölçülen eğri dışına çıkmayı reddetmesiyle
+aynı ilke.
+
+**Çözülemeyen değer her iki kovaya sayılır.** İlk sürüm yalnızca seramiğe
+sayıyordu; pic_programmer'ın `22uF/25V` yazan C3'ü bunu çürüttü — gerçek bir
+bulk kondansatörü, ayrıştırılamıyor, ve yalnızca seramiğe sayılsaydı **uydurma
+bir bulk eksiği** üretirdi. Yani yanlılık yön değiştiriyordu. Şimdi üç
+yanlılığın üçü de iyimser.
+
+Bunun ölçülmüş bedeli var ve gizlenmiyor: `jetson-agx-thor-baseboard` değer
+alanına `C_100n_0402` yazıyor — 100 nF seramikler bulk sayılıyor ve o kartta
+bulk denetimi etkisiz kalıyor. Alternatif (değer alanından paket adı
+ayrıştırmak) yanlış tahminde gerçek bulk'u yok sayardı.
+
+Toprak pinleri `ignore_nets` ile eleniyor: `GND` de `power_in` taşır ve
+sayılsaydı gereken adet **iki katına** çıkardı. TI güç *toplarını* sayıyor.
+
+`uretim` ön ayarı etkilenmedi — kural `yuksek-hiz`e eklendi ve 1d kalibrasyonu
+birebir aynı: medyan 95.9, çeyrekler 80.7/95.9/100.0.
+
+### 21.14 Testler
+
+`python -m unittest discover -s tests` → **459 test**, hepsi geçiyor
 (oturum başında 214). KiCad demolarına bağlı testler kurulum yoksa atlanır.
