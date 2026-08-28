@@ -17,7 +17,12 @@ from pathlib import Path
 
 from pcbqa.harness import evaluate_design, load_design
 from pcbqa.rules import CHECKS, Rule, RuleError, load_rules
-from pcbqa.subcircuit import find_buck_converters, normalize_pin_name
+from pcbqa.subcircuit import (
+    find_buck_converters,
+    hot_loop_area_mm2,
+    hot_loop_polygon,
+    normalize_pin_name,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 DEMOS = Path(r"C:\Program Files\KiCad\10.0\share\kicad\demos")
@@ -232,6 +237,75 @@ class BuckPresetTests(unittest.TestCase):
         rules = load_rules(PRESET)
         ev = evaluate_design(load_design(BENCH), rules)
         self.assertEqual([f for f in ev.findings if f.severity != "info"], [])
+
+
+@unittest.skipUnless(demos_available(), "KiCad demolari kurulu degil")
+class HotLoopTests(unittest.TestCase):
+    """Giris sicak dongusu - projedeki EN GUCLU sayisal kanit.
+
+    TI AN-2155 bunu gercekten OLCTU: 6 mm2'de CISPR-22 Class B marji 8.3 dB,
+    18 mm2'de 6.7 dB. Uzun sure "olculemez" diye isaretliydi cunku dongu tek
+    bir netin alani degil.
+
+    Cozum ENTEGRE regulatorlerde geliyor: her iki anahtar da IC icinde, yani
+    akim IC'ye VIN'den girip GND'den cikiyor. Dongu su dortgen:
+        CIN.VIN -> IC.VIN -> IC.GND -> CIN.GND
+    Anahtarlarin IC ICI baglantisini bilmeye gerek yok.
+    """
+
+    def bucks(self, board_name: str):
+        design = load_design(find_demo(board_name))
+        return design, {b.ic: b for b in find_buck_converters(design)}
+
+    def test_professional_boards_are_well_under_the_measured_limit(self):
+        """Olculdu: 0.73 / 0.85 / 1.13 mm2 - TI'in "iyi" degeri 6 mm2.
+
+        Kalibrasyon ilkesi: profesyonel kartlar iyi skor almali. Alsalar da
+        almasalar da OLCUMUN kendisi burada sinanmis oluyor - 100 mm2 gibi
+        sacma bir sonuc cikarsa test kirilir.
+        """
+        for board, ic in (
+            ("CM5_MINIMA_3.kicad_pcb", "U702"),
+            ("One-Air-Max.kicad_pcb", "U2"),
+            ("jetson-agx-thor-baseboard.kicad_pcb", "U69"),
+        ):
+            with self.subTest(board=board):
+                design, found = self.bucks(board)
+                area = hot_loop_area_mm2(design, found[ic])
+                self.assertIsNotNone(area, "dongu olculemedi")
+                self.assertGreater(area, 0.0)
+                self.assertLess(area, 6.0, "TI'in 'iyi' esiginin ustunde")
+
+    def test_loop_is_a_quadrilateral_of_four_real_pads(self):
+        design, found = self.bucks("CM5_MINIMA_3.kicad_pcb")
+        result = hot_loop_polygon(design, found["U702"])
+        self.assertIsNotNone(result)
+        poly, cap = result
+        self.assertEqual(len(poly), 4)
+        self.assertIn(cap, found["U702"].cin)
+
+    def test_unmeasurable_when_a_role_is_missing(self):
+        """Buck-boost'ta CIN tanınmiyor - iddia etmek yerine None donmeli."""
+        design, found = self.bucks("One-Air-Max.kicad_pcb")
+        self.assertIsNone(hot_loop_area_mm2(design, found["U5"]))
+
+    def test_rule_threshold_fires_when_tightened(self):
+        """Esik gercek degerin altina cekilince kural ateslemeli."""
+        design, found = self.bucks("CM5_MINIMA_3.kicad_pcb")
+        area = hot_loop_area_mm2(design, found["U702"])
+        loose = CHECKS["buck_layout"](
+            design,
+            Rule(id="t", type="buck_layout", severity="warning",
+                 spec={"hot_loop_max_mm2": area * 2}),
+        )
+        tight = CHECKS["buck_layout"](
+            design,
+            Rule(id="t", type="buck_layout", severity="warning",
+                 spec={"hot_loop_max_mm2": area / 2}),
+        )
+        self.assertEqual(loose, [])
+        self.assertTrue(tight)
+        self.assertIn("sicak dongu", tight[0].message)
 
 
 if __name__ == "__main__":

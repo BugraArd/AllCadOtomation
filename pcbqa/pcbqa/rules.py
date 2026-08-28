@@ -742,6 +742,7 @@ def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
         "fb_max_mm": rule.spec.get("fb_max_mm"),
         "fb_inductor_min_mm": rule.spec.get("fb_inductor_min_mm"),
         "sw_area_max_mm2": rule.spec.get("sw_area_max_mm2"),
+        "hot_loop_max_mm2": rule.spec.get("hot_loop_max_mm2"),
     }
     if all(v is None for v in limits.values()):
         raise RuleError(
@@ -866,6 +867,22 @@ def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
                     area,
                     limit,
                 )
+
+        # TI AN-2155'in OLCTUGU buyukluk: 6 mm2 iyi, 18 mm2 kotu
+        limit = limits["hot_loop_max_mm2"]
+        if limit is not None:
+            loop = subcircuit.hot_loop_polygon(design, buck)
+            if loop is not None:
+                poly, cap = loop
+                area = geom.area(poly)
+                if area > float(limit):
+                    add(
+                        f"{tag}: giris sicak dongusu {area:.1f} mm2 "
+                        f"({cap} uzerinden; TI AN-2155: <= {float(limit):g} mm2)",
+                        [buck.ic, cap],
+                        area,
+                        limit,
+                    )
 
     return findings
 

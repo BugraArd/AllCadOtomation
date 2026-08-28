@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from . import geom
 from .model import Design
 
 # Pin ADI desenleri. Kismi eslesme bilincli: gercek parcalarda pin adi
@@ -29,6 +30,7 @@ _SW = re.compile(r"^(SW|PH|LX|VSW|PHASE)\b|^SW\d*$", re.IGNORECASE)
 _FB = re.compile(r"^(FB|VFB|VSENSE|ADJ)", re.IGNORECASE)
 _VIN = re.compile(r"^(VIN|PVIN|VCC|VDD)\b|^P?VIN\d*$", re.IGNORECASE)
 _BOOT = re.compile(r"^(BOOT|BST|CB)\b", re.IGNORECASE)
+_GND = re.compile(r"^(GND|PGND|AGND|VSS|EP|PAD|THERMAL)\b", re.IGNORECASE)
 
 
 # KiCad sembollerinde pin adi BICIMLEME isaretlemesi tasiyabilir:
@@ -62,6 +64,7 @@ class BuckConverter:
     # "buck" ya da "buck-boost". Ikincisinde induktor IKI anahtarlama dugumu
     # arasindadir ve `out_net` bu yolla belirlenemez.
     topology: str = "buck"
+    gnd_net: str | None = None
     cin: list[str] = field(default_factory=list)
     cout: list[str] = field(default_factory=list)
     fb_resistors: list[str] = field(default_factory=list)
@@ -136,6 +139,7 @@ def find_buck_converters(design: Design) -> list[BuckConverter]:
         buck.vin_net = _first_net(pins, _VIN)
         buck.fb_net = _first_net(pins, _FB)
         buck.boot_net = _first_net(pins, _BOOT)
+        buck.gnd_net = _first_net(pins, _GND)
 
         # Cikis: induktorun SW olmayan ucu.
         #
@@ -160,6 +164,62 @@ def find_buck_converters(design: Design) -> list[BuckConverter]:
         found.append(buck)
 
     return found
+
+
+def _pad_xy(design: Design, ref: str, net: str | None):
+    """Bir bilesenin belirli bir netteki pad'inin konumu."""
+    if not net:
+        return None
+    for pin in design.pins_on_net(net):
+        if pin.ref == ref and pin.placed:
+            return (pin.x, pin.y)
+    return None
+
+
+def hot_loop_polygon(design: Design, buck: BuckConverter):
+    """Giris sicak dongusunun cevreledigi dortgen - ya da None.
+
+    TI AN-2155 bu alani OLCTU: 6 mm2'de SW spike 2.5 V ve CISPR-22 Class B
+    marji 8.3 dB; 18 mm2'de 6.1 V ve 6.7 dB. Projedeki en guclu sayisal kanit.
+
+    ENTEGRE regulatorlerde (her iki anahtar da IC icinde) dongu sudur:
+
+        CIN.VIN  ->  IC.VIN  ->  IC.GND  ->  CIN.GND  ->  (CIN icinden geri)
+
+    Dort pad'in cevreledigi dortgen. Anahtarlarin IC ICI baglantisini bilmeye
+    gerek yok; akim IC'ye VIN'den girip GND'den cikiyor.
+
+    AYRIK tasarimlarda (harici FET'ler) bu YANLIS olur - orada dongu FET'lerin
+    uzerinden geciyor. `find_buck_converters` harici FET'leri tanimadigi icin
+    boyle bir kart zaten "entegre" gibi gorunur; bu bilinen sinir.
+
+    En KUCUK dongulu giris kondansatoru secilir: AC akimi tasiyan odur
+    (Richtek AN045 "en kucuk paket en yakina" der).
+    """
+    if not (buck.vin_net and buck.gnd_net and buck.cin):
+        return None
+    ic_vin = _pad_xy(design, buck.ic, buck.vin_net)
+    ic_gnd = _pad_xy(design, buck.ic, buck.gnd_net)
+    if ic_vin is None or ic_gnd is None:
+        return None
+
+    best = None
+    for ref in buck.cin:
+        cap_vin = _pad_xy(design, ref, buck.vin_net)
+        cap_gnd = _pad_xy(design, ref, buck.gnd_net)
+        if cap_vin is None or cap_gnd is None:
+            continue
+        poly = [ic_vin, cap_vin, cap_gnd, ic_gnd]
+        area = geom.area(poly)
+        if best is None or area < best[0]:
+            best = (area, ref, poly)
+    return None if best is None else (best[2], best[1])
+
+
+def hot_loop_area_mm2(design: Design, buck: BuckConverter) -> float | None:
+    """Sicak dongu alani (mm2) - olculemiyorsa None."""
+    result = hot_loop_polygon(design, buck)
+    return None if result is None else geom.area(result[0])
 
 
 # ad -> bulucu. Ileride boost/LDO eklenirse buraya girer.

@@ -42,6 +42,21 @@ rules:
     fb_max_mm: 4.0         # #4-2: FB bolucu FB pinine <= 4 mm
     sw_area_max_mm2: 100   # Oncelik 2: SW bakir alani <= 100 mm2
     #
+    # Giris sicak dongusu - projedeki EN GUCLU sayisal kanit. TI AN-2155 bunu
+    # gercekten OLCTU (LM3102, 1 MHz, 12V->3.3V/2.5A, CISPR-22 Class B, 3 m):
+    #     6 mm2  -> SW spike 2.5 V, Class B marji 8.3 dB
+    #    12 mm2  -> 4.2 V, 7.8 dB
+    #    18 mm2  -> 6.1 V, 6.7 dB
+    # Esik 6 mm2: TI'in "iyi" konfigurasyonu. Olculdu - uc gercek kart da
+    # rahatca geciyor (0.73 / 0.85 / 1.13 mm2), cunku modern entegre
+    # regulatorlerde kondansator IC'ye bitisik.
+    #
+    # Dongu ENTEGRE regulator varsayar: CIN.VIN -> IC.VIN -> IC.GND -> CIN.GND.
+    # Harici FET'li ayrik tasarimlarda dongu FET'lerin uzerinden gecer ve bu
+    # olcum yanlis olur; tanima harici FET'i gormedigi icin oyle bir kart
+    # "entegre" gibi gorunur. Bilinen sinir.
+    hot_loop_max_mm2: 6.0
+    #
     # fb_inductor_min_mm BILEREK VERILMEDI. ROHM #4-1 "FB izi induktorden
     # >= 10 mm" diyor ama bu, AYNI LISTEDEKI diger iki esikle CELISIYOR:
     #
@@ -129,10 +144,12 @@ rules:
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER (arastirmada sayisal degeri var, kural yok)
 #
-#   - Sicak dongu ALANI (TI AN-2155: 6 mm2 iyi, 18 mm2 kotu). Zone okuma ve
-#     alt-devre tanima EKLENDI ama bu hala olculemiyor: dongu alani tek bir
-#     netin alani degil, CIN -> high-side -> low-side -> CIN yolunun
-#     CEVRELEDIGI alan. Anahtarlarin IC ICI baglantisini bilmek gerekiyor.
+#   - Sicak dongu alani AYRIK tasarimlarda (harici FET'ler). Entegre
+#     regulatorlerde olculuyor (hot_loop_max_mm2) cunku akim IC'ye VIN'den
+#     girip GND'den cikiyor ve anahtarlarin IC ICI baglantisini bilmeye gerek
+#     kalmiyor. Harici FET'li tasarimda dongu FET'lerin uzerinden gecer;
+#     tanima harici FET'i gormedigi icin oyle bir kart yanlislikla "entegre"
+#     sayilir ve olcum yanlis olur.
 #   - Induktor altinda bakir olmamasi (ROHM, >= 3 mm temizlik). Zone poligonu
 #     ile bilesen courtyard'inin KESISIMI gerekir; copper_area yalnizca toplam
 #     alani olcer, nerede oldugunu degil.
