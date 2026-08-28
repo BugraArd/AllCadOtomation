@@ -1913,10 +1913,65 @@ teste yazıldı.
   Bead: `Kicad-*` (akım yolu topolojisi).
 - **Yönlendirme** kapsam dışı; gerçekçi yol dış bir otomatik yönlendiriciyi
   çağırıp çıktısını bizim bakır kurallarımızla denetlemek.
-- **`learned` hâlâ `auto`yu geçmiyor.** Skor zenginleşti; bu ölçüm tekrar
-  yapılmalı — henüz yapılmadı.
+- **`learned` hâlâ `auto`yu geçmiyor** — bu kez gerçekten ölçüldü (§21.11).
+
+### 21.11 ML ölçümü ve içinden çıkan sessiz hata
+
+Skor zenginleştiği için `learned` vs `auto` ölçümü tekrarlandı. **Sonuç
+değişmedi** — ama yol boyunca iki hipotez çürüdü ve bir hata bulundu.
+
+**Çürüyen hipotez 1:** "Skor zenginleşince `auto` zorlanır, o zaman sıralamanın
+değeri artar." Hayır — zenginleşen skor `auto`yu zorlamadı, **taktı**: zengin
+kural kümesiyle `pic_programmer`da sıfır bileşen oynadı. Ve nedeni gradyan
+değil **maliyet**ti: `clearance_voltage` tek başına değerlendirmeyi 8.9 ms'den
+467 ms'ye çıkarıyordu, 8 s'lik bütçe ~900 denemeden ~17'ye düşüyordu.
+
+Bu, iki gerçek düzeltmeye yol açtı (§21.12).
+
+**Çürüyen hipotez 2:** "`learned`in değeri, değerlendirmenin pahalı olduğu büyük
+kartlarda görünür." Hayır. `vme-wren`de (1508 bileşen) tek ölçüm **2983 ms**;
+45 s bütçede ~15 deneme kalıyor ve o kadar denemede ne `auto` ne `learned` bir
+şey yapabiliyor.
+
+**Bulunan sessiz hata:** `learned`in `DEFAULT_MODEL_PATH`'i `move-v2.json`
+diyordu; diskteki tek model `move-v3.json`. Model bulunamayınca sınıf —
+belgelendiği gibi — sessizce `auto` gibi davranıyor. Yani **Faz C'den beri
+`learned` hiçbir model kullanmıyordu.**
+
+Fark edilmemesinin sebebi öğretici: beklenen sonuç zaten "learned ≈ auto"
+olduğu için **hata kendi kamuflajını yaptı.** Bu oturumda ölçümü üç kez yapıp
+üçünde de `+0.0` gördüm ve her seferinde "demek ki sıralamanın değeri yok" diye
+yorumladım. Dördüncüde "birebir *aynı* olması şüpheli" deyip modele baktım.
+
+> Beklediğin sonucu doğrulayan bir ölçüm, ölçümün kendisinin bozuk olduğunu
+> gizleyebilir. "Sonuç beklendiği gibi çıktı" bir doğrulama değil, bir uyarıdır.
+
+Düzeltme: yol artık öznitelik **sürümünden** türetiliyor
+(`move-v{FEATURE_VERSION}.json`). Şema değişince yol da değişir ve model
+eğitilmemişse boşluk sessiz değil görünür olur.
+
+Gerçek ölçüm (model yüklenmiş, `ModelRanker` 8 s'de 31 kez çağrılıyor):
+`bench_bad` 16.5=16.5 · `pic_programmer` 3.0=3.0 · `jetson` 64.3=64.3 ·
+`vme-wren` 86.7=86.7. HANDOFF §11'in sonucu **doğru çıktı**, ama artık
+artefaktla değil gerçek ölçümle destekleniyor.
+
+### 21.12 İki performans/anlam düzeltmesi
+
+**1) Yerleştirme yönlendirmeyi geçersiz kılar — ama etmiyordu.**
+`apply_placement` yalnızca bileşenleri taşıyordu; izler, via'lar ve dökümler
+yerinde kalıyordu. Yani bakır kuralları **taşınmış pad'lerle sabit izleri**
+karşılaştırıyordu — fiziksel olarak anlamsız. Artık bir bileşen gerçekten
+oynadıysa bakır temizleniyor ve kart "yönlendirilmemiş" duruma düşüyor; bakır
+kuralları zaten "iz yoksa sessizce atla" diye yazılmıştı.
+
+**2) `clearance_voltage` 6.2× hızlandı.** Sınır kutusu ön filtresi: kutular
+şişme yarıçapı kadar büyütülür; iki kutu arasındaki mesafe gereken açıklıktan
+büyükse gerçek şekil mesafesi de büyüktür, yani atlamak **güvenli**.
+467 ms → 74.8 ms, skor değişmedi. Profil, kalan maliyetin ön filtrenin
+*kendisi* olduğunu gösterdi (81 bin kutu karşılaştırması, yalnızca 2.3 bin
+gerçek şekil hesabı) — yani filtre işini yapıyor.
 
 ### 21.10 Testler
 
-`python -m unittest discover -s tests` → **411 test**, hepsi geçiyor
-(277 → 411). KiCad demolarına bağlı testler kurulum yoksa atlanır.
+`python -m unittest discover -s tests` → **418 test**, hepsi geçiyor
+(oturum başında 214). KiCad demolarına bağlı testler kurulum yoksa atlanır.
