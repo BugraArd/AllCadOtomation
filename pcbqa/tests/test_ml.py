@@ -502,5 +502,72 @@ class AdversarialRankerTests(unittest.TestCase):
         model.check_schema(FEATURE_NAMES, FEATURE_VERSION)  # hata verirse test duser
 
 
+class ShippedModelTests(unittest.TestCase):
+    """Depodaki modelin GERCEKTEN kullanildigini korur.
+
+    Faz C'de sema v3'e cikildi ve model move-v3.json olarak egitildi, ama
+    `learned`in varsayilan yolu "move-v2.json" olarak kaldi. Model
+    bulunamayinca sinif - belgelendigi gibi - sessizce `auto` gibi davraniyor.
+    Sonuc: `learned` FAZ C'DEN BERI ETKISIZDI.
+
+    Fark edilmemesinin sebebi ogretici: beklenen sonuc zaten "learned ~ auto"
+    oldugu icin hata KENDI KAMUFLAJINI yapti. Olculen sey beklentiyi
+    dogruladigi icin kimse modelin yuklenip yuklenmedigine bakmadi.
+
+    Bu testler o sinifi kapatir: yolun dogru olmasi YETMEZ, siralayicinin
+    gercekten cagrildigi da gosterilmelidir.
+    """
+
+    def test_default_path_follows_the_feature_schema(self):
+        from pcbqa.placement.learned import default_model_path
+
+        self.assertEqual(default_model_path().name, f"move-v{FEATURE_VERSION}.json")
+
+    def test_shipped_model_exists_and_matches_the_schema(self):
+        from pcbqa.ml import model as ml_model
+        from pcbqa.placement.learned import default_model_path
+
+        path = default_model_path()
+        self.assertTrue(
+            path.exists(),
+            f"{path.name} yok - sema surumu artirildiysa model yeniden egitilmeli",
+        )
+        model = ml_model.load(path)
+        model.check_schema(FEATURE_NAMES, FEATURE_VERSION)
+
+    def test_learned_actually_invokes_the_ranker(self):
+        """EN KRITIK: model yuklense bile siralayici cagrilmiyorsa olcum bostur."""
+        from pcbqa.placement import get as get_placer
+        from pcbqa.placement import learned as learned_mod
+        from pcbqa.placement.base import PlacementContext
+        from pcbqa.rules import load_rules
+
+        root = Path(__file__).resolve().parent.parent
+        design = load_design(root / "samples" / "bench_bad.kicad_pcb")
+        rules = load_rules(root / "samples" / "bench.rules.yaml")
+
+        calls = []
+        original = learned_mod.ModelRanker.__call__
+
+        def counting(self, *args, **kwargs):
+            calls.append(1)
+            return original(self, *args, **kwargs)
+
+        learned_mod.ModelRanker.__call__ = counting
+        try:
+            ctx = PlacementContext(
+                design=design,
+                evaluator=make_evaluator(design, rules),
+                locked=locked_refs(design),
+                seed=1,
+                time_budget_s=3.0,
+            )
+            get_placer("learned").run(ctx)
+        finally:
+            learned_mod.ModelRanker.__call__ = original
+
+        self.assertTrue(calls, "siralayici hic cagrilmadi - learned sessizce auto oldu")
+
+
 if __name__ == "__main__":
     unittest.main()

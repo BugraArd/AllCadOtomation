@@ -11,7 +11,7 @@ duruyor. Yani:
 
 Bu, ML'i sisteme sokmanin guvenli yolu: model KARAR vermez, SIRA onerir.
 
-Model yoksa (`pcbqa/ml/models/move-v2.json` bulunamazsa) sinif sessizce
+Model yoksa (`pcbqa/ml/models/move-v<sema>.json` bulunamazsa) sinif sessizce
 `auto` gibi davranir; yani depo modelsiz de calisir.
 """
 
@@ -29,7 +29,24 @@ from . import refine
 from .auto import COARSE_SHARE, POLISH_SPLIT
 
 # Egitilmis modelin varsayilan yeri. `python -m pcbqa.ml.train --out ...`
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "models" / "move-v2.json"
+#
+# Dosya adi OZNITELIK SURUMUNDEN turetilir, elle yazilmaz. Neden: Faz C'de
+# sema v3'e cikip model move-v3.json olarak egitildi ama buradaki sabit
+# "move-v2.json" olarak kaldi. Model bulunamayinca sinif - belgelendigi gibi -
+# sessizce `auto` gibi davraniyor, yani `learned` FAZ C'DEN BERI ETKISIZDI.
+#
+# Fark edilmemesinin sebebi ogretici: beklenen sonuc zaten "learned ~ auto"
+# oldugu icin hata kendi kamuflajini yapti. Ada surumu baglamak, sema
+# degistiginde yolun da degismesini ve model egitilmemisse SESSIZ degil
+# gorunur bir bosluk olusmasini saglar.
+MODELS_DIR = Path(__file__).resolve().parent.parent / "ml" / "models"
+
+
+def default_model_path() -> Path:
+    """Su anki oznitelik semasina karsilik gelen model dosyasi."""
+    from ..ml import features as F
+
+    return MODELS_DIR / f"move-v{F.FEATURE_VERSION}.json"
 
 # Oznitelik cikarimi da zaman yiyor; cok kisa listelerde siralamanin getirisi
 # maliyetini karsilamaz.
@@ -85,7 +102,7 @@ def make_ranker(ctx: PlacementContext, model_path: Path | None = None, top_k: in
     from ..ml import features as F
     from ..ml import model as ml_model
 
-    path = Path(model_path) if model_path else DEFAULT_MODEL_PATH
+    path = Path(model_path) if model_path else default_model_path()
     if not path.exists():
         return None
     model = ml_model.load(path)
