@@ -1080,26 +1080,32 @@ def _check_copper_area(design: Design, rule: Rule) -> list[Finding]:
     return findings
 
 
-def _copper_items(design: Design, net_name: str):
-    """Bir netin bakiri: (noktalar, sisme_yaricapi, katman) uculeri.
+def _copper_items_by_net(design: Design) -> dict[str, list]:
+    """TUM bakir parcalarini tek gecisle net'e gore gruplar.
 
-    Uc sekil karisir ve hepsi ayni ifadeyle olculur:
-        aciklik = shape_distance(A, B) - rA - rB
+    Her parca (noktalar, sisme_yaricapi, katmanlar) uclusudur ve uc sekil de
+    ayni ifadeyle olculur:  aciklik = shape_distance(A, B) - rA - rB
 
-      * iz  -> merkez cizgisi (2 nokta) + yarim genislik
-      * via -> tek nokta + yaricap
+      * iz  -> merkez cizgisi (2 nokta) + yarim genislik, kendi katmani
+      * via -> tek nokta + yaricap, katman None (= hepsi). Delikli via tum
+               katmanlari deler; kor/gomulu via nadir ve bu varsayim onlarda
+               MUHAFAZAKAR yonde (fazladan karsilastirma).
       * pad -> sekline gore (bkz. Pad.copper_shape): daire -> nokta + r,
                oval -> parca + r, dortgen -> 4 kose
 
-    Pad'i once cevreleyen daireye, sonra kareye yuvarlamak gercek kartta
-    yanlis alarm uretiyordu; her iki yuvarlama da olculen acikligi bilesen
-    ayak izi mertebesinde (0.5 mm) kuculttugu icin saglam kartlar ihlal
-    veriyordu. Simdi daire ve oval TAM modelleniyor.
+    Pad'i once cevreleyen daireye, sonra kareye yuvarlamak gercek kartta yanlis
+    alarm uretiyordu; her iki yuvarlama da olculen acikligi bilesen ayak izi
+    mertebesinde (0.5 mm) kuculttugu icin saglam kartlar ihlalli gorunuyordu.
+    Daire ve oval artik TAM modelleniyor.
+
+    Tek gecis olmasinin nedeni: onceki hal net BASINA cagriliyor ve her cagrida
+    butun izleri, via'lari, pad'leri bastan tariyordu - 33 netli bir kartta 33
+    kat gereksiz is.
     """
-    items: list[tuple[list[tuple[float, float]], float, frozenset[str] | None]] = []
+    out: dict[str, list] = {}
     for track in design.board.tracks:
-        if track.net == net_name:
-            items.append(
+        if track.net:
+            out.setdefault(track.net, []).append(
                 (
                     [(track.x1, track.y1), (track.x2, track.y2)],
                     track.width / 2.0,
@@ -1107,18 +1113,16 @@ def _copper_items(design: Design, net_name: str):
                 )
             )
     for via in design.board.vias:
-        if via.net == net_name:
-            # Delikli via tum katmanlari deler; kor/gomulu via nadir ve bu
-            # varsayim onlarda MUHAFAZAKAR yonde (fazladan karsilastirma).
-            items.append(([(via.x, via.y)], via.size / 2.0, None))
+        if via.net:
+            out.setdefault(via.net, []).append(([(via.x, via.y)], via.size / 2.0, None))
     for comp in design.board.components:
         for pad in comp.pads:
-            if pad.net != net_name:
+            if not pad.net:
                 continue
             pts, radius = pad.copper_shape()
             layers = None if pad.on_all_layers else frozenset(pad.copper_layers)
-            items.append((pts, radius, layers))
-    return items
+            out.setdefault(pad.net, []).append((pts, radius, layers))
+    return out
 
 
 def _layers_can_touch(a, b) -> bool:
@@ -1167,7 +1171,36 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
     if not sources:
         return []
 
-    copper = {n: _copper_items(design, n) for n in net_names}
+    grouped = _copper_items_by_net(design)
+    copper = {n: grouped.get(n, []) for n in net_names}
+
+    # SINIR KUTUSU ON FILTRESI - performans icin sart, dogruluk icin degil.
+    #
+    # Olculdu (pic_programmer, 370 iz + 247 pad): filtresiz bu kural TEK BASINA
+    # 459 ms suruyordu, geri kalan 21 kural toplam 9 ms. Yerlestirici hakemi
+    # her hamlede cagirdigi icin 8 s'lik butce ~900 denemeden ~17'ye dusuyor ve
+    # HICBIR bilesen oynamiyordu.
+    #
+    # Kutular her parcanin sisme yaricapi kadar buyutulur; iki kutu arasindaki
+    # mesafe gereken acikliktan buyukse gercek sekil mesafesi de buyuktur, yani
+    # atlamak GUVENLIDIR (kutu her zaman sekli icerir).
+    boxes: dict[str, list[tuple[float, float, float, float]]] = {}
+    for name, items in copper.items():
+        rows = []
+        for pts, radius, _layers in items:
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            rows.append(
+                (min(xs) - radius, min(ys) - radius, max(xs) + radius, max(ys) + radius)
+            )
+        boxes[name] = rows
+
+    def box_gap(a, b) -> float:
+        """Iki eksen-hizali kutu arasindaki en kisa mesafe (cakisiyorsa 0)."""
+        dx = max(a[0] - b[2], b[0] - a[2], 0.0)
+        dy = max(a[1] - b[3], b[1] - a[3], 0.0)
+        return math.hypot(dx, dy)
+
     findings: list[Finding] = []
     checked: set[tuple[str, str]] = set()
 
@@ -1186,9 +1219,19 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
             required = ipc2221.clearance_mm(delta_v, klass)
 
             best = math.inf
-            for pts_a, r1, layers_a in copper[net_a]:
-                for pts_b, r2, layers_b in copper[net_b]:
+            items_a = copper[net_a]
+            items_b = copper[net_b]
+            boxes_a = boxes[net_a]
+            boxes_b = boxes[net_b]
+            for i, (pts_a, r1, layers_a) in enumerate(items_a):
+                box_a = boxes_a[i]
+                for j, (pts_b, r2, layers_b) in enumerate(items_b):
                     if not _layers_can_touch(layers_a, layers_b):
+                        continue
+                    # Kaba eleme: kutular zaten yeterince uzaksa sekil mesafesi
+                    # de uzaktir. Simdiye kadarki en iyiyi de asamayacaksa bak.
+                    coarse = box_gap(box_a, boxes_b[j])
+                    if coarse >= required and coarse >= best:
                         continue
                     gap = geom.shape_distance(pts_a, pts_b) - r1 - r2
                     if gap < best:

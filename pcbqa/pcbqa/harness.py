@@ -157,12 +157,35 @@ def locked_refs(design: Design, prefixes=DEFAULT_LOCK_PREFIXES) -> set[str]:
 
 
 def apply_placement(design: Design, placement: Placement) -> Design:
-    """Yerlestirmeyi uygular ve YENI bir Design dondurur (girdi bozulmaz)."""
+    """Yerlestirmeyi uygular ve YENI bir Design dondurur (girdi bozulmaz).
+
+    Bir bilesen GERCEKTEN oynadiysa mevcut yonlendirme GECERSIZDIR: izler
+    bilesenle birlikte tasinmaz, pad'ler altlarindan kayar. Bu yuzden bakir
+    (iz/via/dokum) temizlenir ve kart "yonlendirilmemis" duruma duser.
+
+    Neden onemli: aksi halde bakir kurallari TASINMIS pad'lerle SABIT izleri
+    karsilastirir - fiziksel olarak anlamsiz bir olcum. Ustelik pahali:
+    olculdu, `clearance_voltage` tek basina 8.9 ms'lik degerlendirmeyi 467 ms'ye
+    cikariyordu ve yerlestiricinin 8 s'de yapabildigi deneme 900'den 17'ye
+    dusuyordu. Bakir kurallari zaten "iz yoksa sessizce atla" diye yazilmis;
+    dogru davranis onlarin atlanmasi.
+
+    Karta YAZMA yolu (`write_board`) kaynak dosyadan calisir, bu temizlikten
+    etkilenmez - yani gercek yonlendirme kaybolmaz.
+    """
     board: Board = copy.deepcopy(design.board)
+    moved = False
     for ref, (x, y, rot) in placement.items():
         comp = board.by_ref(ref)
-        if comp is not None:
-            comp.place(x, y, rot)
+        if comp is None:
+            continue
+        if abs(comp.x - x) > 1e-9 or abs(comp.y - y) > 1e-9 or abs(comp.rotation - rot) > 1e-9:
+            moved = True
+        comp.place(x, y, rot)
+    if moved:
+        board.tracks = []
+        board.vias = []
+        board.zones = []
     return build_design(board, netlist_from_board(board), project_name=design.project_name)
 
 
