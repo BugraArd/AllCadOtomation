@@ -428,5 +428,139 @@ class DiscreteBuckTests(unittest.TestCase):
 
 
 
+
+class SyntheticDiscreteBuckTests(unittest.TestCase):
+    """Ayrik dongu ALTIGENI - analitik dogrulama.
+
+    Neden sentetik kart: korpusta ayrik regulator YOK (alti regulatorun altisi
+    entegre) ve gercek kartin CIN konumu sabit oldugu icin beklenen alan elle
+    hesaplanamiyor. Burada koordinatlari BIZ seciyoruz, yani beklenen alan
+    bagimsiz olarak bilinebiliyor - test kodun kendini tekrar etmesini degil
+    GEOMETRIYI dogruluyor.
+
+    Bunun sinadigi sey poligonun SIRASI ve rollerin dogru pad'lere baglanmasi.
+    Sinamadigi sey: tanimanin gercek bir ayrik kartta calistigi (bkz. Kicad-z1d,
+    hala acik).
+    """
+
+    # Dongu, akim yolu sirasinda:
+    #   C1.VIN (0,0) -> Q1.VIN (4,0) -> Q1.SW (4,1)
+    #   -> Q2.SW (4,2) -> Q2.GND (4,3) -> C1.GND (0,3)
+    # x=4 uzerindeki uc nokta dogrusal; alan 4 x 3 dikdortgeni = 12 mm2.
+    EXPECTED_AREA = 12.0
+
+    def build(self, *, low_side=True, bootstrap_diode=False):
+        from pcbqa.model import build_design
+        from pcbqa.netlist import netlist_from_board
+        from pcbqa.pcb import Board, Component, Pad
+
+        def comp(ref, value, pads):
+            return Component(
+                ref=ref,
+                value=value,
+                footprint_id="test:FP",
+                x=pads[0][1],
+                y=pads[0][2],
+                rotation=0.0,
+                layer="F.Cu",
+                pads=[
+                    Pad(number=str(i + 1), net=net, x=x, y=y,
+                        size_x=0.4, size_y=0.4, function=fn)
+                    for i, (net, x, y, fn) in enumerate(pads)
+                ],
+            )
+
+        comps = [
+            # Denetleyici: SW pini + VIN + GND. Ayrik tasarimda anahtarlar
+            # DISARIDA, ama IC yine SW dugumunu surer.
+            comp("U1", "CTRL", [("SW", 8.0, 1.5, "SW"),
+                                ("VIN", 8.0, 0.0, "VIN"),
+                                ("GND", 8.0, 3.0, "GND")]),
+            # Induktor SW'de - taninmanin sarti
+            comp("L1", "10uH", [("SW", 6.0, 1.5, ""), ("VOUT", 6.0, 5.0, "")]),
+            comp("Q1", "FET_H", [("VIN", 4.0, 0.0, ""), ("SW", 4.0, 1.0, "")]),
+            comp("C1", "10uF", [("VIN", 0.0, 0.0, ""), ("GND", 0.0, 3.0, "")]),
+        ]
+        if low_side:
+            comps.append(comp("Q2", "FET_L", [("SW", 4.0, 2.0, ""),
+                                              ("GND", 4.0, 3.0, "")]))
+        if bootstrap_diode:
+            # BOOT <-> SW: GND'de pad'i YOK, alt kol sanilmamali.
+            comps.append(comp("D1", "BOOT", [("SW", 5.0, 1.0, ""),
+                                             ("BOOT", 5.0, 0.5, "")]))
+
+        board = Board(path=Path("synthetic.kicad_pcb"), components=comps)
+        design = build_design(board, netlist_from_board(board), project_name="synth")
+        bucks = {b.ic: b for b in find_buck_converters(design)}
+        self.assertIn("U1", bucks, "sentetik kartta buck taninmadi")
+        return design, bucks["U1"]
+
+    def test_both_switch_roles_are_resolved_from_topology(self):
+        _, buck = self.build()
+        self.assertEqual(buck.high_side, "Q1", "ust kol VIN+SW'den bulunmali")
+        self.assertEqual(buck.low_side, "Q2", "alt kol SW+GND'den bulunmali")
+
+    def test_loop_is_a_hexagon_through_six_pads(self):
+        design, buck = self.build()
+        result = hot_loop_polygon(design, buck)
+        self.assertIsNotNone(result, "ayrik dongu olculemedi")
+        poly, cap = result
+        self.assertEqual(len(poly), 6, "ayrik dongu altigen olmali")
+        self.assertEqual(cap, "C1")
+
+    def test_area_matches_the_hand_computed_value(self):
+        design, buck = self.build()
+        area = hot_loop_area_mm2(design, buck)
+        self.assertAlmostEqual(area, self.EXPECTED_AREA, places=6)
+
+    def test_polygon_follows_the_current_path_order(self):
+        """Sira YANLIS olsaydi shoelace baska (kucuk) bir alan verirdi.
+
+        Ayni alti noktayi rastgele bir sirada okuyan bir uygulama 12 mm2
+        vermez; bu test siranin akim yolunu izledigini sabitler.
+        """
+        design, buck = self.build()
+        poly, _ = hot_loop_polygon(design, buck)
+        self.assertEqual(
+            poly,
+            [(0.0, 0.0), (4.0, 0.0), (4.0, 1.0), (4.0, 2.0), (4.0, 3.0), (0.0, 3.0)],
+        )
+
+    def test_bootstrap_diode_is_not_mistaken_for_the_low_side(self):
+        """Bootstrap diyodu SW'dedir ama GND'de pad'i YOKTUR."""
+        _, buck = self.build(bootstrap_diode=True)
+        self.assertIn("D1", buck.external_switches)
+        self.assertEqual(buck.low_side, "Q2", "bootstrap diyodu alt kol sanildi")
+
+    def test_missing_low_side_refuses_instead_of_guessing(self):
+        design, buck = self.build(low_side=False)
+        self.assertEqual(buck.high_side, "Q1")
+        self.assertIsNone(buck.low_side)
+        self.assertIsNone(hot_loop_area_mm2(design, buck))
+
+    def test_rule_reports_the_discrete_loop_and_names_both_fets(self):
+        design, _ = self.build()
+        findings = CHECKS["buck_layout"](
+            design,
+            Rule(id="t", type="buck_layout", severity="warning",
+                 spec={"hot_loop_max_mm2": self.EXPECTED_AREA / 2}),
+        )
+        hot = [f for f in findings if "sicak dongusu" in f.message]
+        self.assertEqual(len(hot), 1)
+        self.assertAlmostEqual(hot[0].measured, self.EXPECTED_AREA, places=1)
+        self.assertIn("ayrik", hot[0].message)
+        self.assertIn("Q1/Q2", hot[0].message)
+
+    def test_rule_is_silent_when_the_loop_is_small_enough(self):
+        design, _ = self.build()
+        findings = CHECKS["buck_layout"](
+            design,
+            Rule(id="t", type="buck_layout", severity="warning",
+                 spec={"hot_loop_max_mm2": self.EXPECTED_AREA * 2}),
+        )
+        self.assertEqual([f for f in findings if "sicak dongusu" in f.message], [])
+
+
+
 if __name__ == "__main__":
     unittest.main()

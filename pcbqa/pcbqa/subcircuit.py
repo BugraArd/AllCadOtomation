@@ -68,6 +68,10 @@ class BuckConverter:
     # SW dugumundeki HARICI anahtarlama elemanlari (FET / diyot). Bos degilse
     # regulator AYRIKTIR ve giris sicak dongusu IC'nin dort pad'inden GECMEZ.
     external_switches: list[str] = field(default_factory=list)
+    # Ayrik tasarimda anahtar rolleri - TOPOLOJIDEN, pin adindan degil.
+    # Ust kol: VIN ve SW'de pad'i olan. Alt kol: SW ve GND'de pad'i olan.
+    high_side: str | None = None
+    low_side: str | None = None
     cin: list[str] = field(default_factory=list)
     cout: list[str] = field(default_factory=list)
     fb_resistors: list[str] = field(default_factory=list)
@@ -169,6 +173,32 @@ def find_buck_converters(design: Design) -> list[BuckConverter]:
             + _components_on(design, sw_net, "diode")
         )
 
+        if buck.external_switches:
+            # Roller BAGLANTIDAN cikarilir, pin adindan DEGIL: ayrik FET
+            # sembollerinde pin adlari "D/G/S", "1/2/3" ya da bos olabiliyor.
+            # Bootstrap diyodu bu testi gecemez - GND'de pad'i yoktur.
+            def _on(ref: str, net: str | None) -> bool:
+                return bool(net) and any(
+                    pin.ref == ref for pin in design.pins_on_net(net)
+                )
+
+            buck.high_side = next(
+                (
+                    r
+                    for r in buck.external_switches
+                    if _on(r, buck.vin_net) and _on(r, sw_net)
+                ),
+                None,
+            )
+            buck.low_side = next(
+                (
+                    r
+                    for r in buck.external_switches
+                    if r != buck.high_side and _on(r, sw_net) and _on(r, buck.gnd_net)
+                ),
+                None,
+            )
+
         buck.cin = _components_on(design, buck.vin_net, "capacitor")
         buck.cout = _components_on(design, buck.out_net, "capacitor")
         buck.fb_resistors = _components_on(design, buck.fb_net, "resistor")
@@ -200,24 +230,58 @@ def hot_loop_polygon(design: Design, buck: BuckConverter):
     Dort pad'in cevreledigi dortgen. Anahtarlarin IC ICI baglantisini bilmeye
     gerek yok; akim IC'ye VIN'den girip GND'den cikiyor.
 
-    AYRIK tasarimlarda (harici FET'ler) bu dortgen YANLIS olur - orada dongu
-    FET'lerin uzerinden geciyor ve dort pad'in cevreledigi alan gercek donguyu
-    temsil etmez. Ustelik yanlis yonde: IC'ye yakin duran dort pad KUCUK bir
-    alan verir, yani sorunlu bir kart SESSIZCE gecerdi.
+    AYRIK tasarimlarda (harici FET'ler) o dortgen YANLIS olur - orada dongu
+    FET'lerin uzerinden geciyor. Ustelik yanlis yonde: IC'ye yakin duran dort
+    pad KUCUK bir alan verir, yani sorunlu bir kart sessizce gecerdi. O yuzden
+    ayrik tasarimda AKIM YOLU izlenir ve dongu bir ALTIGENDIR:
 
-    Bu yuzden `external_switches` doluysa None doneriz. Olcemedigimiz bir seye
-    sayi UYDURMAYIZ - `thermal`in olculen egri disina cikmayi reddetmesiyle
-    ayni ilke. Ayrik dongunun kendisi akim yolu topolojisi ister (CIN -> ust
-    FET -> alt FET -> CIN) ve elimizdeki korpusta test edilecek ayrik kart
-    yok; olculemeyeni olculmus gibi gostermektense susmayi seciyoruz.
+        CIN.VIN -> Qust.VIN -> Qust.SW -> Qalt.SW -> Qalt.GND -> CIN.GND
+
+    Asenkron buck'ta alt kol diyottur; ayni altigen gecerlidir cunku donus
+    yolu yine SW'den GND'ye o elemanin uzerinden gider.
+
+    Roller cozulemezse (ornegin yalnizca ust kol harici) yine None doner -
+    olcemedigimize sayi UYDURMAYIZ. `thermal`in olculen egri disina cikmayi
+    reddetmesiyle ayni ilke.
+
+    SINIR: bu altigen GERCEK bir ayrik kartta dogrulanmadi - korpusta ayrik
+    regulator yok (alti regulatorun altisi entegre). Geometri analitik olarak
+    sinandi (bilinen koordinatlar -> bilinen alan) ve roller topolojiden
+    cikiyor, ama tanima gercek bir ayrik kartta gorulmedi.
+
+    Alan `geom.area` (shoelace) ile hesaplanir; poligon AKIM YOLU sirasindadir.
+    Kendini kesen patolojik bir yerlesimde shoelace gercek cevrelenen alandan
+    kucuk verir - entegre yoldaki dortgen de ayni varsayimi tasiyor.
 
     En KUCUK dongulu giris kondansatoru secilir: AC akimi tasiyan odur
     (Richtek AN045 "en kucuk paket en yakina" der).
     """
-    if buck.external_switches:
-        return None  # ayrik tasarim - bu dortgen o donguyu modellemiyor
     if not (buck.vin_net and buck.gnd_net and buck.cin):
         return None
+
+    if buck.external_switches:
+        if not (buck.high_side and buck.low_side):
+            return None  # rol cozulemedi - kural bunu "OLCULEMEDI" diye yazar
+        mid = [
+            _pad_xy(design, buck.high_side, buck.vin_net),
+            _pad_xy(design, buck.high_side, buck.sw_net),
+            _pad_xy(design, buck.low_side, buck.sw_net),
+            _pad_xy(design, buck.low_side, buck.gnd_net),
+        ]
+        if any(pt is None for pt in mid):
+            return None
+        best = None
+        for ref in buck.cin:
+            cap_vin = _pad_xy(design, ref, buck.vin_net)
+            cap_gnd = _pad_xy(design, ref, buck.gnd_net)
+            if cap_vin is None or cap_gnd is None:
+                continue
+            poly = [cap_vin, *mid, cap_gnd]
+            a = geom.area(poly)
+            if best is None or a < best[0]:
+                best = (a, ref, poly)
+        return None if best is None else (best[2], best[1])
+
     ic_vin = _pad_xy(design, buck.ic, buck.vin_net)
     ic_gnd = _pad_xy(design, buck.ic, buck.gnd_net)
     if ic_vin is None or ic_gnd is None:

@@ -55,10 +55,19 @@ rules:
     # Harici FET'li ayrik tasarimlarda dongu FET'lerin uzerinden gecer ve bu
     # dortgen o donguyu modellemez.
     #
-    # Bu artik SESSIZ bir sinir DEGIL: SW dugumunde harici FET ya da diyot
-    # varsa kural alan hesaplamaz, "OLCULEMEDI" diye bir `info` yazar. Eskiden
-    # dort pad yine olculuyordu ve sonuc yanlis YONDE kucuk cikiyordu - ayrik
-    # bir kart sessizce temiz gorunurdu.
+    # AYRIK tasarim artik OLCULUYOR: roller topolojiden cikariliyor (ust kol
+    # = VIN+SW'de pad'i olan, alt kol = SW+GND'de pad'i olan) ve dongu bir
+    # ALTIGEN oluyor:
+    #    CIN.VIN -> Qust.VIN -> Qust.SW -> Qalt.SW -> Qalt.GND -> CIN.GND
+    # Asenkron buck'ta alt kol diyottur; ayni altigen gecerli.
+    #
+    # Roller cozulemezse (or. yalnizca ust kol harici) alan HESAPLANMAZ,
+    # "OLCULEMEDI" diye bir `info` duser. Eskiden o durumda IC'nin dort pad'i
+    # olculuyordu ve sonuc yanlis YONDE kucuk cikiyordu - ayrik bir kart
+    # sessizce temiz gorunurdu.
+    #
+    # SINIR: ayrik yol GERCEK bir ayrik kartta dogrulanmadi (korpusta yok);
+    # geometri analitik olarak sinandi. Bkz. Kicad-z1d.
     hot_loop_max_mm2: 6.0
     #
     # fb_inductor_min_mm BILEREK VERILMEDI. ROHM #4-1 "FB izi induktorden
@@ -148,14 +157,10 @@ rules:
 # ---------------------------------------------------------------------------
 # BU MOTORLA OLCULEMEYENLER (arastirmada sayisal degeri var, kural yok)
 #
-#   - Sicak dongu alani AYRIK tasarimlarda (harici FET'ler). Entegre
-#     regulatorlerde olculuyor (hot_loop_max_mm2) cunku akim IC'ye VIN'den
-#     girip GND'den cikiyor ve anahtarlarin IC ICI baglantisini bilmeye gerek
-#     kalmiyor. Ayrik tasarim artik TANINIYOR (SW dugumundeki FET/diyot) ve
-#     olcum REDDEDILIYOR: rapora "OLCULEMEDI" info'su duser. Yani sinir hala
-#     var ama artik SESSIZ degil. Olcmek icin akim yolu topolojisi gerekiyor
-#     (CIN -> ust FET -> alt FET -> CIN) ve korpusta test edilecek ayrik kart
-#     yok - alti regulatorun altisi da entegre.
+#   - (COZULDU) Sicak dongu alani ayrik tasarimlarda: artik olculuyor,
+#     yukaridaki hot_loop_max_mm2'ye bakin. Kalan sinir DOGRULAMA: korpusta
+#     ayrik regulator yok (alti regulatorun altisi entegre), yani tanima
+#     gercek bir ayrik kartta gorulmedi. Geometri analitik olarak sinandi.
 #   - Induktor altinda bakir olmamasi (ROHM, >= 3 mm temizlik). Zone poligonu
 #     ile bilesen courtyard'inin KESISIMI gerekir; copper_area yalnizca toplam
 #     alani olcer, nerede oldugunu degil.

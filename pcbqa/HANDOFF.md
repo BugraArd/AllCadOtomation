@@ -2098,7 +2098,50 @@ pozitif olmadığı ve entegre ölçümün bozulmadığı korunuyor.
 Kalan iş değişmedi: ayrık döngüyü gerçekten ölçmek akım yolu topolojisi
 (CIN → üst FET → alt FET → CIN) ve test edilecek gerçek bir ayrık kart ister.
 
-### 21.15 Testler
+### 21.15 Ayrık döngü: reddetmekten ölçmeye
 
-`python -m unittest discover -s tests` → **465 test**, hepsi geçiyor
+§21.14 ayrık tasarımda ölçmeyi **reddediyordu**. Bu adım onu ölçüyor.
+
+Önce blokajı sınadım: sistemde ayrık regülatörlü kart var mı? Yok — KiCad
+demoları (19 kart, 6 regülatör, altısı da entegre) ve deponun kendi örnekleri
+dışında `.kicad_pcb` yok. Yani blokaj gerçek, ama **kısmi**: engellediği şey
+uygulama değil, tanıyıcının gerçek kartta doğrulanması.
+
+**Roller addan değil topolojiden çıkarılıyor** — ayrık FET sembollerinde pin
+adları "D/G/S", "1/2/3" ya da boş olabiliyor:
+
+    üst kol  = VIN ve SW'de pad'i olan
+    alt kol  = SW ve GND'de pad'i olan
+
+Bootstrap diyodu bu testi geçemez, çünkü GND'de pad'i yoktur — SW'de olması
+onu alt kol yapmıyor. Test bunu ayrıca koruyor.
+
+Döngü artık bir **altıgen**, akım yolu sırasında:
+
+    CIN.VIN -> Qüst.VIN -> Qüst.SW -> Qalt.SW -> Qalt.GND -> CIN.GND
+
+Asenkron buck'ta alt kol diyottur; aynı altıgen geçerli, çünkü dönüş yolu yine
+SW'den GND'ye o elemanın üzerinden gider.
+
+Roller çözülemezse (örneğin yalnızca üst kol harici) hâlâ **None** dönüyor ve
+`info` düşüyor — mesaj artık hangi kolun çözülemediğini de söylüyor.
+
+**Doğrulama analitik.** Gerçek karta FET eklemek alanı öngörülemez yapıyordu
+(CIN'in konumu sabit). Bu yüzden koordinatları biz seçen sentetik bir kart var:
+altı pad bir 4×3 dikdörtgen çevreliyor, beklenen alan **12 mm²** elle
+hesaplanıyor ve `hot_loop_area_mm2` tam onu veriyor. Ayrı bir test poligonun
+nokta sırasını sabitliyor — sıra yanlış olsaydı shoelace başka (küçük) bir alan
+verirdi, ki bu tam da §21.14'te düzeltilen hatanın biçimi.
+
+Altı gerçek entegre regülatörün ölçümü **birebir değişmedi** (0.73 / 0.79 /
+0.81 / 0.85 / 1.13 mm², U5 hâlâ ölçülemiyor).
+
+**Kicad-z1d hâlâ açık.** Kalan iş uygulama değil doğrulama: gerçek bir ayrık
+(harici FET'li) referans kart bulunup tanımanın orada da çalıştığının
+görülmesi. Sentetik kartla eşik doğrulamak 1d'nin "korpusa uydurma" yasağına
+girerdi.
+
+### 21.16 Testler
+
+`python -m unittest discover -s tests` → **473 test**, hepsi geçiyor
 (oturum başında 214). KiCad demolarına bağlı testler kurulum yoksa atlanır.

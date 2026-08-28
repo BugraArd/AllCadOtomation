@@ -734,6 +734,12 @@ def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
     Her esik istege baglidir. Verilmeyen esik olculmez; tespit edilemeyen rol
     de SESSIZCE atlanir - "bu kartta CIN bulunamadi" diye bulgu uretmek,
     tanimanin sinirlarini tasarimin hatasi gibi gosterirdi.
+
+    TEK ISTISNA sicak dongudur: AYRIK tasarimda (SW dugumunde harici FET/diyot)
+    roller cozulemezse `info` yazilir. Sebep, orada sessizligin YANILTICI
+    olmasi - eskiden IC'nin dort pad'i olculuyor ve sonuc yanlis YONDE kucuk
+    cikiyordu, yani sorunlu kart temiz gorunuyordu. Diger rollerde boyle bir
+    risk yok: rol bulunamazsa hicbir sey olculmuyor.
     """
     limits = {
         "cin_max_mm": rule.spec.get("cin_max_mm"),
@@ -871,12 +877,14 @@ def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
         # TI AN-2155'in OLCTUGU buyukluk: 6 mm2 iyi, 18 mm2 kotu
         limit = limits["hot_loop_max_mm2"]
         if limit is not None:
-            # AYRIK tasarim: dongu harici FET'lerin uzerinden geciyor ve IC'nin
-            # dort pad'i onu modellemiyor. Eskiden burada KUCUK bir alan
-            # hesaplanip sessizce geciliyordu - sorunlu kart temiz gorunuyordu.
-            # Artik olcemedigimizi SOYLUYORUZ. `info` cunku bu bir ihlal degil
-            # kapsam disiligi; ceza 0, ama raporda gorunur.
-            if buck.external_switches:
+            loop = subcircuit.hot_loop_polygon(design, buck)
+            if loop is None and buck.external_switches:
+                # Ayrik tasarim ama roller cozulemedi. Eskiden burada IC'nin
+                # dort pad'i olculuyor ve sonuc yanlis YONDE kucuk cikiyordu -
+                # sorunlu kart sessizce temiz gorunurdu. Artik olcemedigimizi
+                # SOYLUYORUZ. `info` cunku bu bir ihlal degil kapsam disiligi;
+                # ceza 0, ama raporda gorunur.
+                eksik = "ust kol" if not buck.high_side else "alt kol"
                 findings.append(
                     Finding(
                         rule_id=rule.id,
@@ -884,22 +892,28 @@ def _check_buck_layout(design: Design, rule: Rule) -> list[Finding]:
                         message=(
                             f"{tag}: giris sicak dongusu OLCULEMEDI - SW "
                             f"dugumunde harici anahtarlama elemani var "
-                            f"({', '.join(buck.external_switches)}). Ayrik "
-                            f"tasarimda dongu bu elemanlarin uzerinden geciyor; "
-                            f"IC pad'lerinden hesaplanan alan yaniltici olurdu"
+                            f"({', '.join(buck.external_switches)}) ama "
+                            f"{eksik} topolojiden cozulemedi. Ayrik tasarimda "
+                            f"dongu bu elemanlarin uzerinden geciyor; IC "
+                            f"pad'lerinden hesaplanan alan yaniltici olurdu"
                         ),
                         refs=[buck.ic, *buck.external_switches],
                     )
                 )
-            loop = subcircuit.hot_loop_polygon(design, buck)
-            if loop is not None:
+            elif loop is not None:
                 poly, cap = loop
                 area = geom.area(poly)
                 if area > float(limit):
+                    if buck.external_switches:
+                        yol = f"{cap} + {buck.high_side}/{buck.low_side} uzerinden, ayrik"
+                        refs = [buck.ic, cap, buck.high_side, buck.low_side]
+                    else:
+                        yol = f"{cap} uzerinden"
+                        refs = [buck.ic, cap]
                     add(
                         f"{tag}: giris sicak dongusu {area:.1f} mm2 "
-                        f"({cap} uzerinden; TI AN-2155: <= {float(limit):g} mm2)",
-                        [buck.ic, cap],
+                        f"({yol}; TI AN-2155: <= {float(limit):g} mm2)",
+                        refs,
                         area,
                         limit,
                     )
