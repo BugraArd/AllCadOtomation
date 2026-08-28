@@ -63,10 +63,16 @@ class Netlist:
 def netlist_from_board(board) -> Netlist:
     """Sematik olmadan, sadece .kicad_pcb'den baglanti bilgisi cikarir.
 
-    KiCad 9+ pad'lerde hem net adini hem pin tipini saklar, bu yuzden
+    KiCad 9+ pad'lerde net adini, pin tipini VE PIN ADINI saklar, bu yuzden
     kurallarimizin neredeyse tamami sematik olmadan da calisabilir.
+
+    Pin adi (`pinfunction`) uzun sure bos birakiliyordu ve docstring "yalnizca
+    sematikten gelir" diyordu; bu YANLISTI. 19 gercek KiCad demo kartinin
+    hepsinde pad'lerde pinfunction var (vme-wren'de 6828 tane). Bos birakmak,
+    kural seciciSindeki `function:` alanini kullanan TUM kurallari sessizce
+    etkisiz birakiyordu - buck CIN/SW/FB, LDO giris/cikis, sensor bypass...
+
     Sematige gore eksik kalanlar:
-      * pin islev adlari (VCC_8 yerine sadece pad numarasi gorunur)
       * net siniflari (hepsi "Default" varsayilir)
       * karta henuz yerlestirilmemis bilesenler
     """
@@ -81,7 +87,12 @@ def netlist_from_board(board) -> Netlist:
             if not pad.net:
                 continue
             buckets.setdefault(pad.net, []).append(
-                NetNode(ref=comp.ref, pin=pad.number, pinfunction="", pintype=pad.pintype)
+                NetNode(
+                    ref=comp.ref,
+                    pin=pad.number,
+                    pinfunction=pad.function,
+                    pintype=pad.pintype,
+                )
             )
 
     for code, (name, nodes) in enumerate(sorted(buckets.items()), start=1):

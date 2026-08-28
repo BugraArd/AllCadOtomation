@@ -20,6 +20,7 @@ Bu kosum iki gercek kusur yakaladi ve ikisi de burada korunuyor:
 
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -83,6 +84,55 @@ class PadLayerTests(unittest.TestCase):
         clearance = [f for f in ev.findings if f.rule_id == "uretim-gerilim-acikligi"]
         self.assertEqual(
             clearance, [], f"yanlis aciklik alarmi: {[f.message for f in clearance]}"
+        )
+
+
+class PinFunctionTests(unittest.TestCase):
+    """Pin ADI pad'den okunmali - `function:` seciciSinin tamami buna bagli.
+
+    Uzun sure bos birakiliyordu ve netlist.py'nin docstring'i "yalnizca
+    sematikten gelir" diyordu. Bu YANLIS: 19 gercek demo kartinin hepsinde
+    pad'lerde pinfunction var (vme-wren'de 6828 tane). Bos birakmak, ON AYAR
+    kurallarinin buyuk kismini SESSIZCE etkisiz birakiyordu - buck CIN/SW/FB,
+    LDO giris/cikis, sensor bypass; hepsi `function:` kullaniyor.
+    """
+
+    @unittest.skipUnless(demos_available(), "KiCad demolari kurulu degil")
+    def test_pin_names_are_read_from_the_board(self):
+        design = load_design(INTERF_U)
+        names = {
+            pin.function
+            for net in design.net_names()
+            for pin in design.pins_on_net(net)
+            if pin.function
+        }
+        self.assertGreater(len(names), 50, "pad'lerden pin adi okunamadi")
+
+    @unittest.skipUnless(demos_available(), "KiCad demolari kurulu degil")
+    def test_function_selector_matches_a_real_pin_name(self):
+        """Asil kazanc: `function:` seciciSi sematik olmadan da eslesmeli.
+
+        Aranacak adi KARTTAN sececek sekilde yaziyoruz; sabit bir ad yazmak
+        (or. "+5V") kartta o adin bulunmasina bagli olurdu ve testi kirilgan
+        yapardi - ilk denemede tam bu oldu.
+        """
+        from pcbqa.rules import Selector
+
+        design = load_design(INTERF_U)
+        # Pad NUMARASI olmayan, gercek bir pin ADI sec ("+12V", "A2"...)
+        named = [
+            pin
+            for net in design.net_names()
+            for pin in design.pins_on_net(net)
+            if pin.function and not pin.function.isdigit()
+        ]
+        self.assertTrue(named, "kartta pad numarasindan farkli pin adi yok")
+
+        target = named[0]
+        selector = Selector({"function": f"^{re.escape(target.function)}$"})
+        self.assertTrue(
+            selector.matches_pin(design, target),
+            f"secici {target.function!r} adiyla eslesemedi",
         )
 
 

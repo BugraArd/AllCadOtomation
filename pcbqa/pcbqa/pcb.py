@@ -28,6 +28,9 @@ class Pad:
     x: float
     y: float
     pintype: str = ""
+    # Pin ADI ("VIN", "SW", "FB"). KiCad bunu pad'e yaziyor; sematik olmadan da
+    # okunabilir. Kural seciciSindeki `function:` alani bunu kullanir.
+    function: str = ""
     # Footprint'e gore yerel, DONDURULMEMIS ofset. Bileseni yeniden
     # konumlandirabilmek icin gerekli (yerlestirme motoru bunu kullanir).
     dx: float = 0.0
@@ -490,6 +493,7 @@ def _read_footprint(node) -> Component | None:
                 x=fx + rx,
                 y=fy + ry,
                 pintype=value(pnode, "pintype", default=""),
+                function=value(pnode, "pinfunction", default="") or "",
                 dx=dx,
                 dy=dy,
                 size_x=as_float(psize[1]) if psize and len(psize) > 1 else 0.0,
