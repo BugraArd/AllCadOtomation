@@ -6,9 +6,37 @@
           {
             "command": "bd prime --hook-json",
             "type": "command"
+          },
+          {
+            "type": "command",
+            "command": "python .claude/graphify-etiketle.py"
+          },
+          {
+            "type": "command",
+            "command": "python .claude/graphify-durum.py"
           }
         ],
         "matcher": ""
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/ardaa/.local/bin/graphify.EXE hook-guard search"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/ardaa/.local/bin/graphify.EXE hook-guard read"
+          }
+        ]
       }
     ]
   }

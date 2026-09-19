@@ -38,3 +38,12 @@ graphify-out/cost.json
 graphify-out/.graphify_*
 graphify-out/.parcalar.json
 .claude/settings.json.graphify-bak
+
+# Yerel ajan ayarlari ve yeniden uretilebilir gecici dosyalar
+.claude/settings.local.json
+.serena/
+.history/
+*.pcbqa-bak*
+.pcbqa-canli.json
+scratchpad/
+graphify-out/20??-??-??/

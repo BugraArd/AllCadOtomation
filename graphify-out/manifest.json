@@ -41,12 +41,6 @@
     "ast_hash": "73249fe63c4e6910c539d7884377d4c0",
     "semantic_hash": ""
   },
-  ".claude/settings.local.json": {
-    "mtime": 1788466344.6021347,
-    "seen": 1788467240.3428104,
-    "ast_hash": "d050e1a04c9c3c5aaeb2bccc33cf7659",
-    "semantic_hash": ""
-  },
   ".codex/hooks.json": {
     "mtime": 1787852658.0433445,
     "seen": 1788103869.7205443,
@@ -761,12 +755,6 @@
     "ast_hash": "77f0758ef922ebb4cf11ffd0c7d7d7ec",
     "semantic_hash": ""
   },
-  "KicadOtomasyon1/.history/README.txt": {
-    "mtime": 1787943507.8583612,
-    "seen": 1788171527.787242,
-    "ast_hash": "00aafcbbe4e884d6739a909841dd12d0",
-    "semantic_hash": "00aafcbbe4e884d6739a909841dd12d0"
-  },
   "pcbqa/HANDOFF.md": {
     "mtime": 1788518745.170777,
     "seen": 1788518864.6957667,
@@ -1133,28 +1121,10 @@
     "ast_hash": "18e31cb0df593ae3ebfe3bcd41794422",
     "semantic_hash": ""
   },
-  "scratchpad/canli-dogrulama/test-sonuclari.txt": {
-    "mtime": 1788796469.5803223,
-    "seen": 1788796581.9384615,
-    "ast_hash": "a4304ab52b83b809cade3fe92a84b8c6",
-    "semantic_hash": ""
-  },
   "pcbqa/docs/hafiza/canli-pcb-arayuzu-ve-dogrulama.md": {
     "mtime": 1788796560.4339087,
     "seen": 1788796581.9384005,
     "ast_hash": "e35274237178baca25af661aa8b9ae69",
-    "semantic_hash": ""
-  },
-  "scratchpad/canli-dogrulama/.history/README.txt": {
-    "mtime": 1788796476.402245,
-    "seen": 1788796581.9384596,
-    "ast_hash": "00aafcbbe4e884d6739a909841dd12d0",
-    "semantic_hash": ""
-  },
-  ".serena/project.yml": {
-    "mtime": 1788817419.610725,
-    "seen": 1788817715.4921093,
-    "ast_hash": "694853a2926dfd0f1d8888e55f640350",
     "semantic_hash": ""
   },
   "CanliProjeler/KicadOtomasyon1-c77c93ac/.pcbqa-canli.json": {
@@ -1181,16 +1151,16 @@
     "ast_hash": "c62a51e15627a978abf70e7e2815a4b0",
     "semantic_hash": ""
   },
-  "CanliProjeler/KicadOtomasyon1-c77c93ac/.history/README.txt": {
-    "mtime": 1787943507.8583612,
-    "seen": 1788855390.704011,
-    "ast_hash": "00aafcbbe4e884d6739a909841dd12d0",
-    "semantic_hash": ""
-  },
   "pcbqa/docs/hafiza/canli-sematik-nightly-dogrulandi.md": {
     "mtime": 1788855595.0384395,
     "seen": 1788855620.0226536,
     "ast_hash": "0b53bd550a9099f3f7e4ef27aafef9a1",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1789852264.7473092,
+    "seen": 1789854834.4367864,
+    "ast_hash": "9ce7045df4e39d98f06f1a6a84d18ea7",
     "semantic_hash": ""
   }
 }
