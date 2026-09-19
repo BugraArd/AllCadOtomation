@@ -1,0 +1,1196 @@
+{
+  ".beads/hooks/post-checkout": {
+    "mtime": 1788103964.987638,
+    "seen": 1788171527.7871401,
+    "ast_hash": "e6dace9cb2359987811ae2c210e32bb3",
+    "semantic_hash": "e6dace9cb2359987811ae2c210e32bb3"
+  },
+  ".beads/hooks/post-merge": {
+    "mtime": 1787852657.8752542,
+    "seen": 1788103869.7205381,
+    "ast_hash": "2f045fa2d1e0c59d389787a8ea2ed8e4",
+    "semantic_hash": "2f045fa2d1e0c59d389787a8ea2ed8e4"
+  },
+  ".beads/hooks/pre-commit": {
+    "mtime": 1787852657.8735256,
+    "seen": 1788103869.7205398,
+    "ast_hash": "04b241daa7636cecaf9e2c216617ce15",
+    "semantic_hash": "04b241daa7636cecaf9e2c216617ce15"
+  },
+  ".beads/hooks/pre-push": {
+    "mtime": 1787852657.8752542,
+    "seen": 1788103869.7205408,
+    "ast_hash": "ee33f47e1168f7b261bb71b74b484a5e",
+    "semantic_hash": "ee33f47e1168f7b261bb71b74b484a5e"
+  },
+  ".beads/hooks/prepare-commit-msg": {
+    "mtime": 1787852657.8764815,
+    "seen": 1788103869.7205415,
+    "ast_hash": "64e754f486681f479810d20fd66c9e38",
+    "semantic_hash": "64e754f486681f479810d20fd66c9e38"
+  },
+  ".beads/metadata.json": {
+    "mtime": 1787852657.232847,
+    "seen": 1788103869.7205422,
+    "ast_hash": "e87b60e93b287453e415dccc6b9f68f2",
+    "semantic_hash": "e87b60e93b287453e415dccc6b9f68f2"
+  },
+  ".claude/settings.json": {
+    "mtime": 1788171816.154284,
+    "seen": 1788172197.1011958,
+    "ast_hash": "73249fe63c4e6910c539d7884377d4c0",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1788466344.6021347,
+    "seen": 1788467240.3428104,
+    "ast_hash": "d050e1a04c9c3c5aaeb2bccc33cf7659",
+    "semantic_hash": ""
+  },
+  ".codex/hooks.json": {
+    "mtime": 1787852658.0433445,
+    "seen": 1788103869.7205443,
+    "ast_hash": "6ab111cb0ebd91918bed9fa0805d8a31",
+    "semantic_hash": "6ab111cb0ebd91918bed9fa0805d8a31"
+  },
+  "pcbqa/baslat.py": {
+    "mtime": 1788469480.1693864,
+    "seen": 1788470375.5330446,
+    "ast_hash": "5a6694cf3f0ef115b9e75bd6ef3a5d18",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/__init__.py": {
+    "mtime": 1787613551.105385,
+    "seen": 1788103869.7205453,
+    "ast_hash": "7a3ba8ff2ede4b795932899e21d547f5",
+    "semantic_hash": "7a3ba8ff2ede4b795932899e21d547f5"
+  },
+  "pcbqa/pcbqa/__main__.py": {
+    "mtime": 1787674779.2595563,
+    "seen": 1788103869.7205458,
+    "ast_hash": "d8c111dad476ea738d8c75c36d6ae5a1",
+    "semantic_hash": "d8c111dad476ea738d8c75c36d6ae5a1"
+  },
+  "pcbqa/pcbqa/app.py": {
+    "mtime": 1788819273.5954213,
+    "seen": 1788855390.703817,
+    "ast_hash": "9d633c90a874b65437774be149306e04",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/bundle.py": {
+    "mtime": 1787938110.1252747,
+    "seen": 1788103869.720547,
+    "ast_hash": "0ff62a8a64850b5449c86463539498d0",
+    "semantic_hash": "0ff62a8a64850b5449c86463539498d0"
+  },
+  "pcbqa/pcbqa/circuit.py": {
+    "mtime": 1787874092.4029016,
+    "seen": 1788103869.7205477,
+    "ast_hash": "0e001acb55c716e15d6c875fa6ed8b45",
+    "semantic_hash": "0e001acb55c716e15d6c875fa6ed8b45"
+  },
+  "pcbqa/pcbqa/confload.py": {
+    "mtime": 1787939667.1224625,
+    "seen": 1788103869.7205482,
+    "ast_hash": "f15ddbea22f7cf200b79129e6fa5aebf",
+    "semantic_hash": "f15ddbea22f7cf200b79129e6fa5aebf"
+  },
+  "pcbqa/pcbqa/connect.py": {
+    "mtime": 1788102188.9787364,
+    "seen": 1788103869.7205486,
+    "ast_hash": "daa1ee500966ef5bbbad93026eb28440",
+    "semantic_hash": "daa1ee500966ef5bbbad93026eb28440"
+  },
+  "pcbqa/pcbqa/default_rules.json": {
+    "mtime": 1787937958.3191867,
+    "seen": 1788103869.720549,
+    "ast_hash": "45b164c09cb143e1da3c432b0009db17",
+    "semantic_hash": "45b164c09cb143e1da3c432b0009db17"
+  },
+  "pcbqa/pcbqa/explore.py": {
+    "mtime": 1787934121.3729217,
+    "seen": 1788103869.7205496,
+    "ast_hash": "933dde009af00dced6856db1943196e3",
+    "semantic_hash": "933dde009af00dced6856db1943196e3"
+  },
+  "pcbqa/pcbqa/generate.py": {
+    "mtime": 1787934038.717878,
+    "seen": 1788103869.7205503,
+    "ast_hash": "173e0671bdd08a70c621fda31d56fb18",
+    "semantic_hash": "173e0671bdd08a70c621fda31d56fb18"
+  },
+  "pcbqa/pcbqa/geom.py": {
+    "mtime": 1787930899.0962234,
+    "seen": 1788103869.720551,
+    "ast_hash": "6ff2fc312bbfbc9fecbac2a24d7f697b",
+    "semantic_hash": "6ff2fc312bbfbc9fecbac2a24d7f697b"
+  },
+  "pcbqa/pcbqa/harness.py": {
+    "mtime": 1787939438.1124547,
+    "seen": 1788103869.7205515,
+    "ast_hash": "9f5b00f6f10cf984222dcbe8a5bb7256",
+    "semantic_hash": "9f5b00f6f10cf984222dcbe8a5bb7256"
+  },
+  "pcbqa/pcbqa/intent.py": {
+    "mtime": 1787937914.688815,
+    "seen": 1788103869.7205522,
+    "ast_hash": "74300e22dde183926bfbeb55a4175407",
+    "semantic_hash": "74300e22dde183926bfbeb55a4175407"
+  },
+  "pcbqa/pcbqa/ipc.py": {
+    "mtime": 1788796221.43982,
+    "seen": 1788796401.8683813,
+    "ast_hash": "8f3d1f9cea43b3111eb776338bb28fe0",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/ipc2221.py": {
+    "mtime": 1787851674.8288217,
+    "seen": 1788103869.7205534,
+    "ast_hash": "6e2314a42a7596bbb557e834ef17e8c0",
+    "semantic_hash": "6e2314a42a7596bbb557e834ef17e8c0"
+  },
+  "pcbqa/pcbqa/ipc_apply.py": {
+    "mtime": 1787671805.9042017,
+    "seen": 1788103869.7205539,
+    "ast_hash": "91997b1fe65b7a7d4e6ef7c0c2cdd60d",
+    "semantic_hash": "91997b1fe65b7a7d4e6ef7c0c2cdd60d"
+  },
+  "pcbqa/pcbqa/kicadcli.py": {
+    "mtime": 1787613768.509466,
+    "seen": 1788103869.7205546,
+    "ast_hash": "7ece235229a9d5bd78a1c76e7f54ed78",
+    "semantic_hash": "7ece235229a9d5bd78a1c76e7f54ed78"
+  },
+  "pcbqa/pcbqa/kurulum.py": {
+    "mtime": 1788796294.5183992,
+    "seen": 1788796401.868385,
+    "ast_hash": "7b167bb6735ca60b73dacc7b386db6d5",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/minyaml.py": {
+    "mtime": 1787939831.5103278,
+    "seen": 1788103869.7205558,
+    "ast_hash": "0ff1345f5f72b11edc154105f24434d2",
+    "semantic_hash": "0ff1345f5f72b11edc154105f24434d2"
+  },
+  "pcbqa/pcbqa/ml/__init__.py": {
+    "mtime": 1787699589.670501,
+    "seen": 1788103869.7205563,
+    "ast_hash": "c4093fae3da21c2eec42c7f3dff3f27b",
+    "semantic_hash": "c4093fae3da21c2eec42c7f3dff3f27b"
+  },
+  "pcbqa/pcbqa/ml/collect.py": {
+    "mtime": 1787744700.3100727,
+    "seen": 1788103869.7205567,
+    "ast_hash": "3e355ef9a789a18139c2365ee2192d4f",
+    "semantic_hash": "3e355ef9a789a18139c2365ee2192d4f"
+  },
+  "pcbqa/pcbqa/ml/collect_design.py": {
+    "mtime": 1787936086.5336058,
+    "seen": 1788103869.7205572,
+    "ast_hash": "4ef7e4a62b2e6c9615c093f66b442891",
+    "semantic_hash": "4ef7e4a62b2e6c9615c093f66b442891"
+  },
+  "pcbqa/pcbqa/ml/dataset.py": {
+    "mtime": 1787936074.5365438,
+    "seen": 1788103869.720558,
+    "ast_hash": "4ffa31c7a7dbe33b6f1d822aec43c1e6",
+    "semantic_hash": "4ffa31c7a7dbe33b6f1d822aec43c1e6"
+  },
+  "pcbqa/pcbqa/ml/features.py": {
+    "mtime": 1787742557.1513627,
+    "seen": 1788103869.7205586,
+    "ast_hash": "d594eb40d26254fee41098809e870ef9",
+    "semantic_hash": "d594eb40d26254fee41098809e870ef9"
+  },
+  "pcbqa/pcbqa/ml/linear.py": {
+    "mtime": 1787702126.9311578,
+    "seen": 1788103869.7205591,
+    "ast_hash": "12be441e5d2b5e9d2ddbe99479806f40",
+    "semantic_hash": "12be441e5d2b5e9d2ddbe99479806f40"
+  },
+  "pcbqa/pcbqa/ml/metrics.py": {
+    "mtime": 1787737293.9878297,
+    "seen": 1788103869.7205596,
+    "ast_hash": "c4c35dbc39cfe712bbac468f796d7aec",
+    "semantic_hash": "c4c35dbc39cfe712bbac468f796d7aec"
+  },
+  "pcbqa/pcbqa/ml/model.py": {
+    "mtime": 1787699492.9563148,
+    "seen": 1788103869.72056,
+    "ast_hash": "de80e1ccbe08bf21c295d479b8dc50b3",
+    "semantic_hash": "de80e1ccbe08bf21c295d479b8dc50b3"
+  },
+  "pcbqa/pcbqa/ml/models/move-v3.json": {
+    "mtime": 1787743110.9786189,
+    "seen": 1788103869.7205606,
+    "ast_hash": "9be007bf1c5447ebe445408ddfb4c992",
+    "semantic_hash": "9be007bf1c5447ebe445408ddfb4c992"
+  },
+  "pcbqa/pcbqa/ml/train.py": {
+    "mtime": 1787737312.4940069,
+    "seen": 1788103869.7205613,
+    "ast_hash": "bfb320c0383f1953acb065d1c02f4137",
+    "semantic_hash": "bfb320c0383f1953acb065d1c02f4137"
+  },
+  "pcbqa/pcbqa/ml/trees.py": {
+    "mtime": 1787699575.6843023,
+    "seen": 1788103869.7205617,
+    "ast_hash": "2d8f3f47d2311ce846ed832ebfc840ee",
+    "semantic_hash": "2d8f3f47d2311ce846ed832ebfc840ee"
+  },
+  "pcbqa/pcbqa/model.py": {
+    "mtime": 1787614276.0799446,
+    "seen": 1788103869.7205622,
+    "ast_hash": "2f9431c97e80b0cbdbb4cd5d2ea909e1",
+    "semantic_hash": "2f9431c97e80b0cbdbb4cd5d2ea909e1"
+  },
+  "pcbqa/pcbqa/netlist.py": {
+    "mtime": 1787874971.5873008,
+    "seen": 1788103869.7205627,
+    "ast_hash": "8fa62aba67ea8b4e791efce1fca0de37",
+    "semantic_hash": "8fa62aba67ea8b4e791efce1fca0de37"
+  },
+  "pcbqa/pcbqa/pcb.py": {
+    "mtime": 1787931922.9310355,
+    "seen": 1788103869.7205632,
+    "ast_hash": "2798a247b9ce689969954af566bfd578",
+    "semantic_hash": "2798a247b9ce689969954af566bfd578"
+  },
+  "pcbqa/pcbqa/pcb_sync.py": {
+    "mtime": 1787787636.4540553,
+    "seen": 1788103869.7205641,
+    "ast_hash": "4a0397a2a56245f4b8d868e42931a14a",
+    "semantic_hash": "4a0397a2a56245f4b8d868e42931a14a"
+  },
+  "pcbqa/pcbqa/placement/__init__.py": {
+    "mtime": 1787699826.7134194,
+    "seen": 1788103869.7205648,
+    "ast_hash": "a03464a3dd553a3c4596956d28367797",
+    "semantic_hash": "a03464a3dd553a3c4596956d28367797"
+  },
+  "pcbqa/pcbqa/placement/anneal.py": {
+    "mtime": 1787651423.3071704,
+    "seen": 1788103869.7205653,
+    "ast_hash": "6e66a37ca1705d26d7e477d86744d0cc",
+    "semantic_hash": "6e66a37ca1705d26d7e477d86744d0cc"
+  },
+  "pcbqa/pcbqa/placement/auto.py": {
+    "mtime": 1787778572.1358962,
+    "seen": 1788103869.7205658,
+    "ast_hash": "25bc8957046af17bc1e0521aae24705f",
+    "semantic_hash": "25bc8957046af17bc1e0521aae24705f"
+  },
+  "pcbqa/pcbqa/placement/base.py": {
+    "mtime": 1787744700.2941692,
+    "seen": 1788103869.7205663,
+    "ast_hash": "98ad19dc354419188de0ef9ff12168ec",
+    "semantic_hash": "98ad19dc354419188de0ef9ff12168ec"
+  },
+  "pcbqa/pcbqa/placement/baseline.py": {
+    "mtime": 1787648366.1180913,
+    "seen": 1788103869.7205667,
+    "ast_hash": "fd0b9423c0b25b56b2711868054eee2a",
+    "semantic_hash": "fd0b9423c0b25b56b2711868054eee2a"
+  },
+  "pcbqa/pcbqa/placement/cluster.py": {
+    "mtime": 1787778840.3525548,
+    "seen": 1788103869.7205672,
+    "ast_hash": "bb3508cb397777957507ced0504667ce",
+    "semantic_hash": "bb3508cb397777957507ced0504667ce"
+  },
+  "pcbqa/pcbqa/placement/codex.py": {
+    "mtime": 1787651423.3680837,
+    "seen": 1788103869.7205677,
+    "ast_hash": "04e3444d45f6cd8596f6eb970249fd9e",
+    "semantic_hash": "04e3444d45f6cd8596f6eb970249fd9e"
+  },
+  "pcbqa/pcbqa/placement/force.py": {
+    "mtime": 1787651423.2722557,
+    "seen": 1788103869.7205684,
+    "ast_hash": "76d05e5e418298ce1cd321520351de19",
+    "semantic_hash": "76d05e5e418298ce1cd321520351de19"
+  },
+  "pcbqa/pcbqa/placement/learned.py": {
+    "mtime": 1787881366.0164292,
+    "seen": 1788103869.7205691,
+    "ast_hash": "d2950336897eec066b3e98259ff70ac3",
+    "semantic_hash": "d2950336897eec066b3e98259ff70ac3"
+  },
+  "pcbqa/pcbqa/placement/refine.py": {
+    "mtime": 1787778541.4822302,
+    "seen": 1788103869.7205696,
+    "ast_hash": "9eb491d7dc4117fab122e47e5d5c5759",
+    "semantic_hash": "9eb491d7dc4117fab122e47e5d5c5759"
+  },
+  "pcbqa/pcbqa/placement/repertoire.py": {
+    "mtime": 1787738294.9697094,
+    "seen": 1788103869.72057,
+    "ast_hash": "31b4d35a3f00e6f0046f22292565badb",
+    "semantic_hash": "31b4d35a3f00e6f0046f22292565badb"
+  },
+  "pcbqa/pcbqa/presets/buck.rules.json": {
+    "mtime": 1787937958.2821653,
+    "seen": 1788103869.7205706,
+    "ast_hash": "6538988d693ee4813c25741abd9b21c6",
+    "semantic_hash": "6538988d693ee4813c25741abd9b21c6"
+  },
+  "pcbqa/pcbqa/presets/lineer-koruma.rules.json": {
+    "mtime": 1787937958.2903466,
+    "seen": 1788103869.720571,
+    "ast_hash": "f0c4c8d39783cc43e8983a5921fbed40",
+    "semantic_hash": "f0c4c8d39783cc43e8983a5921fbed40"
+  },
+  "pcbqa/pcbqa/presets/uretim.rules.json": {
+    "mtime": 1787937958.2971313,
+    "seen": 1788103869.720572,
+    "ast_hash": "048294b860d65694ecace06fc50db4ca",
+    "semantic_hash": "048294b860d65694ecace06fc50db4ca"
+  },
+  "pcbqa/pcbqa/presets/yuksek-hiz.rules.json": {
+    "mtime": 1787937958.3040204,
+    "seen": 1788103869.7205725,
+    "ast_hash": "a2cf2f87916a66bc3e7fc9ce86fd945e",
+    "semantic_hash": "a2cf2f87916a66bc3e7fc9ce86fd945e"
+  },
+  "pcbqa/pcbqa/propose.py": {
+    "mtime": 1788102830.670549,
+    "seen": 1788103869.720573,
+    "ast_hash": "ab307407c5ccee2295f130ce1a2d4d42",
+    "semantic_hash": "ab307407c5ccee2295f130ce1a2d4d42"
+  },
+  "pcbqa/pcbqa/report.py": {
+    "mtime": 1787870385.0400257,
+    "seen": 1788103869.7205734,
+    "ast_hash": "4c601cf4459acd187426f9dbda12691c",
+    "semantic_hash": "4c601cf4459acd187426f9dbda12691c"
+  },
+  "pcbqa/pcbqa/rules.py": {
+    "mtime": 1787937914.6878152,
+    "seen": 1788103869.720574,
+    "ast_hash": "daea612faf14f73fd51a7fac1be305ba",
+    "semantic_hash": "daea612faf14f73fd51a7fac1be305ba"
+  },
+  "pcbqa/pcbqa/sch_add.py": {
+    "mtime": 1788172991.8744812,
+    "seen": 1788173182.217115,
+    "ast_hash": "b566ea055110ef6e9bd9404b1ea4bb86",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/sch_apply.py": {
+    "mtime": 1787677721.319282,
+    "seen": 1788103869.720575,
+    "ast_hash": "a42d21b09bc7dc13005a2b64e08afad1",
+    "semantic_hash": "a42d21b09bc7dc13005a2b64e08afad1"
+  },
+  "pcbqa/pcbqa/sch_move.py": {
+    "mtime": 1787676806.4193137,
+    "seen": 1788103869.7205756,
+    "ast_hash": "2c71011c8d26e95efd5339f2ee909099",
+    "semantic_hash": "2c71011c8d26e95efd5339f2ee909099"
+  },
+  "pcbqa/pcbqa/sch_place.py": {
+    "mtime": 1787737151.0262208,
+    "seen": 1788103869.720576,
+    "ast_hash": "eae4a74d1fbfee2872db30d7f955d600",
+    "semantic_hash": "eae4a74d1fbfee2872db30d7f955d600"
+  },
+  "pcbqa/pcbqa/sch_verify.py": {
+    "mtime": 1787786534.847044,
+    "seen": 1788103869.7205768,
+    "ast_hash": "001fbb815404c609cf2ae32abef0f7ce",
+    "semantic_hash": "001fbb815404c609cf2ae32abef0f7ce"
+  },
+  "pcbqa/pcbqa/sch_wire.py": {
+    "mtime": 1787786534.847044,
+    "seen": 1788103869.7205772,
+    "ast_hash": "33e42aa1df7972fa3671ad24bf632396",
+    "semantic_hash": "33e42aa1df7972fa3671ad24bf632396"
+  },
+  "pcbqa/pcbqa/sch_write.py": {
+    "mtime": 1787676459.1865928,
+    "seen": 1788103869.7205777,
+    "ast_hash": "db50b96d21c5790c044a9c3295e5b3a8",
+    "semantic_hash": "db50b96d21c5790c044a9c3295e5b3a8"
+  },
+  "pcbqa/pcbqa/schematic.py": {
+    "mtime": 1787678551.9059434,
+    "seen": 1788103869.7205782,
+    "ast_hash": "5b3f6fb8da16c56f9a1c988502213e71",
+    "semantic_hash": "5b3f6fb8da16c56f9a1c988502213e71"
+  },
+  "pcbqa/pcbqa/sexpr.py": {
+    "mtime": 1787648206.2393541,
+    "seen": 1788103869.720579,
+    "ast_hash": "5f45ddfaf7748050cf506a84eee42230",
+    "semantic_hash": "5f45ddfaf7748050cf506a84eee42230"
+  },
+  "pcbqa/pcbqa/subcircuit.py": {
+    "mtime": 1787916043.4137678,
+    "seen": 1788103869.7205794,
+    "ast_hash": "fa0143b0a40c9c22de8329a5ff39316b",
+    "semantic_hash": "fa0143b0a40c9c22de8329a5ff39316b"
+  },
+  "pcbqa/pcbqa/swig_apply.py": {
+    "mtime": 1787939463.8290403,
+    "seen": 1788103869.72058,
+    "ast_hash": "17488ea544bbef77ad54b46622db52db",
+    "semantic_hash": "17488ea544bbef77ad54b46622db52db"
+  },
+  "pcbqa/pcbqa/symlib.py": {
+    "mtime": 1787930211.9118586,
+    "seen": 1788103869.7205806,
+    "ast_hash": "7a8c44c31d6e18cf0f4be92a4d972cbf",
+    "semantic_hash": "7a8c44c31d6e18cf0f4be92a4d972cbf"
+  },
+  "pcbqa/pcbqa/synth.py": {
+    "mtime": 1787652730.922624,
+    "seen": 1788103869.720581,
+    "ast_hash": "63267066a4e44e4850994da57853f0b3",
+    "semantic_hash": "63267066a4e44e4850994da57853f0b3"
+  },
+  "pcbqa/pcbqa/templates/crystal-hse.json": {
+    "mtime": 1787937958.3040204,
+    "seen": 1788103869.7205815,
+    "ast_hash": "2ab9c0dfd1abc9f68327c8b749aee54f",
+    "semantic_hash": "2ab9c0dfd1abc9f68327c8b749aee54f"
+  },
+  "pcbqa/pcbqa/templates/guc-girisi-header.json": {
+    "mtime": 1787937958.3113804,
+    "seen": 1788103869.7205822,
+    "ast_hash": "efe205a829dc5931fc19bba42d4cd19d",
+    "semantic_hash": "efe205a829dc5931fc19bba42d4cd19d"
+  },
+  "pcbqa/pcbqa/templates/ldo-ams1117-3v3.json": {
+    "mtime": 1787937958.3113804,
+    "seen": 1788103869.720583,
+    "ast_hash": "0de87d16bd84df04821a78229a51716c",
+    "semantic_hash": "0de87d16bd84df04821a78229a51716c"
+  },
+  "pcbqa/pcbqa/templates/mcu-stm32f103c8.json": {
+    "mtime": 1787937958.3174098,
+    "seen": 1788103869.7205834,
+    "ast_hash": "c8a99081cf4b76a9298c8f5b79ca74fa",
+    "semantic_hash": "c8a99081cf4b76a9298c8f5b79ca74fa"
+  },
+  "pcbqa/pcbqa/templates/swd-header.json": {
+    "mtime": 1787937958.317918,
+    "seen": 1788103869.7205842,
+    "ast_hash": "a29ae005bbda7335718733976eceff69",
+    "semantic_hash": "a29ae005bbda7335718733976eceff69"
+  },
+  "pcbqa/pcbqa/templates/usb-micro-b.json": {
+    "mtime": 1787937958.3191867,
+    "seen": 1788103869.7205846,
+    "ast_hash": "85ec03318a4c3896e3553be5530f4c0f",
+    "semantic_hash": "85ec03318a4c3896e3553be5530f4c0f"
+  },
+  "pcbqa/pcbqa/thermal.py": {
+    "mtime": 1787882405.139721,
+    "seen": 1788103869.720585,
+    "ast_hash": "6d039c917de4630f20d4a65f4b3abdc8",
+    "semantic_hash": "6d039c917de4630f20d4a65f4b3abdc8"
+  },
+  "pcbqa/tests/test_app.py": {
+    "mtime": 1788470225.1049056,
+    "seen": 1788470375.5331666,
+    "ast_hash": "b29cceb12412d6bc839e498b9324b064",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_calibration.py": {
+    "mtime": 1787875580.5894597,
+    "seen": 1788103869.7205865,
+    "ast_hash": "f1bfe05725d0603d12432f58712b28d6",
+    "semantic_hash": "f1bfe05725d0603d12432f58712b28d6"
+  },
+  "pcbqa/tests/test_circuit.py": {
+    "mtime": 1787874280.4765449,
+    "seen": 1788103869.720587,
+    "ast_hash": "0113dc90c3be7ace6a1a9cb8ee8ab523",
+    "semantic_hash": "0113dc90c3be7ace6a1a9cb8ee8ab523"
+  },
+  "pcbqa/tests/test_collect_design.py": {
+    "mtime": 1787936160.724182,
+    "seen": 1788103869.7205875,
+    "ast_hash": "28ae132245b29ad4c1110a97bad45c0f",
+    "semantic_hash": "28ae132245b29ad4c1110a97bad45c0f"
+  },
+  "pcbqa/tests/test_connect.py": {
+    "mtime": 1788102312.8554716,
+    "seen": 1788103869.720596,
+    "ast_hash": "ddc44fcc140df3a4d72bdc551b012c6a",
+    "semantic_hash": "ddc44fcc140df3a4d72bdc551b012c6a"
+  },
+  "pcbqa/tests/test_copper.py": {
+    "mtime": 1787833389.0611525,
+    "seen": 1788103869.7205966,
+    "ast_hash": "6d7627175f5bd3537b2203ea979b4966",
+    "semantic_hash": "6d7627175f5bd3537b2203ea979b4966"
+  },
+  "pcbqa/tests/test_copper_rules.py": {
+    "mtime": 1787876102.4528008,
+    "seen": 1788103869.7205973,
+    "ast_hash": "2adba13550686726b921b53b3bcde240",
+    "semantic_hash": "2adba13550686726b921b53b3bcde240"
+  },
+  "pcbqa/tests/test_courtyard.py": {
+    "mtime": 1787932033.535354,
+    "seen": 1788103869.7205977,
+    "ast_hash": "dfe011c7504c165b4fafcdc351e2a627",
+    "semantic_hash": "dfe011c7504c165b4fafcdc351e2a627"
+  },
+  "pcbqa/tests/test_decoupling_count.py": {
+    "mtime": 1787888775.1848702,
+    "seen": 1788103869.7205982,
+    "ast_hash": "ede3c452f83fffbd10cbf47108198056",
+    "semantic_hash": "ede3c452f83fffbd10cbf47108198056"
+  },
+  "pcbqa/tests/test_explore.py": {
+    "mtime": 1787934299.5070012,
+    "seen": 1788103869.7205987,
+    "ast_hash": "b2f62c7ae1bcebb2779433ad4415e8eb",
+    "semantic_hash": "b2f62c7ae1bcebb2779433ad4415e8eb"
+  },
+  "pcbqa/tests/test_generate.py": {
+    "mtime": 1787932023.6685405,
+    "seen": 1788103869.7205997,
+    "ast_hash": "a03be2d40da8595f5c98144f1f3b0f88",
+    "semantic_hash": "a03be2d40da8595f5c98144f1f3b0f88"
+  },
+  "pcbqa/tests/test_intent.py": {
+    "mtime": 1787929002.2540874,
+    "seen": 1788103869.7206001,
+    "ast_hash": "52c42f3d20bcef5e24028038313290b4",
+    "semantic_hash": "52c42f3d20bcef5e24028038313290b4"
+  },
+  "pcbqa/tests/test_ipc2221.py": {
+    "mtime": 1787833736.703339,
+    "seen": 1788103869.7206006,
+    "ast_hash": "9075bd6bdb2a23ad18a87e869301c15e",
+    "semantic_hash": "9075bd6bdb2a23ad18a87e869301c15e"
+  },
+  "pcbqa/tests/test_ipc_apply.py": {
+    "mtime": 1788796222.3808484,
+    "seen": 1788796401.8684447,
+    "ast_hash": "cef810e030614e49884d9e52fe56fbb5",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_kurulum.py": {
+    "mtime": 1788796146.06011,
+    "seen": 1788796401.868446,
+    "ast_hash": "b3f2d464e801e61e2fad0e4724f89696",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_minyaml.py": {
+    "mtime": 1787939860.0846756,
+    "seen": 1788103869.7206025,
+    "ast_hash": "0dac62e0a4c4f86b0015e79d2a5c8459",
+    "semantic_hash": "0dac62e0a4c4f86b0015e79d2a5c8459"
+  },
+  "pcbqa/tests/test_ml.py": {
+    "mtime": 1787881489.409686,
+    "seen": 1788103869.7206032,
+    "ast_hash": "15e7230046723e5d56174bbc38009416",
+    "semantic_hash": "15e7230046723e5d56174bbc38009416"
+  },
+  "pcbqa/tests/test_pcb_sync.py": {
+    "mtime": 1787787676.2738616,
+    "seen": 1788103869.7206037,
+    "ast_hash": "31146ade776ff6ca8ea3f1b680a05f2b",
+    "semantic_hash": "31146ade776ff6ca8ea3f1b680a05f2b"
+  },
+  "pcbqa/tests/test_pcb_versions.py": {
+    "mtime": 1787915910.6145759,
+    "seen": 1788103869.7206042,
+    "ast_hash": "e9ca6bfaca3338c2291fae88a5e8d031",
+    "semantic_hash": "e9ca6bfaca3338c2291fae88a5e8d031"
+  },
+  "pcbqa/tests/test_placement_keep_apart.py": {
+    "mtime": 1787866301.566573,
+    "seen": 1788103869.7206047,
+    "ast_hash": "06096cbdd4db4af3ff576247a5e28475",
+    "semantic_hash": "06096cbdd4db4af3ff576247a5e28475"
+  },
+  "pcbqa/tests/test_presets.py": {
+    "mtime": 1787871466.667802,
+    "seen": 1788103869.7206054,
+    "ast_hash": "fbf746f86e443b0a3d68a36061183d7f",
+    "semantic_hash": "fbf746f86e443b0a3d68a36061183d7f"
+  },
+  "pcbqa/tests/test_propose.py": {
+    "mtime": 1788102263.06729,
+    "seen": 1788103869.7206059,
+    "ast_hash": "37c09093853fecc36cd6c93b4f230f5b",
+    "semantic_hash": "37c09093853fecc36cd6c93b4f230f5b"
+  },
+  "pcbqa/tests/test_refine.py": {
+    "mtime": 1787745820.6686218,
+    "seen": 1788103869.7206068,
+    "ast_hash": "75dcaaeaf3ae67608233520ef9fef6cd",
+    "semantic_hash": "75dcaaeaf3ae67608233520ef9fef6cd"
+  },
+  "pcbqa/tests/test_repertoire.py": {
+    "mtime": 1787739017.7249517,
+    "seen": 1788103869.7206073,
+    "ast_hash": "4ff5b72b22449d73b2dd3cdce7086e22",
+    "semantic_hash": "4ff5b72b22449d73b2dd3cdce7086e22"
+  },
+  "pcbqa/tests/test_sch_add.py": {
+    "mtime": 1788173084.154164,
+    "seen": 1788173182.2171752,
+    "ast_hash": "973276b09af31de6813c9526e38d1217",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_sch_connect.py": {
+    "mtime": 1787786884.9539855,
+    "seen": 1788103869.7206082,
+    "ast_hash": "56b796c5b09b31576b4cb65bf3baa989",
+    "semantic_hash": "56b796c5b09b31576b4cb65bf3baa989"
+  },
+  "pcbqa/tests/test_sch_move.py": {
+    "mtime": 1787676754.3653722,
+    "seen": 1788103869.720609,
+    "ast_hash": "18d832c9e1124f1ff901c54545bb80f0",
+    "semantic_hash": "18d832c9e1124f1ff901c54545bb80f0"
+  },
+  "pcbqa/tests/test_sch_place.py": {
+    "mtime": 1787678214.20321,
+    "seen": 1788103869.7206092,
+    "ast_hash": "d312d4157f99fac8a0741e3e0ab71d41",
+    "semantic_hash": "d312d4157f99fac8a0741e3e0ab71d41"
+  },
+  "pcbqa/tests/test_schematic.py": {
+    "mtime": 1787674860.917741,
+    "seen": 1788103869.72061,
+    "ast_hash": "2a89832da8b102f87d9df17d09a2e654",
+    "semantic_hash": "2a89832da8b102f87d9df17d09a2e654"
+  },
+  "pcbqa/tests/test_score_weights.py": {
+    "mtime": 1787870568.6200805,
+    "seen": 1788103869.7206106,
+    "ast_hash": "88ef84f7e26aca51754148c9dcb2cbfd",
+    "semantic_hash": "88ef84f7e26aca51754148c9dcb2cbfd"
+  },
+  "pcbqa/tests/test_subcircuit.py": {
+    "mtime": 1787916077.8737924,
+    "seen": 1788103869.720611,
+    "ast_hash": "bc751a95bcc2a68a192f4428803c37ea",
+    "semantic_hash": "bc751a95bcc2a68a192f4428803c37ea"
+  },
+  "pcbqa/tests/test_swig_bridge.py": {
+    "mtime": 1788099598.5260947,
+    "seen": 1788103869.7206116,
+    "ast_hash": "1ddcfbd243d98a053b3738b702bb177f",
+    "semantic_hash": "1ddcfbd243d98a053b3738b702bb177f"
+  },
+  "pcbqa/tests/test_thermal.py": {
+    "mtime": 1787887967.5824702,
+    "seen": 1788103869.720612,
+    "ast_hash": "b3e140ef1831694c387c77ed069c31dd",
+    "semantic_hash": "b3e140ef1831694c387c77ed069c31dd"
+  },
+  "pcbqa/tests/test_zones.py": {
+    "mtime": 1787873251.8950667,
+    "seen": 1788103869.7206125,
+    "ast_hash": "3054ba7c80dbb11857a19317235bdb36",
+    "semantic_hash": "3054ba7c80dbb11857a19317235bdb36"
+  },
+  ".beads/hooks/post-commit": {
+    "mtime": 1788103964.987638,
+    "seen": 1788171527.787144,
+    "ast_hash": "5d050bf34a4f074fbc104f40ea20ef6a",
+    "semantic_hash": "5d050bf34a4f074fbc104f40ea20ef6a"
+  },
+  ".claude/graphify-durum.py": {
+    "mtime": 1788172388.8599072,
+    "seen": 1788172438.8168273,
+    "ast_hash": "7c44317ab8df71f8d19ba3b17467dd9d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/beads/SKILL.md": {
+    "mtime": 1787852658.0089152,
+    "seen": 1788171527.7872365,
+    "ast_hash": "4eba59bd27c18667fbbed3d5942b40ef",
+    "semantic_hash": "4eba59bd27c18667fbbed3d5942b40ef"
+  },
+  ".agents/skills/beads/agents/openai.yaml": {
+    "mtime": 1787852658.010564,
+    "seen": 1788171527.7872372,
+    "ast_hash": "075f32133b20f796e271f03cd50cd03e",
+    "semantic_hash": "075f32133b20f796e271f03cd50cd03e"
+  },
+  ".beads/README.md": {
+    "mtime": 1787852657.2624528,
+    "seen": 1788171527.787238,
+    "ast_hash": "7b562344dfbbf12388c3032ba0aa4d4e",
+    "semantic_hash": "7b562344dfbbf12388c3032ba0aa4d4e"
+  },
+  ".beads/config.yaml": {
+    "mtime": 1787852657.2613707,
+    "seen": 1788171527.7872384,
+    "ast_hash": "02c8b4ab144b921a57ef7989db4fb5fd",
+    "semantic_hash": "02c8b4ab144b921a57ef7989db4fb5fd"
+  },
+  ".claude/agents/placer-anneal.md": {
+    "mtime": 1787648950.4149733,
+    "seen": 1788171527.787239,
+    "ast_hash": "e901e8284125304fe69ef1ed67be7d96",
+    "semantic_hash": "e901e8284125304fe69ef1ed67be7d96"
+  },
+  ".claude/agents/placer-cluster.md": {
+    "mtime": 1787648950.4149733,
+    "seen": 1788171527.78724,
+    "ast_hash": "d15b04224793be75d48ac09d4a8af495",
+    "semantic_hash": "d15b04224793be75d48ac09d4a8af495"
+  },
+  ".claude/agents/placer-force.md": {
+    "mtime": 1787648950.4149733,
+    "seen": 1788171527.7872405,
+    "ast_hash": "d0344674324e2a0c6aa2ad6d217c2f8e",
+    "semantic_hash": "d0344674324e2a0c6aa2ad6d217c2f8e"
+  },
+  "AGENTS.md": {
+    "mtime": 1788794249.217571,
+    "seen": 1788794298.7137244,
+    "ast_hash": "35c9fd69a1644e23f16909cf8be71359",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1788794250.1835766,
+    "seen": 1788794298.713725,
+    "ast_hash": "77f0758ef922ebb4cf11ffd0c7d7d7ec",
+    "semantic_hash": ""
+  },
+  "KicadOtomasyon1/.history/README.txt": {
+    "mtime": 1787943507.8583612,
+    "seen": 1788171527.787242,
+    "ast_hash": "00aafcbbe4e884d6739a909841dd12d0",
+    "semantic_hash": "00aafcbbe4e884d6739a909841dd12d0"
+  },
+  "pcbqa/HANDOFF.md": {
+    "mtime": 1788518745.170777,
+    "seen": 1788518864.6957667,
+    "ast_hash": "89d1654acf6c64169c930af2e41a2c76",
+    "semantic_hash": ""
+  },
+  "pcbqa/KURULUM.md": {
+    "mtime": 1788855370.2508688,
+    "seen": 1788855390.704016,
+    "ast_hash": "72a7ecbbf3857848b09051d0714d7c5d",
+    "semantic_hash": ""
+  },
+  "pcbqa/README.md": {
+    "mtime": 1788102802.5287516,
+    "seen": 1788171527.7872448,
+    "ast_hash": "e02b3c2e55d46c1ab7b83b3e92b77959",
+    "semantic_hash": "e02b3c2e55d46c1ab7b83b3e92b77959"
+  },
+  "pcbqa/docs/hafiza/beads-acik-kayitlar.md": {
+    "mtime": 1788817703.940145,
+    "seen": 1788817715.492116,
+    "ast_hash": "641796c5228e2b69576cb9a87daf8ce4",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/beads-kapali-kayitlar.md": {
+    "mtime": 1788855599.4395418,
+    "seen": 1788855620.0226483,
+    "ast_hash": "b8b4d538556a4c5183c6ab39c73e794c",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/canli-mod-ve-sematik-api.md": {
+    "mtime": 1788172183.7894104,
+    "seen": 1788172197.1012976,
+    "ast_hash": "904c3f26db4fa30ebe6abe3e5c585190",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/canli-pcb-duzenleme-calisiyor.md": {
+    "mtime": 1788172184.333662,
+    "seen": 1788172197.1012986,
+    "ast_hash": "10001344db57e51ef33d7eec86ea1aa6",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/evre-3-uretken-tasarim-fazlama.md": {
+    "mtime": 1788172184.8548431,
+    "seen": 1788172197.1012995,
+    "ast_hash": "072ebec6ec4ed3f95c985df886ffe163",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/kicad-baglanti-yollari.md": {
+    "mtime": 1788172185.8772855,
+    "seen": 1788172197.101301,
+    "ast_hash": "a83a2291f9e919b165908d597eb29b79",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/kicad-python-sys-path-silme.md": {
+    "mtime": 1788172186.3897088,
+    "seen": 1788172197.1013017,
+    "ast_hash": "1eaf836a31d213d4a0b65c87aa3242be",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/sematik-canli-yazma-mumkun-degil.md": {
+    "mtime": 1788172186.9131908,
+    "seen": 1788172197.1013026,
+    "ast_hash": "dd0787406aa41b6831eccce9c28a28db",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/serena-kaldirildi-graphify-eklendi.md": {
+    "mtime": 1788172187.4669054,
+    "seen": 1788172197.1013033,
+    "ast_hash": "d27ef1ad68e4c34854a6a4b07a2c6fc4",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/skorlama-yol-haritasi-evre-1-tam-metin-pcbqa.md": {
+    "mtime": 1788172187.9778814,
+    "seen": 1788172197.1013038,
+    "ast_hash": "b485fbbf8b72ffd3564034b5031bc770",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/tasarim-kurallari/01-anahtarlamali-guc.md": {
+    "mtime": 1787834340.4135203,
+    "seen": 1788171527.7872512,
+    "ast_hash": "ac7817ba31587bcf453d48a077b0dce0",
+    "semantic_hash": "ac7817ba31587bcf453d48a077b0dce0"
+  },
+  "pcbqa/docs/tasarim-kurallari/02-uretilebilirlik-ipc.md": {
+    "mtime": 1787834364.4023075,
+    "seen": 1788171527.7872517,
+    "ast_hash": "bc73a0ee47bbd2617f1a5ca857574df4",
+    "semantic_hash": "bc73a0ee47bbd2617f1a5ca857574df4"
+  },
+  "pcbqa/docs/tasarim-kurallari/03-yuksek-hiz-sinyal.md": {
+    "mtime": 1787834825.4802046,
+    "seen": 1788171527.7872524,
+    "ast_hash": "3c937999c2ddc85a5e66a5d9df681a6c",
+    "semantic_hash": "3c937999c2ddc85a5e66a5d9df681a6c"
+  },
+  "pcbqa/docs/tasarim-kurallari/04-lineer-motor-koruma.md": {
+    "mtime": 1787834580.5759113,
+    "seen": 1788171527.787253,
+    "ast_hash": "3297881dc3ddb08f5d62ae74af24880c",
+    "semantic_hash": "3297881dc3ddb08f5d62ae74af24880c"
+  },
+  "pcbqa/docs/tasarim-kurallari/README.md": {
+    "mtime": 1787888826.8198383,
+    "seen": 1788171527.7872539,
+    "ast_hash": "1fae6f52171f4c250aec811589a24130",
+    "semantic_hash": "1fae6f52171f4c250aec811589a24130"
+  },
+  "pcbqa/docs/yol-haritasi-skorlama.md": {
+    "mtime": 1788103259.6889384,
+    "seen": 1788171527.7872543,
+    "ast_hash": "45e80820175c01b979fc45bb32ed61b8",
+    "semantic_hash": "45e80820175c01b979fc45bb32ed61b8"
+  },
+  "pcbqa/pcbqa/default_rules.yaml": {
+    "mtime": 1787870925.3016424,
+    "seen": 1788171527.7872548,
+    "ast_hash": "a9b9c01d5eb49425c0caab28e2e8ab04",
+    "semantic_hash": "a9b9c01d5eb49425c0caab28e2e8ab04"
+  },
+  "pcbqa/pcbqa/placement/AGENT_BRIEF.md": {
+    "mtime": 1787671845.6884913,
+    "seen": 1788171527.7872553,
+    "ast_hash": "71a5f9428f70d81d327545d272008707",
+    "semantic_hash": "71a5f9428f70d81d327545d272008707"
+  },
+  "pcbqa/pcbqa/presets/buck.rules.yaml": {
+    "mtime": 1787892986.1869917,
+    "seen": 1788171527.787256,
+    "ast_hash": "2715c00b968fce340f7936fdab5a09e8",
+    "semantic_hash": "2715c00b968fce340f7936fdab5a09e8"
+  },
+  "pcbqa/pcbqa/presets/lineer-koruma.rules.yaml": {
+    "mtime": 1787882806.65551,
+    "seen": 1788171527.7872565,
+    "ast_hash": "8ea84d126e30d2033c010e3107d2c063",
+    "semantic_hash": "8ea84d126e30d2033c010e3107d2c063"
+  },
+  "pcbqa/pcbqa/presets/uretim.rules.yaml": {
+    "mtime": 1787915805.4811273,
+    "seen": 1788171527.7872572,
+    "ast_hash": "7ea01a24379be17c744d13b857d357be",
+    "semantic_hash": "7ea01a24379be17c744d13b857d357be"
+  },
+  "pcbqa/pcbqa/presets/yuksek-hiz.rules.yaml": {
+    "mtime": 1787888582.6707988,
+    "seen": 1788171527.787258,
+    "ast_hash": "bbe79ff40e20a256272618b003a3350c",
+    "semantic_hash": "bbe79ff40e20a256272618b003a3350c"
+  },
+  "pcbqa/pcbqa/templates/crystal-hse.yaml": {
+    "mtime": 1787928871.6253433,
+    "seen": 1788171527.7872584,
+    "ast_hash": "392dc0de9aeadbdfdad456f7af4d479d",
+    "semantic_hash": "392dc0de9aeadbdfdad456f7af4d479d"
+  },
+  "pcbqa/pcbqa/templates/guc-girisi-header.yaml": {
+    "mtime": 1787928891.7085054,
+    "seen": 1788171527.7872589,
+    "ast_hash": "0ff674aa4bc72ab3dca643c14c09e957",
+    "semantic_hash": "0ff674aa4bc72ab3dca643c14c09e957"
+  },
+  "pcbqa/pcbqa/templates/ldo-ams1117-3v3.yaml": {
+    "mtime": 1787928863.1204684,
+    "seen": 1788171527.7872593,
+    "ast_hash": "0e88faf6c5a5e7d3e871619052d96797",
+    "semantic_hash": "0e88faf6c5a5e7d3e871619052d96797"
+  },
+  "pcbqa/pcbqa/templates/mcu-stm32f103c8.yaml": {
+    "mtime": 1787928853.229763,
+    "seen": 1788171527.78726,
+    "ast_hash": "dcb11d4057e5c0238d9ab85cb69959ab",
+    "semantic_hash": "dcb11d4057e5c0238d9ab85cb69959ab"
+  },
+  "pcbqa/pcbqa/templates/swd-header.yaml": {
+    "mtime": 1787928886.4032109,
+    "seen": 1788171527.7872608,
+    "ast_hash": "8ce77c18817f14b40040969825b517bb",
+    "semantic_hash": "8ce77c18817f14b40040969825b517bb"
+  },
+  "pcbqa/pcbqa/templates/usb-micro-b.yaml": {
+    "mtime": 1787928881.8605697,
+    "seen": 1788171527.7872612,
+    "ast_hash": "49a1bf33494763fa1da9657e62cdc5d2",
+    "semantic_hash": "49a1bf33494763fa1da9657e62cdc5d2"
+  },
+  "pcbqa/requirements.txt": {
+    "mtime": 1787938433.4633305,
+    "seen": 1788171527.7872617,
+    "ast_hash": "fccc4042f9c9197227c955952532ac29",
+    "semantic_hash": "fccc4042f9c9197227c955952532ac29"
+  },
+  "pcbqa/samples/bench.rules.yaml": {
+    "mtime": 1787615508.5835886,
+    "seen": 1788171527.7872622,
+    "ast_hash": "b6cfaf9af71e71d230ff8b1b760eb8c4",
+    "semantic_hash": "b6cfaf9af71e71d230ff8b1b760eb8c4"
+  },
+  "pcbqa/samples/niyetler/f103-asgari.yaml": {
+    "mtime": 1787935540.7065692,
+    "seen": 1788171527.787263,
+    "ast_hash": "8ebebdbd702440c3e26151afcdc7d179",
+    "semantic_hash": "8ebebdbd702440c3e26151afcdc7d179"
+  },
+  "pcbqa/samples/niyetler/f103-harici-guc-kristal.yaml": {
+    "mtime": 1787935540.6528099,
+    "seen": 1788171527.7872634,
+    "ast_hash": "4a789f4810342c0fe5f222d476720aba",
+    "semantic_hash": "4a789f4810342c0fe5f222d476720aba"
+  },
+  "pcbqa/samples/niyetler/f103-harici-guc-swd.yaml": {
+    "mtime": 1787935540.6814468,
+    "seen": 1788171527.787264,
+    "ast_hash": "293b110570905b6929f55778a7b92a98",
+    "semantic_hash": "293b110570905b6929f55778a7b92a98"
+  },
+  "pcbqa/samples/niyetler/f103-usb-kristal-swd.yaml": {
+    "mtime": 1787935540.5821753,
+    "seen": 1788171527.7872646,
+    "ast_hash": "493184152a70115cbc6e2cec990b7764",
+    "semantic_hash": "493184152a70115cbc6e2cec990b7764"
+  },
+  "pcbqa/samples/niyetler/f103-usb-kristal.yaml": {
+    "mtime": 1787935540.632334,
+    "seen": 1788171527.7872653,
+    "ast_hash": "278f24a46782497e9f3de183918ed541",
+    "semantic_hash": "278f24a46782497e9f3de183918ed541"
+  },
+  "pcbqa/samples/niyetler/f103-usb-swd.yaml": {
+    "mtime": 1787935540.608184,
+    "seen": 1788171527.7872658,
+    "ast_hash": "783fb98eba813bf1507a99ddbbf24d13",
+    "semantic_hash": "783fb98eba813bf1507a99ddbbf24d13"
+  },
+  "pcbqa/samples/niyetler/guc-modulu.yaml": {
+    "mtime": 1787935540.732495,
+    "seen": 1788171527.787269,
+    "ast_hash": "7235231a624e0894e7393d1a015e1d0e",
+    "semantic_hash": "7235231a624e0894e7393d1a015e1d0e"
+  },
+  "pcbqa/samples/ornek-niyet.yaml": {
+    "mtime": 1787928908.9455647,
+    "seen": 1788171527.7872696,
+    "ast_hash": "7b0dca75b51d65f95e65eea90e72cc75",
+    "semantic_hash": "7b0dca75b51d65f95e65eea90e72cc75"
+  },
+  "pcbqa/samples/pic_programmer.rules.yaml": {
+    "mtime": 1787614004.0379312,
+    "seen": 1788171527.7872703,
+    "ast_hash": "328fc8b30f82c091fbb39bad0f963da8",
+    "semantic_hash": "328fc8b30f82c091fbb39bad0f963da8"
+  },
+  ".claude/graphify-bilgilendir.py": {
+    "mtime": 1788172260.5790472,
+    "seen": 1788172281.7994845,
+    "ast_hash": "d15e1e8f8d8d5d0434281d1d76b12fc4",
+    "semantic_hash": ""
+  },
+  ".claude/graphify-etiketle.py": {
+    "mtime": 1788172251.7874765,
+    "seen": 1788172281.7994893,
+    "ast_hash": "9903d88435e8314f4e46722ae267c1a5",
+    "semantic_hash": ""
+  },
+  ".claude/graphify-etiketler.json": {
+    "mtime": 1788171803.4379947,
+    "seen": 1788172197.1011949,
+    "ast_hash": "e3b9b68c8387131137f279977e9581b9",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/graphify-kurulumu-ve-hafiza-akisi.md": {
+    "mtime": 1788172185.3558624,
+    "seen": 1788172197.1013002,
+    "ast_hash": "539a1d493360ff681139d7aa3a1461b0",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/calisma-anlasmasi-graphify-entegre.md": {
+    "mtime": 1788794356.1848378,
+    "seen": 1788794368.1673994,
+    "ast_hash": "01bd9da4044c0daf71f6257388ec3435",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/netlistte-gorunmeyeni-netlistte-arama.md": {
+    "mtime": 1788173162.8209014,
+    "seen": 1788173182.2172198,
+    "ast_hash": "b57a9ccdce4e02885a4af8bf9e36612d",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/lexicon.py": {
+    "mtime": 1788174651.6532154,
+    "seen": 1788174840.3471978,
+    "ast_hash": "357bb04bbf0a66f9a2e0dd62d5ac1b9d",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_lexicon.py": {
+    "mtime": 1788174702.979185,
+    "seen": 1788174840.3472567,
+    "ast_hash": "5d5de15a417975c80853128c5869b515",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/mpn.py": {
+    "mtime": 1788467903.6552098,
+    "seen": 1788468771.0874581,
+    "ast_hash": "83a01b5d81c152d0731b9da3c223a93d",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_mpn.py": {
+    "mtime": 1788175371.9501607,
+    "seen": 1788175473.0304832,
+    "ast_hash": "3a9ce8b92e290bc7141acf37e0cbd87a",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/sentetik-veri-isaretlenmeli.md": {
+    "mtime": 1788175462.2656288,
+    "seen": 1788175473.0305161,
+    "ast_hash": "4bcb4f329a1a4278d9c003dc420f08ed",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/komut.py": {
+    "mtime": 1788518957.7652102,
+    "seen": 1788794298.7136424,
+    "ast_hash": "889a1383f84939cba8e000f6fa1c59cb",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_komut.py": {
+    "mtime": 1788518628.3950593,
+    "seen": 1788518864.6957173,
+    "ast_hash": "0eda4ec0721de8b921cc84fe597d07ce",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/arayuz.py": {
+    "mtime": 1788855368.9156022,
+    "seen": 1788855390.703819,
+    "ast_hash": "34b129391cbab1f7ddeab01fd36d38a5",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/elektrik.py": {
+    "mtime": 1788468113.9341471,
+    "seen": 1788468771.0874033,
+    "ast_hash": "2929fca9d45c3073375502b4e31a4861",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_arayuz.py": {
+    "mtime": 1788855203.2445426,
+    "seen": 1788855390.7039363,
+    "ast_hash": "88b59b636c047b2764f93f6209fe7f61",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_elektrik.py": {
+    "mtime": 1788468216.780438,
+    "seen": 1788468771.0875483,
+    "ast_hash": "b2dd2abfd0795466b9f31cf1ab8e5108",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/canli.py": {
+    "mtime": 1788855367.0493364,
+    "seen": 1788855390.7038226,
+    "ast_hash": "c773f2570906a05eeb3fc08d7580ea0f",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_canli.py": {
+    "mtime": 1788796297.402073,
+    "seen": 1788796401.868435,
+    "ast_hash": "18e31cb0df593ae3ebfe3bcd41794422",
+    "semantic_hash": ""
+  },
+  "scratchpad/canli-dogrulama/test-sonuclari.txt": {
+    "mtime": 1788796469.5803223,
+    "seen": 1788796581.9384615,
+    "ast_hash": "a4304ab52b83b809cade3fe92a84b8c6",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/canli-pcb-arayuzu-ve-dogrulama.md": {
+    "mtime": 1788796560.4339087,
+    "seen": 1788796581.9384005,
+    "ast_hash": "e35274237178baca25af661aa8b9ae69",
+    "semantic_hash": ""
+  },
+  "scratchpad/canli-dogrulama/.history/README.txt": {
+    "mtime": 1788796476.402245,
+    "seen": 1788796581.9384596,
+    "ast_hash": "00aafcbbe4e884d6739a909841dd12d0",
+    "semantic_hash": ""
+  },
+  ".serena/project.yml": {
+    "mtime": 1788817419.610725,
+    "seen": 1788817715.4921093,
+    "ast_hash": "694853a2926dfd0f1d8888e55f640350",
+    "semantic_hash": ""
+  },
+  "CanliProjeler/KicadOtomasyon1-c77c93ac/.pcbqa-canli.json": {
+    "mtime": 1788819304.1839366,
+    "seen": 1788855390.7038093,
+    "ast_hash": "bc2005ca8e8b4d0d5d70c362f2aecf38",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/canli_sematik.py": {
+    "mtime": 1788819298.4527843,
+    "seen": 1788855390.7038248,
+    "ast_hash": "7f89abf9502f3aef2e06fef19416ead3",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/canli_sematik_worker.py": {
+    "mtime": 1788819101.7656298,
+    "seen": 1788855390.7038262,
+    "ast_hash": "2edc7179af572489eedb5ea8c0bdcfb9",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_canli_sematik.py": {
+    "mtime": 1788855204.376429,
+    "seen": 1788855390.703941,
+    "ast_hash": "c62a51e15627a978abf70e7e2815a4b0",
+    "semantic_hash": ""
+  },
+  "CanliProjeler/KicadOtomasyon1-c77c93ac/.history/README.txt": {
+    "mtime": 1787943507.8583612,
+    "seen": 1788855390.704011,
+    "ast_hash": "00aafcbbe4e884d6739a909841dd12d0",
+    "semantic_hash": ""
+  },
+  "pcbqa/docs/hafiza/canli-sematik-nightly-dogrulandi.md": {
+    "mtime": 1788855595.0384395,
+    "seen": 1788855620.0226536,
+    "ast_hash": "0b53bd550a9099f3f7e4ef27aafef9a1",
+    "semantic_hash": ""
+  }
+}
