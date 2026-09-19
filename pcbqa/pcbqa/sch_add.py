@@ -296,7 +296,7 @@ def plan_add(
     placements = [(refs[slot], unit_no) for slot, unit_no in assignments]
 
     # Govde boyutu: yalnizca YERLESTIRILEN birimin pinleri sayilir
-    size = _symbol_size(symbol, placements[0][1])
+    size = symbol_size(symbol, placements[0][1])
     notes: list[str] = []
     if at is not None:
         positions = [(_snap(at[0] + i * step), _snap(at[1])) for i in range(count)]
@@ -383,7 +383,7 @@ def allocate_units(
     return [(i // per_ref, (i % per_ref) + 1) for i in range(count)]
 
 
-def _symbol_size(symbol: symlib.LibSymbol, unit: int = 1) -> tuple[float, float]:
+def symbol_size(symbol: symlib.LibSymbol, unit: int = 1) -> tuple[float, float]:
     """Sembolun kapladigi kaba alan (pinler dahil)."""
     pins = [p for p in symbol.pins if p.unit in (0, unit)] or symbol.pins
     xs = [p.x for p in pins]
@@ -554,7 +554,8 @@ def new_pin_points(symbol: symlib.LibSymbol, new: NewSymbol) -> dict[str, tuple]
     }
 
 
-def _pin_rotation(symbol: symlib.LibSymbol, new: NewSymbol, number: str) -> float:
+def pin_rotation(symbol: symlib.LibSymbol, new: NewSymbol, number: str) -> float:
+    """Pinin SAYFA uzerindeki acisi (etiketi dogru yone yazdirmak icin)."""
     for pin in symbol.pins:
         if pin.number == number and pin.unit in (0, new.unit):
             return (pin.rotation + new.rotation) % 360.0
@@ -592,7 +593,7 @@ def build_connections(
 
             if not conn.is_pin_target:
                 rotation = sch_wire.label_rotation(
-                    _pin_rotation(symbol, new, conn.pin)
+                    pin_rotation(symbol, new, conn.pin)
                 )
                 nodes.append(sch_wire.label_node(start[0], start[1], conn.target, rotation))
                 plan.connections.append((new.ref, conn.pin, conn.target, "etiket"))
@@ -737,8 +738,14 @@ def add_symbols(
                 after = connectivity_of(after_root, kicad_cli)
             except SchVerifyError as exc:
                 raise SchAddError(f"kalkan calistirilamadi: {exc}") from exc
+            # SANAL semboller (#PWR, #FLG) netlist'te HIC gorunmez - KiCad
+            # onlari bilesen olarak yazmaz. Beklenen listeye koyarsak
+            # "eklenenler beklenenlerle ayni mi" kontrolu HER ZAMAN duser ve
+            # guc sembolu eklenemez. Olculdu: power:+24V eklendikten sonra
+            # netlist'in bilesen kumesi HIC degismiyor (17 -> 17).
+            beklenen = {s.ref for s in plan.symbols if not s.ref.startswith("#")}
             diff = compare_additive(
-                before, after, {s.ref for s in plan.symbols},
+                before, after, beklenen,
                 expected_joins=_expected_joins(plan, wanted, before),
             )
 
@@ -823,11 +830,15 @@ def main(argv: list[str] | None = None) -> int:
         if result.diff.ok:
             print("  kalkan: mevcut devre degismedi, yalnizca yeni bilesenler eklendi")
         else:
-            print("  KALKAN REDDETTI:")
+            # Ozet ONCE yazilir: asagidaki dokum bos kalabiliyor (or. yalnizca
+            # "eklenenler beklenenle tutmadi" durumunda) ve o zaman kullaniciya
+            # gerekcesiz bir "KALKAN REDDETTI:" gorunuyordu. Olculdu: guc
+            # sembolu eklerken red mesaji tamamen bostu.
+            print(f"  KALKAN REDDETTI: {result.diff.describe()}")
+            for satir in result.diff.details():
+                print("  " + satir)
             for pin, old, new, *_ in result.diff.regrouped[:5]:
                 print(f"    {pin[0]}.{pin[1]}: {old} -> {new}")
-            for ref in result.diff.removed_components[:5]:
-                print(f"    silinen bilesen: {ref}")
             for pin in result.diff.lost_pins[:5]:
                 print(f"    kaybolan pin: {pin[0]}.{pin[1]}")
     if result.write is not None:

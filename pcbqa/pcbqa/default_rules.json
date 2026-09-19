@@ -1,0 +1,77 @@
+{
+  "defaults": {
+    "ignore_nets": [
+      "GND",
+      "AGND",
+      "DGND",
+      "GNDA",
+      "GNDD",
+      "GNDPWR",
+      "/GND",
+      "earth"
+    ],
+    "severity": "warning"
+  },
+  "rules": [
+    {
+      "description": "Her IC guc pininin yakininda kendi decoupling kondansatoru olmali",
+      "exclusive": false,
+      "id": "decoupling-mesafe",
+      "max_distance_mm": 10,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "kind": "ic",
+        "pintype": "power_in"
+      },
+      "require_partner": true,
+      "severity": "error",
+      "type": "proximity"
+    },
+    {
+      "description": "I2C / veri hatlarinda pull-up direnci bekleniyor",
+      "id": "veri-hatti-pullup",
+      "net": "(SDA|SCL|I2C|CLOCK|DATA)",
+      "partner": {
+        "kind": "resistor"
+      },
+      "severity": "warning",
+      "type": "require_on_net"
+    },
+    {
+      "description": "Netler asiri uzun degil (yerlestirme verimliligi gostergesi)",
+      "id": "net-uzunluk-butcesi",
+      "max_findings": 10,
+      "max_hpwl_mm": 120,
+      "net": ".*",
+      "severity": "warning",
+      "type": "net_length"
+    },
+    {
+      "clearance_mm": 0.0,
+      "description": "Bilesenler cakismamali, aralarinda montaj boslugu olmali",
+      "id": "courtyard-cakisma",
+      "severity": "warning",
+      "type": "courtyard_overlap"
+    },
+    {
+      "description": "Bilesenler kart kenarindan yeterince iceride olmali",
+      "id": "kart-kenari-mesafesi",
+      "ignore_refs": [
+        "^J",
+        "^P",
+        "^CON",
+        "^MH",
+        "^H\\d",
+        "^SW",
+        "^TP"
+      ],
+      "max_findings": 15,
+      "min_distance_mm": 0.5,
+      "severity": "warning",
+      "type": "edge_clearance"
+    }
+  ],
+  "version": 1
+}

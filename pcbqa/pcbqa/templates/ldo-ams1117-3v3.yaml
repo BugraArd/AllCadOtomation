@@ -1,0 +1,44 @@
+# 3.3 V dogrusal regulator: AMS1117-3.3 (SOT-223).
+#
+# Kaynak: AMS1117 veri sayfasi (Advanced Monolithic Systems) - cikis
+# kararliligi icin dusuk ESR'li >= 22 uF cikis kondansatoru ister.
+# Giris 10 uF: veri sayfasinin uygulama devresindeki deger; kesin bir alt
+# sinir verilmedigi icin muhendislik secimi sayilmali.
+#
+# Not: 5 V -> 3.3 V dusumu, USB'den beslenen tipik kullanim. Girisi
+# `guc-vbus` saglayan herhangi bir blok verebilir (USB ya da guc header'i).
+
+version: 1
+id: ldo-ams1117-3v3
+description: "AMS1117-3.3 LDO: VBUS -> 3V3, giris/cikis kondansatorleriyle"
+
+provides: [guc-3v3]
+requires: [guc-vbus]
+
+params:
+  vin: "VBUS"
+  vout: "3V3"
+  gnd: "GND"
+
+components:
+  - name: ldo
+    lib_id: Regulator_Linear:AMS1117-3.3
+    value: AMS1117-3.3
+    footprint: Package_TO_SOT_SMD:SOT-223-3_TabPin2
+    connect:
+      VI: "${vin}"
+      VO: "${vout}"
+      GND: "${gnd}"
+
+  - name: giris-kondansatoru
+    lib_id: Device:C
+    value: 10uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    connect: {"#1": "${vin}", "#2": "${gnd}"}
+
+  # AMS1117 veri sayfasi: kararlilik icin >= 22 uF, dusuk ESR.
+  - name: cikis-kondansatoru
+    lib_id: Device:C
+    value: 22uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    connect: {"#1": "${vout}", "#2": "${gnd}"}

@@ -62,10 +62,11 @@ def _load_kipy():
     try:
         from kipy import KiCad
         from kipy.geometry import Angle, Vector2
-    except ModuleNotFoundError as exc:
+    except (ImportError, OSError) as exc:
         raise IpcApplyError(
-            "kicad-python kurulu degil. Kurulum: "
-            ".\\.venv\\Scripts\\python -m pip install kicad-python"
+            "Canli baglanti kutuphaneleri yuklenemedi: " + str(exc) + ". "
+            "Ortam/Canli sekmesinden bagimliliklari kurun veya "
+            "pcbqa kurulum --canli-bagimliliklar calistirin."
         ) from exc
     return KiCad, Vector2, Angle
 
@@ -238,10 +239,12 @@ def apply_placement_to_board(
             raise
         raise IpcApplyError(f"KiCad IPC uygulamasi basarisiz: {exc}") from exc
 
+    # KiCad 10.0.4, push_commit ONCESINDE GetItems'a eski konumlari verir.
+    # Erken dogrulama dogru yazmayi reddediyordu; gorunur islemden sonra oku.
     summary.verify_errors = _verify(board, placement, summary.applied_refs, tolerance_mm)
     if summary.verify_errors:
         raise IpcApplyError(
-            "KiCad IPC uygulandi ama dogrulama basarisiz: "
+            "KiCad IPC uygulandi ama dogrulama basarisiz; Ctrl+Z ile geri alin: "
             + "; ".join(summary.verify_errors[:5])
         )
 

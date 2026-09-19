@@ -1,0 +1,121 @@
+{
+  "_aciklama": "Topluluk adlari CAPA DUGUMUNE bagli, topluluk NUMARASINA degil. Sebep olculdu: 'graphify update' her kosuda yeniden kumeliyor (174 -> 165), numaralar kayiyor ve elle verilen adlar siliniyor - yerine en yuksek dereceli dugumun adi geciyor. Capa dugum kimlikleri ise dosya yolundan turedigi icin sabit. Sira onemli: bir topluluk ilk eslesen capadan adini alir.",
+  "capalar": [
+    [
+      "pcbqa_pcbqa_rules",
+      "Kural motoru ve tasarim modeli"
+    ],
+    [
+      "pcbqa_pcbqa_harness",
+      "Hakem ve yerlestirme uygulama"
+    ],
+    [
+      "pcbqa_pcbqa_kurulum",
+      "Canli mod kurulumu"
+    ],
+    [
+      "pcbqa_pcbqa_minyaml",
+      "Bagimsiz YAML okuyucu"
+    ],
+    [
+      "pcbqa_pcbqa_pcb_sync",
+      "PCB/sematik yazma ve esitleme"
+    ],
+    [
+      "pcbqa_pcbqa_subcircuit",
+      "Alt-devre tanima"
+    ],
+    [
+      "pcbqa_pcbqa_ipc",
+      "IPC koprusu"
+    ],
+    [
+      "pcbqa_pcbqa_placement_repertoire",
+      "Hamle repertuari"
+    ],
+    [
+      "pcbqa_pcbqa_symlib",
+      "Sembol kutuphanesi"
+    ],
+    [
+      "pcbqa_pcbqa_intent",
+      "Niyet semasi ve sablonlar"
+    ],
+    [
+      "pcbqa_pcbqa_generate",
+      "Niyetten kart uretimi"
+    ],
+    [
+      "pcbqa_pcbqa_placement_force",
+      "Kuvvet tabanli yerlestirici"
+    ],
+    [
+      "pcbqa_pcbqa_placement_codex",
+      "Yerlestirici bilesen modeli"
+    ],
+    [
+      "pcbqa_pcbqa_sch_move",
+      "Sematik tasima"
+    ],
+    [
+      "pcbqa_pcbqa_sch_add",
+      "Sematige sembol ekleme"
+    ],
+    [
+      "pcbqa_pcbqa_ml_features",
+      "ML oznitelikleri"
+    ],
+    [
+      "pcbqa_pcbqa_ml_dataset",
+      "ML veri kumesi"
+    ],
+    [
+      "pcbqa_pcbqa_connect",
+      "Baglanti yurutme (bagla)"
+    ],
+    [
+      "pcbqa_pcbqa_propose",
+      "Baglanti karar katmani (oneri)"
+    ],
+    [
+      "pcbqa_pcbqa_explore",
+      "Varyant kesfi"
+    ],
+    [
+      "pcbqa_pcbqa_pcb",
+      "Kart ayristirma"
+    ],
+    [
+      "pcbqa_pcbqa_geom",
+      "Geometri"
+    ],
+    [
+      "pcbqa_pcbqa_report",
+      "Raporlama ve CLI"
+    ],
+    [
+      "pcbqa_pcbqa_ipc2221",
+      "IPC-2221 hesaplari"
+    ],
+    [
+      "pcbqa_pcbqa_sch_verify",
+      "Netlist kalkani"
+    ],
+    [
+      "pcbqa_handoff_sessiz_hata_sinifi",
+      "Sessiz hata sinifi ve surum korlugu"
+    ],
+    [
+      "pcbqa_docs_tasarim_kurallari_03_yuksek_hiz_sinyal_20h_kurali_curutuldu",
+      "Yuksek hizli sinyal kurallari"
+    ],
+    [
+      "pcbqa_docs_tasarim_kurallari_01_anahtarlamali_guc_sicak_dongu_alani",
+      "Anahtarlamali guc kurallari"
+    ],
+    [
+      "pcbqa_docs_hafiza_beads_kapali_kayitlar_kicad_i6z_baslatici_pythonpath",
+      "Calisma zamani, dagitim ve baslatici"
+    ]
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "components": [
+    {
+      "connect": {
+        "BOOT0": "${boot0}",
+        "NRST": "${nrst}",
+        "VBAT": "${vdd}",
+        "VDD": "${vdd}",
+        "VDDA": "${vdd}",
+        "VSS": "${gnd}",
+        "VSSA": "${gnd}"
+      },
+      "footprint": "Package_QFP:LQFP-48_7x7mm_P0.5mm",
+      "lib_id": "MCU_ST_STM32F1:STM32F103C8Tx",
+      "name": "mcu",
+      "value": "STM32F103C8"
+    },
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${gnd}"
+      },
+      "count": 3,
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "lib_id": "Device:C",
+      "name": "vdd-decoupling",
+      "value": "100nF"
+    },
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0805_2012Metric",
+      "lib_id": "Device:C",
+      "name": "bulk",
+      "value": "4.7uF"
+    },
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "lib_id": "Device:C",
+      "name": "vdda-filtre-kucuk",
+      "value": "10nF"
+    },
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "lib_id": "Device:C",
+      "name": "vdda-filtre-buyuk",
+      "value": "1uF"
+    },
+    {
+      "connect": {
+        "#1": "${nrst}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "lib_id": "Device:C",
+      "name": "nrst-kondansator",
+      "value": "100nF"
+    },
+    {
+      "connect": {
+        "#1": "${boot0}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "lib_id": "Device:R",
+      "name": "boot0-pulldown",
+      "value": "10k"
+    }
+  ],
+  "description": "STM32F103C8Tx (LQFP-48) cekirdegi: decoupling, NRST, BOOT0",
+  "id": "mcu-stm32f103c8",
+  "interfaces": {
+    "hse-pinleri": {
+      "mcu": {
+        "PD0": "${hse_in}",
+        "PD1": "${hse_out}"
+      }
+    },
+    "i2c1": {
+      "mcu": {
+        "PB6": "${scl}",
+        "PB7": "${sda}"
+      }
+    },
+    "swd": {
+      "mcu": {
+        "PA13": "${swdio}",
+        "PA14": "${swclk}"
+      }
+    },
+    "usb-fs": {
+      "mcu": {
+        "PA11": "${usb_dm}",
+        "PA12": "${usb_dp}"
+      }
+    }
+  },
+  "params": {
+    "boot0": "BOOT0",
+    "gnd": "GND",
+    "hse_in": "HSE_IN",
+    "hse_out": "HSE_OUT",
+    "nrst": "NRST",
+    "scl": "I2C1_SCL",
+    "sda": "I2C1_SDA",
+    "swclk": "SWCLK",
+    "swdio": "SWDIO",
+    "usb_dm": "USB_DM",
+    "usb_dp": "USB_DP",
+    "vdd": "3V3"
+  },
+  "provides": [
+    "mcu"
+  ],
+  "requires": [
+    "guc-3v3"
+  ],
+  "version": 1
+}

@@ -1,0 +1,8 @@
+# Harici besleme + SWD, kristalsiz.
+version: 1
+name: f103-harici-guc-swd
+blocks:
+  - mcu-stm32f103c8
+  - ldo-ams1117-3v3
+  - guc-girisi-header
+  - swd-header

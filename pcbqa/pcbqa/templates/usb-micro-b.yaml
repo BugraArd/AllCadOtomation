@@ -1,0 +1,43 @@
+# USB Micro-B cihaz baglantisi: konnektor + D+ pull-up.
+#
+# Kaynak: STM32F103 veri sayfasinin USB bolumu - F103'te DAHILI D+ pull-up
+# YOKTUR; cihazin kendini full-speed olarak tanitmasi icin D+ hatti 3.3 V'a
+# 1.5 kOhm ile cekilir (USB 2.0 spesifikasyonunun full-speed degeri).
+# F103'un USB'si seri sonlandirma direnclerini dahili tasir; harici 22R
+# konulmaz.
+#
+# Shield -> GND dogrudan: muhendislik secimi. EMI'ye hassas tasarimlar
+# RC ile baglar; o ayri bir sablon varyanti olur.
+
+version: 1
+id: usb-micro-b
+description: "USB Micro-B konnektoru + 1.5k D+ pull-up (F103 tarzi cihaz)"
+
+provides: [guc-vbus]
+requires: [usb-fs, guc-3v3]
+
+params:
+  vbus: "VBUS"
+  vdd: "3V3"
+  gnd: "GND"
+  usb_dm: "USB_DM"
+  usb_dp: "USB_DP"
+
+components:
+  - name: konnektor
+    lib_id: Connector:USB_B_Micro
+    value: USB_B_Micro
+    footprint: Connector_USB:USB_Micro-B_Molex-105017-0001
+    connect:
+      VBUS: "${vbus}"
+      D-: "${usb_dm}"
+      D+: "${usb_dp}"
+      GND: "${gnd}"
+      Shield: "${gnd}"
+      # ID pini cihaz modunda bos birakilir (OTG kullanilmiyor)
+
+  - name: dp-pullup
+    lib_id: Device:R
+    value: 1k5
+    footprint: Resistor_SMD:R_0603_1608Metric
+    connect: {"#1": "${usb_dp}", "#2": "${vdd}"}

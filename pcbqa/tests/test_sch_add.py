@@ -68,6 +68,30 @@ class SymLibTests(unittest.TestCase):
         self.assertEqual(sym.reference_prefix, "R")
         self.assertEqual({p.number for p in sym.pins}, {"1", "2"})
 
+    def test_extended_symbol_units_are_renamed(self):
+        """`extends` cozulurken birim dugumleri TUREVIN adini almali.
+
+        KiCad birim dugumlerini `<sembol_adi>_<birim>_<govde>` diye adlandirir.
+        Govde ust sembolden kopyalandigi icin ic adlar ustte kaliyordu:
+        "STM32F103C8Tx" adli sembolun icinde "STM32F103C_8-B_Tx_0_1".
+        OLCULDU: boyle bir sematigi `kicad-cli` hicbir mesaj vermeden 3
+        koduyla reddediyor - yani turev sembol kullanan her ekleme (STM32,
+        AMS1117...) KiCad'de acilamayan dosya uretiyordu.
+        """
+        from pcbqa.sexpr import children
+
+        sym = symlib.get_symbol("MCU_ST_STM32F1:STM32F103C8Tx")
+        self.assertTrue(sym.extends, "bu sembol bir turev olmali")
+        node = symlib.resolve_definition(sym)
+        self.assertEqual(symlib.head_atom(node), "MCU_ST_STM32F1:STM32F103C8Tx")
+        units = [symlib.head_atom(u) for u in children(node, "symbol")]
+        self.assertTrue(units)
+        for unit in units:
+            self.assertTrue(
+                unit.startswith(sym.name),
+                f"birim adi turevin adiyla baslamali: {unit!r}",
+            )
+
     def test_unknown_library_names_the_problem(self):
         with self.assertRaises(symlib.SymLibError) as ctx:
             symlib.get_symbol("YokBoyleBirKutuphane:R")
@@ -326,6 +350,57 @@ class EndToEndTests(SandboxProject):
         (self.project / LOCK_NAME).unlink(missing_ok=True)
         for new in result.plan.symbols:
             self.assertIn(new.ref, conn.components)
+
+    def test_power_symbols_can_be_added(self):
+        """Regresyon: guc sembolu kalkandan gecemiyordu.
+
+        Olculdu (2026-08-31): KiCad netlist'inde SANAL semboller (#PWR, #FLG)
+        bilesen olarak HIC gorunmuyor - power:+24V eklendikten sonra netlist'in
+        bilesen kumesi degismiyordu (17 -> 17). Kalkan ise beklenen eklenenler
+        listesinde `#PWR2`yi ariyordu, yani "eklenenler beklenenle ayni mi"
+        kontrolu HER ZAMAN dusuyordu ve hicbir guc sembolu eklenemiyordu.
+        """
+        result = add_symbols(self.sch, "power:+24V", 1, apply=True)
+        self.assertTrue(result.applied,
+                        f"guc sembolu eklenemedi: {result.diff}")
+        self.assertIsNotNone(result.diff)
+        self.assertTrue(result.diff.ok, result.diff)
+
+        schematic = read_schematic(self.sch)
+        eklenen = schematic.by_ref(result.plan.symbols[0].ref)
+        self.assertIsNotNone(eklenen, "guc sembolu geri okunamadi")
+        self.assertTrue(eklenen.is_virtual)
+        self.assertEqual(eklenen.value, "+24V")
+
+    def test_power_symbol_is_not_expected_in_the_netlist(self):
+        """Kalkanin beklenen listesi sanal sembolleri ICERMEMELI.
+
+        Bu, yukaridaki hatanin kok sebebi: netlist'te hic gorunmeyen bir
+        referansi beklemek, gecmesi mumkun olmayan bir sart koymaktir.
+        """
+        from pcbqa.sch_verify import connectivity_of
+
+        once = connectivity_of(self.sch)
+        result = add_symbols(self.sch, "power:+5V", 1, verify=False, apply=True)
+        sonra = connectivity_of(self.sch)
+        (self.project / LOCK_NAME).unlink(missing_ok=True)
+
+        self.assertTrue(result.plan.symbols[0].ref.startswith("#"))
+        self.assertEqual(sonra.components, once.components,
+                         "guc sembolu netlist'e bilesen olarak girmemeli")
+
+    def test_shield_rejection_always_states_a_reason(self):
+        """Reddeden kalkan NEDENINI soylemeli.
+
+        Olculdu: guc sembolu reddi sirasinda mesaj tamamen bostu - ekranda
+        yalnizca 'KALKAN REDDETTI:' yaziyordu. Bir ret gerekcesiz olursa
+        kullanici neyi duzeltecegini bilemez.
+        """
+        from pcbqa.sch_verify import ConnectivityDiff
+
+        diff = ConnectivityDiff(ok=False, added_components=["#PWR2"])
+        self.assertTrue(diff.describe().strip())
+        self.assertNotEqual(diff.describe().strip(), "BAGLANTI DEGISTI:")
 
     def test_shield_leaves_no_lock_in_the_project(self):
         """Kalkan kum havuzunda calisir; kullanicinin klasorune kilit birakmaz."""

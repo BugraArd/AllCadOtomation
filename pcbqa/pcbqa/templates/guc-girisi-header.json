@@ -1,0 +1,25 @@
+{
+  "components": [
+    {
+      "connect": {
+        "#1": "${vin}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "lib_id": "Connector_Generic:Conn_01x02",
+      "name": "header",
+      "value": "GUC-5V"
+    }
+  ],
+  "description": "2 pinli guc girisi header'i (5V/VBUS + GND)",
+  "id": "guc-girisi-header",
+  "params": {
+    "gnd": "GND",
+    "vin": "VBUS"
+  },
+  "provides": [
+    "guc-vbus"
+  ],
+  "requires": [],
+  "version": 1
+}

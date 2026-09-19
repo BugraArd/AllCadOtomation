@@ -1,0 +1,147 @@
+{
+  "defaults": {
+    "ignore_nets": [
+      "GND",
+      "AGND",
+      "DGND",
+      "PGND",
+      "/GND"
+    ],
+    "severity": "warning"
+  },
+  "rules": [
+    {
+      "description": "LDO giris kondansatoru VIN pinine yakin olmali (TI: < 5 mm)",
+      "id": "ldo-giris-kondansatoru",
+      "max_distance_mm": 5.0,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "function": "^(VIN|IN|VI)$",
+        "kind": "ic"
+      },
+      "require_partner": true,
+      "severity": "error",
+      "type": "proximity",
+      "weight": 6
+    },
+    {
+      "description": "LDO cikis kondansatoru VOUT pinine yakin olmali (TI: < 5 mm)",
+      "id": "ldo-cikis-kondansatoru",
+      "max_distance_mm": 5.0,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "function": "^(VOUT|OUT|VO)$",
+        "kind": "ic"
+      },
+      "require_partner": false,
+      "severity": "error",
+      "type": "proximity",
+      "weight": 6
+    },
+    {
+      "current_a": 0.001,
+      "description": "Gate izleri yeterince genis olmali (TI SLVA959B: >= 0.508 mm @ 1 oz)",
+      "id": "motor-gate-izi-genisligi",
+      "min_width_mm": 0.508,
+      "net": "^(GATE|GH|GL|HG|LG|G[0-9])",
+      "scale": true,
+      "type": "trace_width",
+      "weight": 10
+    },
+    {
+      "current_a": 1.0,
+      "description": "Motor guc izleri (TI SNVA021C: >= 0.381 mm/A mutlak minimum)",
+      "id": "motor-guc-izi",
+      "min_width_mm": 0.381,
+      "net": "^(VM|VBAT|MOTOR|OUT[AB]|M[12])",
+      "scale": true,
+      "severity": "error",
+      "type": "trace_width",
+      "weight": 14
+    },
+    {
+      "description": "Motor surucu bypass kondansatoru besleme pinine yakin (TI: < 5 mm)",
+      "id": "motor-bypass-kondansatoru",
+      "max_distance_mm": 5.0,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "kind": "ic",
+        "pintype": "power_in",
+        "ref": "^U"
+      },
+      "require_partner": true,
+      "severity": "error",
+      "type": "proximity",
+      "weight": 10
+    },
+    {
+      "description": "TVS/ESD korumasi konnektore bitisik olmali (TI SLVA680A; sayi ikincil kaynak)",
+      "id": "esd-tvs-konnektore-yakin",
+      "max_distance_mm": 5.0,
+      "partner": {
+        "kind": "diode",
+        "ref": "^(D|TVS|ESD)"
+      },
+      "pin": {
+        "kind": "connector"
+      },
+      "require_partner": false,
+      "severity": "error",
+      "type": "proximity",
+      "weight": 14
+    },
+    {
+      "description": "Sicaklik sensorunun bypass kondansatoru <= 5 mm (TI SNOA986A)",
+      "id": "sensor-bypass-kondansatoru",
+      "max_distance_mm": 5.0,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "kind": "ic",
+        "pintype": "power_in",
+        "ref": "^(U|TMP|IC)"
+      },
+      "require_partner": false,
+      "severity": "error",
+      "type": "proximity",
+      "weight": 12
+    },
+    {
+      "a": {
+        "kind": "resistor"
+      },
+      "b": {
+        "kind": "ic",
+        "ref": "^(TMP|TEMP|LM7[45])"
+      },
+      "description": "I2C pull-up direncleri sicaklik sensorunden >= 10 mm (TI SNOA986A: oz-isinma)",
+      "id": "sensor-pullup-uzak-dursun",
+      "min_distance_mm": 10.0,
+      "severity": "error",
+      "type": "keep_apart",
+      "weight": 12
+    },
+    {
+      "a": {
+        "kind": "ic",
+        "ref": "^(IMU|MAG|LSM|MPU|BM[IX])"
+      },
+      "b": {
+        "kind": "inductor"
+      },
+      "description": "Manyetometre/IMU guc bilesenlerinden >= 10 mm (NXP AN4247; kalibrasyon yine de sart)",
+      "id": "manyetik-sensor-guc-izinden-uzak",
+      "min_distance_mm": 10.0,
+      "type": "keep_apart",
+      "weight": 4
+    }
+  ],
+  "version": 1
+}

@@ -159,10 +159,23 @@ class Dataset:
 
     # ---------------------------------------------------------------- depolama
 
+    # Baslikta ANLAMI olan alanlar; `meta` bunlari ezemez.
+    RESERVED_META = ("kind", "feature_version", "features", "count")
+
     def save(self, path: Path) -> None:
         """JSONL: ilk satir baslik, sonraki her satir bir ornek."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        # `meta` basliga duz olarak serpiliyor; ayrilmis bir ad kullanmak
+        # dosyayi SESSIZCE bozar. Olculdu: meta'da "kind" olan bir dosya
+        # sorunsuz yaziliyor, sonra `load` "pcbqa veri kumesi degil" diye
+        # reddediyor ve sebebi hicbir yerde yazmiyor.
+        clashing = sorted(set(self.meta) & set(self.RESERVED_META))
+        if clashing:
+            raise ValueError(
+                "meta alani baslikta ayrilmis ad(lar) iceriyor: "
+                f"{', '.join(clashing)} (ayrilmis: {', '.join(self.RESERVED_META)})"
+            )
         header = {
             "kind": DATASET_KIND,
             "feature_version": self.feature_version,

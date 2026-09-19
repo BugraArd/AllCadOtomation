@@ -1,0 +1,65 @@
+{
+  "defaults": {
+    "ignore_nets": [
+      "GND",
+      "AGND",
+      "DGND",
+      "PGND",
+      "/GND"
+    ],
+    "severity": "warning"
+  },
+  "rules": [
+    {
+      "cin_max_mm": 3.0,
+      "cout_max_mm": 4.0,
+      "description": "Anahtarlamali regulator yerlesimi (ROHM 66AN015E kontrol listesi)",
+      "fb_max_mm": 4.0,
+      "hot_loop_max_mm2": 6.0,
+      "id": "buck-yerlesim",
+      "severity": "error",
+      "sw_area_max_mm2": 100,
+      "sw_max_mm": 4.0,
+      "type": "buck_layout",
+      "weight": 18
+    },
+    {
+      "a": {
+        "kind": "resistor"
+      },
+      "a_on_net": "^(FB|VFB|VSENSE)$",
+      "b": {
+        "kind": "diode"
+      },
+      "description": "Geri besleme bilesenleri serbest gecis diyodundan uzak olmali (ROHM: >= 10 mm)",
+      "id": "buck-fb-diyottan-uzak",
+      "max_findings": 10,
+      "min_distance_mm": 10.0,
+      "type": "keep_apart",
+      "weight": 8
+    },
+    {
+      "copper_oz": 1.0,
+      "current_a": 2.0,
+      "delta_t_c": 10,
+      "description": "Guc izleri akimi tasiyacak genislikte olmali (IPC-2221B)",
+      "id": "buck-guc-izi-genisligi",
+      "method": "ipc2221",
+      "net": "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$",
+      "scale": true,
+      "severity": "error",
+      "type": "trace_width",
+      "weight": 12
+    },
+    {
+      "current_a": 2.0,
+      "description": "Guc yolunda katman degistiren via'lar akimi tasimali (TI: ~1 via/A)",
+      "id": "buck-guc-via-sayisi",
+      "net": "^(VIN|PVIN|SW|PH|LX|VOUT|VO)$",
+      "scale": true,
+      "type": "via_current",
+      "weight": 10
+    }
+  ],
+  "version": 1
+}

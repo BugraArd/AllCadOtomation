@@ -1,4 +1,12 @@
+# CALISMA ZAMANI BAGIMLILIGI YOKTUR - cekirdek yalnizca stdlib kullanir.
+# Sebep: paket KiCad'in KENDI Python'unda da calisabilmeli (eklenti / API'siz
+# baglanti). Orada pyyaml YOKTUR; kural ve sablon dosyalari `pcbqa.bundle` ile
+# uretilen JSON kopyalarindan okunur. Bkz. pcbqa/confload.py.
+
+# Gelistirme: YAML kaynaklarini okumak ve JSON kopyalarini uretmek icin.
 pyyaml>=6.0
 
-# Asama 2: calisan KiCad PCB Editor'e IPC ile placement uygulama.
+# Istege bagli: calisan KiCad'e IPC API ile baglanmak (ipc.py).
+# API sunucusu KiCad'de varsayilan KAPALI oldugu icin dagitimda tercih
+# edilmez - `swig_apply.py` ayni isi API'siz yapar.
 kicad-python>=0.7.0

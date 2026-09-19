@@ -1,0 +1,30 @@
+{
+  "components": [
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${swdio}",
+        "#3": "${swclk}",
+        "#4": "${gnd}"
+      },
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
+      "lib_id": "Connector_Generic:Conn_01x04",
+      "name": "header",
+      "value": "SWD"
+    }
+  ],
+  "description": "4 pinli SWD header'i (3V3, SWDIO, SWCLK, GND)",
+  "id": "swd-header",
+  "params": {
+    "gnd": "GND",
+    "swclk": "SWCLK",
+    "swdio": "SWDIO",
+    "vdd": "3V3"
+  },
+  "provides": [],
+  "requires": [
+    "swd",
+    "guc-3v3"
+  ],
+  "version": 1
+}

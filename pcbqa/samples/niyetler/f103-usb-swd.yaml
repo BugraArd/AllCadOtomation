@@ -1,0 +1,9 @@
+# Kristalsiz: F103 dahili RC osilatoruyla calisir (USB icin HSE gerekir,
+# yani bu kart USB'yi yalnizca besleme icin kullanan tasarimlari temsil eder).
+version: 1
+name: f103-usb-swd
+blocks:
+  - mcu-stm32f103c8
+  - ldo-ams1117-3v3
+  - usb-micro-b
+  - swd-header

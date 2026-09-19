@@ -54,6 +54,28 @@ $env:PCBQA_KICAD_CLI = "C:\Program Files\KiCad\10.0\bin\kicad-cli.exe"
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
 
+### Var olan sembolleri telleme (`bagla`)
+
+```powershell
+# Sayfaya baksın ve gerekçesiyle önersin (yazmaz)
+.\.venv\Scripts\python -m pcbqa.connect samples\uc_parca\uc_parca.kicad_sch --oner
+
+# Öneriyi çiz
+.\.venv\Scripts\python -m pcbqa.connect samples\uc_parca\uc_parca.kicad_sch --oner --uygula
+
+# Ya da hangi pinlerin aynı ağa gireceğini kendiniz söyleyin
+.\.venv\Scripts\python -m pcbqa.connect <şematik> --ag "#PWR01.1 R1.1 C1.1" --uygula
+```
+
+`--oner` niyeti **yerleşimden** okur: iki boş pin birbirinin en yakın hizalı
+komşusuysa ve aralarında engel yoksa bağlanır; güç sembolü bir rayın ortasına
+dik iniyorsa oraya iner. Kanıtı olmayan hiçbir şey önerilmez ve **atlanan pin
+adıyla söylenir**. Aynı sembolün kendi pinleri asla eşleşmez — o hizalama
+sembolün geometrisinden gelir, kullanıcının yerleşiminden değil.
+
+Yazdıktan sonra `kicad-cli` netlist'i hakemdir: istenen pinler gerçekten aynı
+ağa girmediyse komut hata döner ve yedeğin yolunu söyler.
+
 ## Aşama 5: makine öğrenimi altyapısı
 
 Aşama 3'ün dersi "yerleştirici, hakemin puanladığı şeyi optimize etmeli"ydi.
@@ -777,16 +799,23 @@ ilgilendiren pcbqa'nın kendi kurallarıdır.
 ```
 pcbqa/
   sexpr.py         s-expression okuyucu (bağımlılıksız, hatalı dosyalara toleranslı)
-  geom.py          dışbükey kabuk, SAT çakışma testi, poligon mesafesi
+  geom.py          poligon çakışması (içbükeyde de kesin), mesafe, dışbükey kabuk
   pcb.py           .kicad_pcb  -> bileşen/pad/courtyard konumları
   netlist.py       kicadxml veya doğrudan PCB -> net/pin bağlantıları
   model.py         ikisini birleştirir + ölçümler (HPWL, yoğunluk)
   rules.py         YAML kural motoru (7 kural tipi)
   kicadcli.py      kicad-cli sarmalayıcısı (netlist, ERC, DRC)
-  ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement yazar
+  ipc.py           kicad-python ile çalışan KiCad PCB Editor'e placement yazar (API sunucusu gerekir)
+  swig_apply.py    KiCad'in kendi Python'undan pcbnew ile uygular (API GEREKMEZ)
+  confload.py      YAML varsa YAML, yoksa yanındaki JSON kopyası
+  bundle.py        çalışma zamanı JSON kopyalarını üretir/denetler
   ipc_apply.py     kazanan yerleştiriciyi seçip IPC uygulamasını koşturan CLI
   report.py        terminal raporu + skor
   synth.py         sentetik test kartı üreteci
+  intent.py        niyet beyanı + şablon kütüphanesi -> inşa planı
+  generate.py      plandan sıfırdan KiCad projesi (şematik + kart + yerleşim + skor)
+  explore.py       aynı niyetten N varyant üretir, ölçer, en iyisini seçer
+  ml/collect_design.py  varyant koşumlarını eğitim verisine çevirir (3c)
   harness.py       yerleştiricileri koşturur, puanlar, kazanan kartı yazabilir
   schematic.py     .kicad_sch okuyucu (hiyerarşik, pin/bbox geometrisi çözülmüş)
   sch_verify.py    netlist değişmezliği kalkanı
@@ -848,8 +877,15 @@ dosyada 71 bileşenin tamamı yine de okunabiliyor. Katı davranış isterseniz
 temsil etmek ciddi yanlış alarm üretir: stickhub demosunda `U1` -135° dönük,
 gerçek courtyard'ı eğik bir dikdörtgen ama sınır kutusu çok daha büyük bir kare
 — yakınındaki kondansatörler o karenin köşelerine düşüyor ve "çakışıyor" gibi
-görünüyorlardı. Çakışma testleri artık gerçek poligon üzerinden yapılıyor
-(dışbükey kabuk + ayırıcı eksen teoremi), bu yanlış alarmlar ortadan kalktı.
+görünüyorlardı. Çakışma testleri artık gerçek poligon üzerinden yapılıyor ve bu yanlış
+alarmlar ortadan kalktı.
+
+Poligonlar **içbükey olabilir** ve öyle okunur: courtyard parçaları uç uca
+zincirlenir. Dışbükey kabuğa çevirmek (ve ayırıcı eksen teoremi kullanmak)
+L biçimli bir konnektörün *boşluğunu* dolu sayıyor, o boşlukta duran
+kondansatörü "çakışıyor" gösteriyordu — `pic_programmer`da P3/C7'de ölçüldü.
+Çakışma testi bu yüzden kenar kesişimi + içerme ile yapılır: her basit
+poligonda kesin, dışbükeyde SAT ile aynı cevap.
 
 **KiCad'in DRC'si her şeyi yakalamaz.** `courtyards_overlap` kontrolü proje
 ayarlarından kapatılabiliyor — stickhub demosunda kapalı, o yüzden KiCad 0 ihlal

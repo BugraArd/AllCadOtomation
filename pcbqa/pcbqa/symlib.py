@@ -512,6 +512,7 @@ def resolve_definition(symbol: LibSymbol) -> list:
             raise SymLibError(f"{symbol.name}: ust sembol {symbol.extends!r} bulunamadi")
         merged = _deep_copy(parent)
         merged[1] = f'"{symbol.library}:{symbol.name}"'
+        _rename_units(merged, symbol.extends, symbol.name)
         # Turevin ozellikleri ust sembolun ozelliklerini ezer
         own = {k: v for k, v in _properties_of(symbol.node).items()}
         merged = [n for n in merged
@@ -522,6 +523,30 @@ def resolve_definition(symbol: LibSymbol) -> list:
 
     node[1] = f'"{symbol.library}:{symbol.name}"'
     return [n for n in node if not (isinstance(n, list) and head(n) == "extends")]
+
+
+def _rename_units(node, old_name: str, new_name: str) -> None:
+    """Alt birim dugumlerini turevin adiyla yeniden adlandirir.
+
+    KiCad birim dugumlerini `<sembol_adi>_<birim>_<govde>` diye adlandirir ve
+    dis adla IC adlarin AYNI koke sahip olmasini bekler. `extends` cozulurken
+    govde ust sembolden kopyalandigi icin ic adlar ustte kalir; sonuc
+    "STM32F103C8Tx" adli bir sembolun icinde "STM32F103C_8-B_Tx_0_1" olur.
+
+    OLCULDU: boyle bir sematigi `kicad-cli` HICBIR MESAJ VERMEDEN 3 koduyla
+    reddediyor - dosya KiCad'de de acilmiyor. Turev sembol kullanan her
+    ekleme (Regulator_Linear:AMS1117-3.3, MCU_ST_STM32F1:STM32F103C8Tx...)
+    bu yuzden okunamaz dosya uretiyordu.
+    """
+    for sub in children(node, "symbol"):
+        name = head_atom(sub)
+        if not name.startswith(old_name):
+            raise SymLibError(
+                f"{new_name}: ust sembolun birim dugumu beklenmedik adda "
+                f"({name!r}, {old_name!r} ile baslamiyor) - yeniden "
+                "adlandirilamadi, uretilen dosya KiCad'de acilmazdi"
+            )
+        sub[1] = f'"{new_name}{name[len(old_name):]}"'
 
 
 def _deep_copy(node):

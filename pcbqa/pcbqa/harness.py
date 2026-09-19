@@ -29,7 +29,8 @@ from .pcb import Board, read_board
 from .placement.base import Evaluation, Placement, PlacementContext, validate
 from .report import PENALTY, Report, enable_ansi
 from .rules import load_rules, run_rules
-from .sexpr import dumps, parse_with_stats
+from .sch_write import SchWriteError, lock_files
+from .sexpr import as_float, child, dumps, parse_with_stats
 
 # Tezgah varsayilanlari
 DEFAULT_BOARD = Path("samples/bench_bad.kicad_pcb")
@@ -189,11 +190,57 @@ def apply_placement(design: Design, placement: Placement) -> Design:
     return build_design(board, netlist_from_board(board), project_name=design.project_name)
 
 
-def write_board(source: Path, placement: Placement, target: Path) -> None:
+def _turn_parts(node, delta: float) -> None:
+    """Footprint icindeki metin ve pad acilarini `delta` kadar dondurur.
+
+    KiCad bir footprint'i dondururken govdesini VE icindeki her metnin,
+    her pad'in acisini birlikte dondurur: 90 derece donmus bir footprint'te
+    `(property "Reference" ... (at dx dy 90))` ve `(pad "1" ... (at x y 90))`
+    yazar. Konumlar (dx, dy) donmemis yerel eksende kalir; donen ACIDIR.
+    Yalnizca govdeyi dondurup icini oldugu gibi birakmak dosyayi KiCad'in
+    gozunde kutuphane kopyasindan FARKLI kilar.
+
+    OLCULDU: uretilen 18 bilesenlik kartta `pcb drc --schematic-parity`
+    "kutuphanedeki kopyasiyla eslesmiyor" diye uyari verdi ve uyari alan
+    bilesenler kartta DONMUS olanlarin tam olarak kendisiydi; donmemis
+    hicbir bilesen uyari uretmedi.
+    """
+    for item in node:
+        if not (isinstance(item, list) and item
+                and item[0] in ("property", "fp_text", "pad")):
+            continue
+        at = child(item, "at")
+        if at is None or len(at) < 3:
+            continue
+        current = as_float(at[3]) if len(at) > 3 else 0.0
+        angle = (current + delta) % 360.0
+        if len(at) > 3:
+            at[3] = f"{angle:g}"
+        elif angle:
+            at.append(f"{angle:g}")
+
+
+def write_board(
+    source: Path,
+    placement: Placement,
+    target: Path,
+    allow_open_project: bool = False,
+) -> None:
     """Yerlestirmeyi kaynak dosyaya uygulayip yeni bir .kicad_pcb yazar.
 
     KiCad'de gozle incelemek icin. Kaynak dosyaya dokunulmaz.
+
+    ACIK-PROJE KORUMASI: sematik tarafinda bastan beri var (`sch_write`), kart
+    tarafinda YOKTU. Dagitilan bir uygulamada bu gercek bir tehlike: KiCad
+    kartI bellekte tutar, biz yazarken kullanici kaydederse iki taraftan biri
+    sessizce kaybolur. Kilit varsa yazmayi reddederiz.
     """
+    locks = lock_files(target)
+    if locks and not allow_open_project:
+        raise SchWriteError(
+            f"proje KiCad'de acik gorunuyor ({locks[0].name}); once kapatin. "
+            "Bilincli devam etmek icin allow_open_project=True."
+        )
     root, _ = parse_with_stats(source.read_text(encoding="utf-8"))
 
     for node in root:
@@ -210,7 +257,11 @@ def write_board(source: Path, placement: Placement, target: Path) -> None:
         x, y, rot = placement[ref]
         for item in node:
             if isinstance(item, list) and item and item[0] == "at":
+                previous = as_float(item[3]) if len(item) > 3 else 0.0
                 item[1:] = [f"{x:g}", f"{y:g}"] + ([f"{rot:g}"] if rot else [])
+                delta = (rot - previous) % 360.0
+                if delta:
+                    _turn_parts(node, delta)
                 break
 
     target.parent.mkdir(parents=True, exist_ok=True)

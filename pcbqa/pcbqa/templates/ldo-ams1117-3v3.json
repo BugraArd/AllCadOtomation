@@ -1,0 +1,49 @@
+{
+  "components": [
+    {
+      "connect": {
+        "GND": "${gnd}",
+        "VI": "${vin}",
+        "VO": "${vout}"
+      },
+      "footprint": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+      "lib_id": "Regulator_Linear:AMS1117-3.3",
+      "name": "ldo",
+      "value": "AMS1117-3.3"
+    },
+    {
+      "connect": {
+        "#1": "${vin}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0805_2012Metric",
+      "lib_id": "Device:C",
+      "name": "giris-kondansatoru",
+      "value": "10uF"
+    },
+    {
+      "connect": {
+        "#1": "${vout}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0805_2012Metric",
+      "lib_id": "Device:C",
+      "name": "cikis-kondansatoru",
+      "value": "22uF"
+    }
+  ],
+  "description": "AMS1117-3.3 LDO: VBUS -> 3V3, giris/cikis kondansatorleriyle",
+  "id": "ldo-ams1117-3v3",
+  "params": {
+    "gnd": "GND",
+    "vin": "VBUS",
+    "vout": "3V3"
+  },
+  "provides": [
+    "guc-3v3"
+  ],
+  "requires": [
+    "guc-vbus"
+  ],
+  "version": 1
+}

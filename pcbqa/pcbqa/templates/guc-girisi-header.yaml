@@ -1,0 +1,25 @@
+# Harici guc girisi (USB'siz kartlar icin): 2 pinli header, 5 V + GND.
+#
+# `guc-vbus` yetenegini USB konnektoru yerine bu blok da saglayabilir.
+# Ikisi birden niyette olursa plan not duser (ayni agi iki kaynak surer) -
+# gercek kartlarda mesru (USB + harici besleme) ama bilincli secilmeli.
+
+version: 1
+id: guc-girisi-header
+description: "2 pinli guc girisi header'i (5V/VBUS + GND)"
+
+provides: [guc-vbus]
+requires: []
+
+params:
+  vin: "VBUS"
+  gnd: "GND"
+
+components:
+  - name: header
+    lib_id: Connector_Generic:Conn_01x02
+    value: GUC-5V
+    footprint: Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
+    connect:
+      "#1": "${vin}"
+      "#2": "${gnd}"

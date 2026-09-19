@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from pcbqa.ipc import apply_placement_to_board
+from pcbqa.ipc import IpcApplyError, apply_placement_to_board
 from pcbqa.ipc_apply import Candidate, select_winner
 
 
@@ -94,6 +94,21 @@ class Result:
 
 
 class IpcApplyTests(unittest.TestCase):
+    def test_readback_waits_until_the_commit_is_visible(self):
+        import copy
+        board = FakeBoard()
+        visible = copy.deepcopy(board.footprints)
+        board.get_footprints = lambda: copy.deepcopy(board.footprints if board.pushed else visible)
+        def update(items):
+            board.footprints = items
+            return items
+        board.update_items = update
+        summary = apply_placement_to_board(board, {"U1": (11, 12, 90)}, vector2=FakeVector2,
+                                           angle=FakeAngle, apply=True)
+        self.assertTrue(board.pushed)
+        self.assertEqual(summary.verify_errors, [])
+        self.assertFalse(board.saved)
+
     def test_dry_run_does_not_mutate_board(self):
         board = FakeBoard()
         summary = apply_placement_to_board(

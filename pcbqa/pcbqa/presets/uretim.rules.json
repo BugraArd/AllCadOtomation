@@ -1,0 +1,66 @@
+{
+  "defaults": {
+    "ignore_nets": [
+      "GND",
+      "AGND",
+      "DGND",
+      "/GND",
+      "earth"
+    ],
+    "severity": "warning"
+  },
+  "rules": [
+    {
+      "clearance_mm": 0.0,
+      "description": "Bilesen courtyard'lari cakismamali (IPC-7351B Level N: 0.25 mm excess)",
+      "id": "uretim-courtyard-cakisma",
+      "severity": "warning",
+      "type": "courtyard_overlap",
+      "weight": 6
+    },
+    {
+      "description": "Bilesenler kart kenarindan yeterince iceride olmali (0.3 mm routing / 0.5 mm V-score)",
+      "id": "uretim-kart-kenari",
+      "ignore_refs": [
+        "^J",
+        "^P",
+        "^CON",
+        "^MH",
+        "^H\\d",
+        "^SW",
+        "^TP",
+        "^BUS"
+      ],
+      "max_findings": 15,
+      "min_distance_mm": 0.3,
+      "type": "edge_clearance",
+      "weight": 8
+    },
+    {
+      "class": "B2",
+      "default_voltage": 0,
+      "description": "Netler arasi bakir acikligi gerilime yetmeli (IPC-2221B Tablo 6-1)",
+      "id": "uretim-gerilim-acikligi",
+      "scale": true,
+      "severity": "error",
+      "type": "clearance_voltage",
+      "voltages": {
+        "^(VBUS|VCC|VDD|3V3|5V)$": 5.0
+      },
+      "weight": 24
+    },
+    {
+      "current_a": 0.001,
+      "description": "Hicbir iz uretim minimumunun altinda olmamali (yaygin ucuz sinif: 0.10 mm)",
+      "id": "uretim-min-iz-genisligi",
+      "max_findings": 20,
+      "min_width_mm": 0.1,
+      "net": ".*",
+      "scale": true,
+      "severity": "error",
+      "type": "trace_width",
+      "weight": 20
+    }
+  ],
+  "version": 1
+}

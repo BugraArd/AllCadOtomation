@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import geom, sexpr
-from .sexpr import as_float, child, children, value
+from .sexpr import as_float, child, children, head, value
 
 # Kart anahatlarinin cizildigi katman
 EDGE_LAYER = "Edge.Cuts"
@@ -411,8 +411,22 @@ def _pad_copper_layers(pad_node) -> tuple[str, ...]:
 
 
 def _local_points(node) -> list[tuple[float, float]]:
-    """Bir cizim dugumundeki tum koordinatlari toplar (footprint yerel eksende)."""
+    """Bir cizim dugumundeki tum koordinatlari toplar (footprint yerel eksende).
+
+    DIKDORTGEN OZEL DURUMU (olculdu, sessiz veri kaybiydi): `fp_rect` sekli
+    yalnizca iki KOSEGEN kosesini saklar. Onlari oldugu gibi toplamak iki
+    nokta uretir ve cagiran taraf uc noktadan az gelen sekli poligon
+    sayamayip DUSURUR. Sonuc: courtyard'ini tek bir fp_rect ile cizen her
+    footprint - yani 0603/0805 gibi en yaygin pasifler - modelde
+    COURTYARD'SIZ goruluyordu; courtyard_overlap, edge_clearance ve
+    yogunluk olcumu onlarda sessizce sussuz kaliyordu. Dort kose acilir.
+    """
     pts: list[tuple[float, float]] = []
+    start, end = child(node, "start"), child(node, "end")
+    if str(head(node)).endswith("rect") and start and end and len(start) > 2 and len(end) > 2:
+        x0, y0 = as_float(start[1]), as_float(start[2])
+        x1, y1 = as_float(end[1]), as_float(end[2])
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
     for key in ("start", "end", "center", "mid"):
         pt = child(node, key)
         if pt and len(pt) > 2:
@@ -425,19 +439,75 @@ def _local_points(node) -> list[tuple[float, float]]:
     return pts
 
 
+def _edges_of(node) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """Bir cizim dugumunun kenarlari (kapali sekillerde cevre boyunca)."""
+    pts = _local_points(node)
+    kind = str(head(node))
+    if kind.endswith(("rect", "poly")) and len(pts) >= 3:
+        return [(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
+    if len(pts) >= 2:
+        return [(pts[0], pts[1])]
+    return []
+
+
+def _chain(edges) -> list[tuple[float, float]] | None:
+    """Kenarlari uc uca ekleyerek TEK kapali halka kurar; kuramazsa None.
+
+    Courtyard dosyada tek bir fp_poly/fp_rect olarak da, kenar kenar
+    fp_line'lar olarak da saklanabilir. Ikinci durumda parcalarin dosyadaki
+    SIRASI rastgeledir; halkayi uc noktalarindan izleyerek kurmak sekli
+    oldugu gibi (icbukey de olsa) geri verir.
+    """
+    def key(p):
+        return (round(p[0], 4), round(p[1], 4))
+
+    remaining = {i: e for i, e in enumerate(edges) if key(e[0]) != key(e[1])}
+    if not remaining:
+        return None
+    ends: dict[tuple[float, float], list[int]] = {}
+    for i, (a, b) in remaining.items():
+        ends.setdefault(key(a), []).append(i)
+        ends.setdefault(key(b), []).append(i)
+    # Kapali bir halkada her dugumden TAM IKI kenar cikar; saglanmiyorsa
+    # sekil ya acik ya da birden fazla parcali - zincirleme yapilamaz.
+    if any(len(v) != 2 for v in ends.values()):
+        return None
+
+    first = next(iter(remaining))
+    start = remaining[first][0]
+    poly = [start]
+    current, used = remaining[first][1], {first}
+    while key(current) != key(start):
+        nxt = next((i for i in ends[key(current)] if i not in used), None)
+        if nxt is None:
+            return None
+        a, b = remaining[nxt]
+        used.add(nxt)
+        poly.append(current)
+        current = b if key(a) == key(current) else a
+    if len(used) != len(remaining) or len(poly) < 3:
+        return None  # birden fazla ayri halka var
+    return poly
+
+
 def _read_courtyard_local(node) -> list[tuple[float, float]]:
     """Footprint icindeki courtyard cizimlerinden YEREL poligon.
 
-    Courtyard dosyada tek bir fp_poly olarak da, dort ayri fp_line olarak da
-    saklanabilir; ikinci durumda nokta sirasi belirsizdir. Bu yuzden toplanan
-    noktalarin dısbukey kabugu alinir - dikdortgen courtyard'lar icin birebir
-    dogru, nadir gorulen icbukey olanlarda ise guvenli tarafta kalan bir
-    yaklasimdir.
+    Sekil once uc uca ZINCIRLENIR; boylece icbukey courtyard'lar (L bicimli
+    konnektorler) oldugu gibi korunur. Zincirleme mumkun degilse (acik sekil,
+    birden fazla halka, yay) toplanan noktalarin dısbukey kabugu alinir -
+    guvenli tarafta kalan eski davranis.
+
+    ICBUKEY OLCUMU NEDEN ONEMLI (olculdu): pic_programmer'da P3 konnektorunun
+    courtyard'i L bicimli ve dısbukey kabugu L'nin bosluguna da yayiliyor.
+    O boslukta duran C7 kondansatoru "cakisiyor" diye isaretleniyordu; KiCad'in
+    kendi DRC'si ayni kartta sifir ihlal buluyor.
 
     Not: fp_circle icin sadece merkez ve cevre noktasi alinir, dairesel
     courtyard'larda alan bir miktar kucuk cikabilir.
     """
     pts: list[tuple[float, float]] = []
+    edges: list[tuple[tuple[float, float], tuple[float, float]]] = []
     for item in node:
         if not isinstance(item, list) or not item:
             continue
@@ -446,9 +516,10 @@ def _read_courtyard_local(node) -> list[tuple[float, float]]:
         if value(item, "layer") not in COURTYARD_LAYERS:
             continue
         pts.extend(_local_points(item))
+        edges.extend(_edges_of(item))
     if len(pts) < 3:
         return []
-    return geom.convex_hull(pts)
+    return _chain(edges) or geom.convex_hull(pts)
 
 
 def _read_footprint(node) -> Component | None:
@@ -509,7 +580,20 @@ def _read_footprint(node) -> Component | None:
                 dy=dy,
                 size_x=as_float(psize[1]) if psize and len(psize) > 1 else 0.0,
                 size_y=as_float(psize[2]) if psize and len(psize) > 2 else 0.0,
-                angle=frot + (as_float(pat[3]) if pat and len(pat) > 3 else 0.0),
+                # Pad KONUMU footprint'in DONMEMIS yerel eksenindedir (yukarida
+                # `frot` ile dondurulur), ama pad ACISI dosyada MUTLAK durur:
+                # KiCad bir footprint'i dondururken her pad'in acisina da
+                # dondurmeyi isler. Ikisini toplamak donmeyi CIFT sayardi -
+                # olculdu: pic_programmer'da rot=90 olan U2'nin pad'leri 180
+                # derece okunuyordu. Dikdortgen pad'ler 180 simetrik oldugu
+                # icin bu 90/270 donmus bilesenlerde gorunur hale geliyor ve
+                # bakir aciklik olcumunu yanlislastiriyordu.
+                #
+                # Aci belirtilmemisse footprint'in donmesine dusulur: pad
+                # fiziksel olarak govdeyle birlikte doner, ve aciyi hic
+                # yazmayan uretici araclar (bizim `write_board`umuz dahil)
+                # boyle dosyalar birakabiliyor.
+                angle=as_float(pat[3]) if pat and len(pat) > 3 else frot,
                 shape=str(pnode[3]) if len(pnode) > 3 and isinstance(pnode[3], str) else "rect",
                 copper_layers=_pad_copper_layers(pnode),
             )

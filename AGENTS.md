@@ -1,5 +1,21 @@
 # Agent Instructions
 
+## Graphify ile çalışma (kullanıcı talimatı, 2026-09-07)
+
+- Serena MCP gerekli değil; bu proje için kurma veya kullanma.
+- Proje boyunca Graphify kullan. Her oturumda `bd prime` ile kalıcı bağlamı
+  yükle ve Graphify'ın çalıştığını yerel bir `graphify explain` sorgusuyla doğrula.
+- Kod sorularında kaynak dosyalarını taramadan önce `graphify explain "<kavram>"`,
+  `graphify path "<A>" "<B>"` veya `graphify query "<soru>" --budget N` çalıştır.
+  Bulguları gerektiğinde kaynak koduyla doğrula.
+- Her yeni karar, hata düzeltmesi ve gelecek planını Beads'e kaydet; ardından
+  `python .claude/graphify-bilgilendir.py` çalıştır. Kod değişince yerel AST
+  grafiğini `graphify update .` ile güncelle (aktarım betiği bunu da yapar).
+- Beads kanonik kaynaktır; `pcbqa/docs/hafiza/` dosyalarını elle düzenleme.
+  Metin aktarımı ve AST güncellemesi yeni anlamsal kavram/gerekçe kenarları
+  üretmez; bunları tamamlanmış anlamsal tarama olarak bildirme.
+- Bu talimatı `CLAUDE.md` ile uyumlu tut; yönetilen kurulum bloklarının dışında koru.
+
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
 > **Architecture in one line:** Issues live in a local Dolt database

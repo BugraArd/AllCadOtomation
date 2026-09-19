@@ -300,4 +300,4 @@ tasarım dosyasındadır), bu yüzden ayrımın dışındadır.
 ## Kayıtlar
 
 - Beads: Evre 1 fazları ve Evre 2 devir promptu bead olarak kayıtlı.
-- Serena hafızası: `scoring_roadmap`.
+- Beads hafızası: `bd memories skorlama` (Serena kaldırıldı, 2026-08-30).

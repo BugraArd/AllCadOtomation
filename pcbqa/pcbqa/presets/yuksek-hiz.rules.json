@@ -1,0 +1,124 @@
+{
+  "defaults": {
+    "ignore_nets": [
+      "GND",
+      "AGND",
+      "DGND",
+      "/GND"
+    ],
+    "severity": "warning"
+  },
+  "rules": [
+    {
+      "description": "Her IC guc pininin yakininda kendi decoupling kondansatoru olmali (TI SBAA113: < 6.35 mm)",
+      "exclusive": true,
+      "id": "hs-decoupling-mesafesi",
+      "max_distance_mm": 6.35,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "kind": "ic",
+        "pintype": "power_in"
+      },
+      "require_partner": true,
+      "severity": "error",
+      "type": "proximity",
+      "weight": 12
+    },
+    {
+      "bulk_min_uf": 15.0,
+      "description": "IC'nin guc pini sayisina gore yeterli decoupling olmali (TI SPRABV2 6)",
+      "id": "hs-decoupling-adedi",
+      "max_distance_mm": 6.35,
+      "select": {
+        "kind": "ic"
+      },
+      "severity": "warning",
+      "type": "decoupling_count",
+      "weight": 10
+    },
+    {
+      "description": "Kristalin yuk kondansatorleri kristale yakin olmali (kaynak niteliksel: 'close to each other')",
+      "id": "hs-kristal-yuk-kondansatoru",
+      "max_distance_mm": 5.0,
+      "partner": {
+        "kind": "capacitor"
+      },
+      "pin": {
+        "kind": "crystal"
+      },
+      "require_partner": false,
+      "type": "proximity",
+      "weight": 4
+    },
+    {
+      "a": {
+        "kind": "crystal"
+      },
+      "b": {
+        "kind": "inductor"
+      },
+      "description": "Kristal anahtarlamali regulatorden uzak olmali (SAYISAL KAYNAK YOK - secim)",
+      "id": "hs-kristal-regulatorden-uzak",
+      "min_distance_mm": 15.0,
+      "type": "keep_apart",
+      "weight": 2
+    },
+    {
+      "description": "I2C hatlarinda pull-up direnci bekleniyor (NXP UM10204)",
+      "id": "hs-i2c-pullup",
+      "net": "(SDA|SCL|I2C)",
+      "partner": {
+        "kind": "resistor"
+      },
+      "type": "require_on_net",
+      "weight": 12
+    },
+    {
+      "description": "USB D+/D- uzunluk eslestirmesi (TI SPRAAR7E: 50 mil = 1.27 mm MAX)",
+      "groups": [
+        [
+          "USB_DP",
+          "USB_DM"
+        ],
+        [
+          "D+",
+          "D-"
+        ]
+      ],
+      "id": "hs-usb-cift-eslestirme",
+      "severity": "error",
+      "tolerance_mm": 1.27,
+      "type": "length_match",
+      "weight": 8
+    },
+    {
+      "description": "Ethernet MDI cift ici eslestirme (Microchip: 50 mil = 1.27 mm)",
+      "groups": [
+        [
+          "TRD0_P",
+          "TRD0_N"
+        ],
+        [
+          "TRD1_P",
+          "TRD1_N"
+        ]
+      ],
+      "id": "hs-ethernet-cift-eslestirme",
+      "severity": "error",
+      "tolerance_mm": 1.27,
+      "type": "length_match",
+      "weight": 10
+    },
+    {
+      "description": "USB 2.0 toplam iz uzunlugu (TI SPRAAR7E: max 12000 mil = 305 mm)",
+      "id": "hs-usb-net-uzunlugu",
+      "max_hpwl_mm": 305.0,
+      "net": "(USB_D|D\\+|D-)",
+      "type": "net_length",
+      "weight": 8
+    }
+  ],
+  "version": 1
+}

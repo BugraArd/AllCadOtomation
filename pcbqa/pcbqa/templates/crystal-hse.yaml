@@ -1,0 +1,45 @@
+# HSE kristali + yuk kondansatorleri.
+#
+# Kaynak: ST AN2867 "Oscillator design guide" - yuk kondansatoru formulu
+#   CL1 = CL2 = 2 x (CL - Cs)
+# Varsayilan 15 pF su varsayimla: kristal CL = 12.5 pF (yaygin deger),
+# kart kacak kapasitesi Cs = 5 pF (AN2867'nin tipik araligi 2-7 pF).
+# Secilen kristalin CL'i farkliysa `load` parametresiyle duzeltin.
+#
+# Frekans varsayilani 8 MHz: STM32F1'in PLL'i icin en yaygin HSE degeri
+# (muhendislik secimi; F103 8 MHz HSE ile 72 MHz'e kilitlenir).
+
+version: 1
+id: crystal-hse
+description: "HSE kristali (varsayilan 8 MHz) + AN2867 yuk kondansatorleri"
+
+provides: []
+requires: [hse-pinleri]
+
+params:
+  freq: "8MHz"
+  load: "15pF"
+  hse_in: "HSE_IN"
+  hse_out: "HSE_OUT"
+  gnd: "GND"
+
+components:
+  - name: kristal
+    lib_id: Device:Crystal
+    value: "${freq}"
+    footprint: Crystal:Crystal_SMD_HC49-SD
+    connect:
+      "#1": "${hse_in}"
+      "#2": "${hse_out}"
+
+  - name: yuk-kondansatoru-giris
+    lib_id: Device:C
+    value: "${load}"
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    connect: {"#1": "${hse_in}", "#2": "${gnd}"}
+
+  - name: yuk-kondansatoru-cikis
+    lib_id: Device:C
+    value: "${load}"
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    connect: {"#1": "${hse_out}", "#2": "${gnd}"}

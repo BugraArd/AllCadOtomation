@@ -1,0 +1,17 @@
+# Ornek niyet beyani: USB'den beslenen, kristalli, SWD'li bir F103 karti.
+# Kullanim:
+#   .venv\Scripts\python.exe -m pcbqa.intent --intent samples\ornek-niyet.yaml
+
+version: 1
+name: ornek-f103
+
+blocks:
+  - mcu-stm32f103c8
+  - ldo-ams1117-3v3
+  - usb-micro-b
+  - swd-header
+  - template: crystal-hse
+    params:
+      freq: 8MHz
+      # kristal CL = 12.5 pF, Cs = 5 pF varsayimi (AN2867); kristal degisirse:
+      # load: 20pF

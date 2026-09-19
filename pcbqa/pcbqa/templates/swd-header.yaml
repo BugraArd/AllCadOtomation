@@ -1,0 +1,29 @@
+# SWD programlama/hata ayiklama header'i.
+#
+# Pin dizilisi ST-Link'in 4 uclu kablo gelenegiyle (3V3, SWDIO, SWCLK, GND)
+# uyumlu - muhendislik secimi; resmi bir standart pin sirasi yok (ARM'in
+# 10-pinli Cortex Debug konnektoru ayri bir sablon olur).
+
+version: 1
+id: swd-header
+description: "4 pinli SWD header'i (3V3, SWDIO, SWCLK, GND)"
+
+provides: []
+requires: [swd, guc-3v3]
+
+params:
+  vdd: "3V3"
+  gnd: "GND"
+  swdio: "SWDIO"
+  swclk: "SWCLK"
+
+components:
+  - name: header
+    lib_id: Connector_Generic:Conn_01x04
+    value: SWD
+    footprint: Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical
+    connect:
+      "#1": "${vdd}"
+      "#2": "${swdio}"
+      "#3": "${swclk}"
+      "#4": "${gnd}"

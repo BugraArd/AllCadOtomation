@@ -1,0 +1,114 @@
+# STM32F103C8 cekirdek blogu: guc, reset, boot - MCU'nun "yasamasi" icin
+# gereken asgari cevre.
+#
+# Kaynak: ST AN2586 "Getting started with STM32F10xxx hardware development"
+#   - Guc: her VDD pinine bir 100 nF seramik + toplamda bir 4.7 uF (Bolum 3.4)
+#   - VDDA: 10 nF + 1 uF cifti (Bolum 3.4)
+#   - NRST: 100 nF kondansator GND'ye (Bolum 3.5, gurultu bagisikligi)
+#   - BOOT0: 10 kOhm pull-down -> her acilista flash'tan boot (Bolum 3.3)
+#   - VBAT: pil yoksa VDD'ye baglanir (Bolum 3.4.1)
+#
+# Cevre birimleri (kristal, USB, SWD) AYRI sablonlardir; MCU'nun ilgili
+# pinleri yalnizca o bloklar niyette istendiginde etiketlenir (interfaces).
+
+version: 1
+id: mcu-stm32f103c8
+description: "STM32F103C8Tx (LQFP-48) cekirdegi: decoupling, NRST, BOOT0"
+
+provides: [mcu]
+requires: [guc-3v3]
+
+params:
+  vdd: "3V3"
+  gnd: "GND"
+  nrst: "NRST"
+  boot0: "BOOT0"
+  hse_in: "HSE_IN"
+  hse_out: "HSE_OUT"
+  usb_dm: "USB_DM"
+  usb_dp: "USB_DP"
+  swdio: "SWDIO"
+  swclk: "SWCLK"
+  scl: "I2C1_SCL"
+  sda: "I2C1_SDA"
+
+components:
+  - name: mcu
+    lib_id: MCU_ST_STM32F1:STM32F103C8Tx
+    value: STM32F103C8
+    footprint: Package_QFP:LQFP-48_7x7mm_P0.5mm
+    connect:
+      # Pin ADI ile baglama: ayni ada sahip TUM pinler baglanir.
+      # VDD = 24/36/48, VSS = 23/35/47 - tek satir uc pini tasir.
+      VDD: "${vdd}"
+      VSS: "${gnd}"
+      VBAT: "${vdd}"     # pil yok -> VDD'ye (AN2586 3.4.1)
+      VDDA: "${vdd}"     # dogrudan VDD'ye; filtreli VDDA ayri sablon olur
+      VSSA: "${gnd}"
+      NRST: "${nrst}"
+      BOOT0: "${boot0}"
+
+  # AN2586 3.4: VDD pini basina bir 100 nF. STM32F103C8Tx'te 3 VDD pini var;
+  # count bu yuzden 3 (test, kutuphane sembolundeki VDD pin sayisiyla esler).
+  - name: vdd-decoupling
+    lib_id: Device:C
+    value: 100nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    count: 3
+    connect: {"#1": "${vdd}", "#2": "${gnd}"}
+
+  - name: bulk
+    lib_id: Device:C
+    value: 4.7uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    connect: {"#1": "${vdd}", "#2": "${gnd}"}
+
+  # VDDA cifti (AN2586 3.4). VDDA dogrudan VDD'ye bagli oldugu icin bu
+  # kondansatorler de ayni agda durur; yerlestirici onlari VDDA pinine
+  # yaklastirmayi decoupling kuralindan ogrenir.
+  - name: vdda-filtre-kucuk
+    lib_id: Device:C
+    value: 10nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    connect: {"#1": "${vdd}", "#2": "${gnd}"}
+
+  - name: vdda-filtre-buyuk
+    lib_id: Device:C
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    connect: {"#1": "${vdd}", "#2": "${gnd}"}
+
+  # NRST gurultu bagisikligi (AN2586 3.5). Dahili pull-up var; harici
+  # direnc gerekmez, yalnizca kondansator.
+  - name: nrst-kondansator
+    lib_id: Device:C
+    value: 100nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    connect: {"#1": "${nrst}", "#2": "${gnd}"}
+
+  # BOOT0 pull-down (AN2586 3.3): acilista ana flash'tan boot.
+  - name: boot0-pulldown
+    lib_id: Device:R
+    value: 10k
+    footprint: Resistor_SMD:R_0603_1608Metric
+    connect: {"#1": "${boot0}", "#2": "${gnd}"}
+
+# Cevre pinleri: yalnizca ilgili blok niyette varsa etiketlenir. Kosulsuz
+# etiketleseydik kristalsiz kartta HSE_IN tek pinli bir ag olarak kalirdi.
+interfaces:
+  hse-pinleri:
+    mcu:
+      PD0: "${hse_in}"    # OSC_IN
+      PD1: "${hse_out}"   # OSC_OUT
+  usb-fs:
+    mcu:
+      PA11: "${usb_dm}"
+      PA12: "${usb_dp}"
+  swd:
+    mcu:
+      PA13: "${swdio}"
+      PA14: "${swclk}"
+  i2c1:
+    mcu:
+      PB6: "${scl}"
+      PB7: "${sda}"

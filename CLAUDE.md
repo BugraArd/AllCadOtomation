@@ -1,5 +1,21 @@
 # Project Instructions for AI Agents
 
+## Graphify ile çalışma (kullanıcı talimatı, 2026-09-07)
+
+- Serena MCP gerekli değil; bu proje için kurma veya kullanma.
+- Proje boyunca Graphify kullan. Her oturumda `bd prime` ile kalıcı bağlamı
+  yükle ve Graphify'ın çalıştığını yerel bir `graphify explain` sorgusuyla doğrula.
+- Kod sorularında kaynak dosyalarını taramadan önce `graphify explain "<kavram>"`,
+  `graphify path "<A>" "<B>"` veya `graphify query "<soru>" --budget N` çalıştır.
+  Bulguları gerektiğinde kaynak koduyla doğrula.
+- Her yeni karar, hata düzeltmesi ve gelecek planını Beads'e kaydet; ardından
+  `python .claude/graphify-bilgilendir.py` çalıştır. Kod değişince yerel AST
+  grafiğini `graphify update .` ile güncelle (aktarım betiği bunu da yapar).
+- Beads kanonik kaynaktır; `pcbqa/docs/hafiza/` dosyalarını elle düzenleme.
+  Metin aktarımı ve AST güncellemesi yeni anlamsal kavram/gerekçe kenarları
+  üretmez; bunları tamamlanmış anlamsal tarama olarak bildirme.
+- Bu talimatı `AGENTS.md` ile uyumlu tut; yönetilen kurulum bloklarının dışında koru.
+
 This file provides instructions and context for AI coding agents working on this project.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
@@ -88,7 +104,7 @@ içindedir.
 
 ```bash
 # Test (cerceve unittest'tir, pytest DEGIL - pytest kurulu degil)
-.venv\Scripts\python.exe -m unittest discover -s tests    # 277 test, ~2-3 dk
+.venv\Scripts\python.exe -m unittest discover -s tests    # 729 test, ~6 dk
 
 # Tek modul
 .venv\Scripts\python.exe -m unittest tests.test_copper_rules
@@ -136,3 +152,49 @@ Ayrıntı: `pcbqa/HANDOFF.md` (tam bağlam), `pcbqa/README.md`,
   (`samples/pic_programmer`) bakır kuralları sıfır bulgu üretmelidir.
 - Netlist değişmezliği kutsaldır: yerleştirme bağlantıyı asla değiştirmez.
 - KiCad açıkken dosyaya yazılmaz (açık-proje koruması).
+
+## Çalışma Anlaşması — graphify ile entegre
+
+> Bu bölüm kullanıcının açık talimatıdır (2026-08-31) ve yönetilen blokların
+> DIŞINDADIR; `bd setup claude` ya da `graphify claude install` yeniden
+> çalıştırıldığında silinmemelidir.
+
+Bilgi grafiği bu projenin hafızasıdır. **Her oturumda açık** ve **her
+değişiklikte güncel** tutulur.
+
+**Ne zaman graphify bilgilendirilir** — üçü de zorunlu:
+
+1. **Her yeni karar** (mimari, eşik, bağımlılık, arayüz, ürün şekli)
+2. **Her hata düzeltmesi** (kök sebep + başarısız denemeler + doğrulama)
+3. **Her gelecek planı** (evre, yol haritası, sıradaki iş)
+
+**Nasıl** — akış tek yönlüdür, ikinci bir kayıt yeri açılmaz:
+
+```
+bd create / bd remember          →  karar beads'e yazılır (kanonik kaynak)
+python .claude/graphify-bilgilendir.py
+        beads → pcbqa/docs/hafiza/*.md  (graphify görebilsin diye)
+        graphify update .               (kod grafiği, yerel, jeton yok)
+        graphify-etiketle.py            (topluluk adlarını geri uygular)
+```
+
+Beads **kanonik** kaynaktır; `pcbqa/docs/hafiza/` onun graphify'ın görebildiği
+kopyasıdır. Elle düzenlenmez — `graphify-bilgilendir.py` üretir.
+
+**Sınır, dürüstçe:** `graphify-bilgilendir.py` yeni kaydın *metnini* dosyaya
+düşürür ve aranabilir yapar, ama **kavram düğümü ve gerekçe kenarları
+oluşturmaz** — onlar anlamsal tarama ister (`/graphify --update`, alt-ajan
+gerektirir, kullanıcı onayı ile). Betik bunu her koşuda söyler.
+
+**Kod sorusundan önce grafiğe sor:** `graphify explain "<kavram>"` (en isabetli),
+`graphify path "<A>" "<B>"`, `graphify query "<soru>" --budget N`.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

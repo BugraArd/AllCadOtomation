@@ -15,9 +15,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-import yaml
 
 from . import circuit, geom, ipc2221, subcircuit, thermal
+from .confload import ConfigError, load_config
 from .model import Design, PinRef
 
 SEVERITIES = ("error", "warning", "info")
@@ -1660,10 +1660,9 @@ def _load_rules(path: Path, seen_files: set[Path], seen_ids: set[str]) -> list[R
     seen_files.add(resolved)
 
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise RuleError(f"kural dosyasi okunamadi: {path} ({exc})") from exc
-    data = yaml.safe_load(text) or {}
+        data, _ = load_config(path)
+    except ConfigError as exc:
+        raise RuleError(f"kural dosyasi okunamadi: {exc}") from exc
 
     defaults = data.get("defaults") or {}
     default_severity = defaults.get("severity", "warning")

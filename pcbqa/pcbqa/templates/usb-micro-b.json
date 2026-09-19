@@ -1,0 +1,44 @@
+{
+  "components": [
+    {
+      "connect": {
+        "D+": "${usb_dp}",
+        "D-": "${usb_dm}",
+        "GND": "${gnd}",
+        "Shield": "${gnd}",
+        "VBUS": "${vbus}"
+      },
+      "footprint": "Connector_USB:USB_Micro-B_Molex-105017-0001",
+      "lib_id": "Connector:USB_B_Micro",
+      "name": "konnektor",
+      "value": "USB_B_Micro"
+    },
+    {
+      "connect": {
+        "#1": "${usb_dp}",
+        "#2": "${vdd}"
+      },
+      "footprint": "Resistor_SMD:R_0603_1608Metric",
+      "lib_id": "Device:R",
+      "name": "dp-pullup",
+      "value": "1k5"
+    }
+  ],
+  "description": "USB Micro-B konnektoru + 1.5k D+ pull-up (F103 tarzi cihaz)",
+  "id": "usb-micro-b",
+  "params": {
+    "gnd": "GND",
+    "usb_dm": "USB_DM",
+    "usb_dp": "USB_DP",
+    "vbus": "VBUS",
+    "vdd": "3V3"
+  },
+  "provides": [
+    "guc-vbus"
+  ],
+  "requires": [
+    "usb-fs",
+    "guc-3v3"
+  ],
+  "version": 1
+}

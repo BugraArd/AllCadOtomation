@@ -1,0 +1,7 @@
+# MCU'suz: yalnizca 5V -> 3V3 guc modulu. Veri kumesinde kucuk topolojiyi
+# temsil eder (dort bilesen).
+version: 1
+name: guc-modulu
+blocks:
+  - guc-girisi-header
+  - ldo-ams1117-3v3

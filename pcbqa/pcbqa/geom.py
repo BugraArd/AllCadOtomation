@@ -8,8 +8,8 @@ karenin koselerine dusuyor ve "cakisiyor" gibi gorunuyorlar - oysa KiCad'in
 kendi DRC'si (gercek poligon kesisimi kullanir) hicbir ihlal bulmuyor.
 
 Bu modul gercek poligon uzerinden calisir:
-  * convex_hull  - courtyard noktalarindan dısbukey kabuk (dikdortgenler icin birebir)
-  * overlap      - ayirici eksen teoremi (SAT) ile kesin cakisma testi
+  * convex_hull  - siralanamayan nokta kumeleri icin son care kabuk
+  * overlap      - kenar kesisimi + icerme; ICBUKEY poligonlarda da kesin
   * distance     - cakismayan iki poligon arasindaki en kisa mesafe
 """
 
@@ -67,31 +67,48 @@ def area(poly: Polygon) -> float:
     return abs(total) / 2.0
 
 
-def _axes(poly: Polygon):
-    """Poligon kenarlarinin normalleri (SAT icin aday ayirici eksenler)."""
+def contains(poly: Polygon, point: Point) -> bool:
+    """Nokta poligonun icinde mi? (isin atma - icbukeyde de dogru)"""
+    x, y = point
+    inside = False
     for i, (x1, y1) in enumerate(poly):
         x2, y2 = poly[(i + 1) % len(poly)]
-        ex, ey = x2 - x1, y2 - y1
-        length = math.hypot(ex, ey)
-        if length > 1e-12:
-            yield (-ey / length, ex / length)
-
-
-def _project(poly: Polygon, axis: Point) -> tuple[float, float]:
-    dots = [p[0] * axis[0] + p[1] * axis[1] for p in poly]
-    return min(dots), max(dots)
+        if (y1 > y) != (y2 > y):
+            t = (y - y1) / (y2 - y1)
+            if x < x1 + t * (x2 - x1):
+                inside = not inside
+    return inside
 
 
 def overlap(a: Polygon, b: Polygon) -> bool:
-    """Iki dısbukey poligon kesisiyor mu? (Ayirici Eksen Teoremi)"""
+    """Iki BASIT poligon kesisiyor mu?
+
+    Once ucuz bir sinir kutusu elemesi, sonra kesin test: kenarlardan biri
+    otekini kesiyor mu, ya da biri otekini tamamen iceriyor mu.
+
+    NEDEN SAT DEGIL (olculdu): ayirici eksen teoremi yalnizca DISBUKEY
+    poligonlarda dogrudur. Gercek courtyard'lar icbukey olabiliyor -
+    pic_programmer'daki P3 konnektorunun courtyard'i L bicimli. Icbukey bir
+    sekli SAT'a vermek (ya da dısbukey kabugunu almak) L'nin BOSLUGUNU da
+    dolu sayar; o boslukta duran C7 kondansatoru "cakisiyor" diye
+    isaretleniyordu. KiCad'in kendi DRC'si ayni kartta sifir ihlal buluyor.
+
+    Kenar kesisimi + icerme testi her basit poligon icin kesindir ve
+    dısbukey durumda SAT ile ayni cevabi verir.
+    """
     if len(a) < 3 or len(b) < 3:
         return False
-    for axis in (*_axes(a), *_axes(b)):
-        amin, amax = _project(a, axis)
-        bmin, bmax = _project(b, axis)
-        if amax < bmin or bmax < amin:
-            return False  # ayirici eksen bulundu -> kesismiyorlar
-    return True
+    ax0, ay0, ax1, ay1 = bbox(a)
+    bx0, by0, bx1, by1 = bbox(b)
+    if ax1 < bx0 or bx1 < ax0 or ay1 < by0 or by1 < ay0:
+        return False
+    for i, p1 in enumerate(a):
+        p2 = a[(i + 1) % len(a)]
+        for j, q1 in enumerate(b):
+            q2 = b[(j + 1) % len(b)]
+            if _segments_cross(p1, p2, q1, q2):
+                return True
+    return contains(b, a[0]) or contains(a, b[0])
 
 
 def _segment_distance(p1: Point, p2: Point, q1: Point, q2: Point) -> float:

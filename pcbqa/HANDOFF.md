@@ -2193,3 +2193,1428 @@ lisansı da yok, korpusa eklenemez. Pin adı olmayan kartta net adına
 
 `python -m unittest discover -s tests` → **485 test**, hepsi geçiyor
 (oturum başında 214). KiCad demolarına bağlı testler kurulum yoksa atlanır.
+## 22. Evre 3a — niyet şeması ve STM32 şablon kütüphanesi (2026-08-28)
+
+### 22.1 Ne ve neden
+
+Üretken tasarımın ilk deterministik adımı: kullanıcı devreyi parça listesiyle
+değil **niyetle** söyler ("STM32F103 + USB + 3V3 LDO + kristal"), sistem bunu
+şablon kütüphanesinden geçirip somut bir **inşa planına** açar — hangi
+semboller, hangi değerlerle, hangi ağlara. ML yok; skorun yargılayabildiği
+bir üretim zinciri kurmak önce gelir (bkz. `bd memories evre-3`).
+
+Yeni dosyalar:
+
+| Dosya | Ne |
+|---|---|
+| `pcbqa/intent.py` | Niyet YAML şeması, şablon yükleme, açılım, symlib ile pin çözümleme, CLI |
+| `pcbqa/templates/*.yaml` | 6 şablon: `mcu-stm32f103c8`, `ldo-ams1117-3v3`, `crystal-hse`, `usb-micro-b`, `swd-header`, `guc-girisi-header` |
+| `samples/ornek-niyet.yaml` | 18 bileşen / 11 ağlı örnek F103 kartı niyeti |
+| `tests/test_intent.py` | 31 test |
+
+CLI: `python -m pcbqa.intent --intent samples/ornek-niyet.yaml` (`--list`
+şablonları döker, `--json` planı yazar, engel varsa çıkış kodu 1).
+
+### 22.2 Tasarım kararları
+
+- **Yetenek modeli (`provides`/`requires`/`interfaces`).** Bloklar birbirini
+  ağ adıyla bulur (3V3, HSE_IN...). Karşılanmayan `requires` plan engelidir ve
+  mesaj hangi şablonun sağlayabileceğini söyler. `interfaces` yalnızca istendiğinde
+  aktifleşir: MCU'nun PD0/PD1'i ancak kristal bloğu `hse-pinleri` istediğinde
+  etiketlenir — yoksa kristalsiz kartta tek pinli ağ çöplüğü oluşurdu.
+- **Pin ADI ile bağlama.** `VDD: "${vdd}"` aynı ada sahip **tüm** pinleri bağlar
+  (STM32'nin üç VDD pini tek satır). `#3` pin numarasıdır (adsız pasifler için).
+  Çözümleme kurulu KiCad kütüphanesine karşı yapılır; sembolde olmayan ad,
+  olmayan footprint, **bağlanmamış `power_in` pini** — hepsi engel (sessiz
+  hata dersinin şablonlara uygulanışı).
+- **Referans numarası planda YOK** — o `sch_add`'in işi (mevcut şematiğe göre
+  atanır). Plan bileşenleri şablon-yerel etiketle konuşur
+  (`mcu-stm32f103c8/vdd-decoupling.2`).
+- **Değerlerin kaynağı şablon yorumunda**: AN2586 (VDD pini başına 100 nF +
+  4.7 µF bulk, VDDA 10 nF + 1 µF, NRST 100 nF, BOOT0 10k), AN2867 (yük
+  kondansatörü 2×(CL−Cs); 15 pF varsayılanı CL=12.5/Cs=5 varsayımıyla),
+  AMS1117 veri sayfası (çıkış ≥ 22 µF), F103'te dahili D+ pull-up olmadığı
+  için 1.5k harici. Kaynaksız seçimler "mühendislik seçimi" etiketli.
+- **Aynı şablon iki kez → engel** (ağ adları çakışır; param ile ayrıştırma
+  ileriye bırakıldı). İki `guc-vbus` kaynağı (USB + güç header'ı) → not,
+  engel değil (gerçek kartlarda meşru).
+
+### 22.3 Testin koruduğu şey
+
+`test_every_bundled_template_resolves_cleanly` paketteki **her** şablonu
+gerçek kütüphaneden geçirir — "şablon yazıldı ama kütüphaneyle hiç sınanmadı"
+durumu kalıcı olarak kapalı. `test_vdd_decoupling_count_matches_symbol`
+şablondaki `count: 3`'ü sembolün gerçek VDD pin sayısına bağlar: kütüphane
+değişirse test bağırır.
+
+### 22.4 Kalan işler (3a devamı)
+
+- **Sürücü yok**: plan → gerçek `.kicad_sch` üretimi (boş proje iskeleti +
+  `sch_add(connect=...)` döngüsü) → `pcb_sync` → `auto` → skor. Plan çıktısı
+  `sch_add`'in diliyle bire bir (pin = ağ adı) tasarlandı.
+- Şablonlar tek MCU'yu tanıyor; ikinci paket (F103RC, F4) eklenince MCU
+  şablonundan aile şablonuna geçilecek.
+- ERC "unconnected pin" gürültüsü: kullanılmayan GPIO'lara no-connect
+  bayrağı üretimi sürücünün işi.
+
+### 22.5 Testler
+
+`python -m unittest discover -s tests` → **516 test** (485 + 31), hepsi geçiyor.
+## 23. Evre 3a sürücüsü — plandan gerçek KiCad projesine (2026-08-28)
+
+### 23.1 Zincir kapandı
+
+`intent.py` bir plan üretiyordu ama plan bir **veri yapısıydı**. `generate.py`
+zinciri kapatır:
+
+    niyet.yaml --intent--> plan --generate--> .kicad_sch
+                                          --pcb_sync--> .kicad_pcb
+                                          --auto------> yerleşim
+                                          --run_rules--> skor
+
+CLI: `python -m pcbqa.generate --intent samples/ornek-niyet.yaml --out <klasör>`
+
+Örnek F103 kartında ölçülen sonuç:
+
+| adım | sonuç |
+|---|---|
+| şematik | 18 bileşen, A4, 55 etiket |
+| **kalkan** | **11 planlanan ağın tamamı KiCad netlist'inde birebir doğrulandı** |
+| kart | 50 × 35 mm, 18/18 bileşen yansıtıldı, pad ağları geri okundu |
+| yerleşim | 1.2 → **100.0** (kendi kurallarımız: 0 hata / 0 uyarı) |
+| `sch erc` | **0 ihlal** (`--no-connect-unused` ile) |
+| `pcb drc --schematic-parity` | **0 fark** |
+| kalan DRC | 52 bağlanmamış bakır (yönlendirme yok — bilinen sınır), ipek çakışması (Kicad-ywm) |
+
+### 23.2 Tasarım kararları
+
+- **`sch_add` döngüsü değil, tek geçiş.** `add_symbols` her çağrıda netlist
+  kalkanını iki kez koşturur (~4 s × 2); 18 bileşen iki dakikadan fazla eder.
+  Üstelik kalkanın sorusu burada yanlış: "mevcut devre bozulmasın" der, oysa
+  mevcut devre yoktur. Semboller `sch_add`'in düğüm üreticileriyle tek geçişte
+  kurulur, sonunda **daha güçlü** bir soru sorulur: *KiCad'in kendi netlist'i
+  planın kurmak istediği ağların aynısını mı okuyor?* Üç sessiz hata sınıfı
+  ayrı ayrı aranır — eksik pin (etiket tutmamış), bölünmüş ağ, fazla pin
+  (sessiz kısa devre).
+- **Bağlantı hep etiketle.** Plan zaten pin → ağ adı dilinde; etiket tam olarak
+  bunu ifade eder ve mesafeden bağımsızdır.
+- **Kilitli bileşen yok.** `harness.locked_refs` konnektörleri sabit sayar;
+  üretilen kartta böyle bir mekanik kısıt henüz yoktur ve kilitli sayılsalardı
+  `pcb_sync`'in bıraktığı ara konumda (sınırın dışında) donup kalırlardı.
+- **Kart sınırı tahmin değil ölçüm.** Önce bileşenler karta yansıtılır, sonra
+  gerçek courtyard alanları okunup %25 yoğunluk hedefiyle Edge.Cuts çizilir.
+- **Yığılmış güç pinleri.** STM32F103C8Tx'in üç VSS pini aynı noktada durur
+  (KiCad'in kendi geleneği). Doğru değişmez "çakışma olmasın" değil,
+  **"çakışanlar aynı ağda olsun"**; etiket noktaya bir kez yazılır.
+
+### 23.3 Üretim koşumunun bulduğu DÖRT gerçek hata
+
+Hepsi sessizdi ve hiçbiri birim testleriyle değil, **KiCad'in kendi araçlarıyla**
+bulundu — §19.7'deki dersin tekrarı.
+
+**1) Türev sembollerin birim adları (`symlib.resolve_definition`).**
+`extends` çözülürken gövde üst sembolden kopyalanıyor ama birim düğümlerinin
+adı üstte kalıyordu: `STM32F103C8Tx` adlı sembolün içinde
+`STM32F103C_8-B_Tx_0_1`. `kicad-cli` böyle bir dosyayı **hiçbir mesaj vermeden
+3 koduyla** reddediyor. Yani `sch_add` bugüne kadar türev sembol kullanan her
+eklemede (STM32, AMS1117…) **KiCad'de açılamayan dosya üretiyordu.**
+
+**2) `fp_rect` courtyard'lar düşüyordu (`pcb._local_points`).**
+Şekil iki köşegen köşesini saklar; okuyucu iki noktayı poligon sayamayıp
+atıyordu. Etkilenen: **0603/0805 gibi en yaygın pasifler** — yani hemen her
+kartın bileşenlerinin çoğu courtyard'sız görülüyordu. `courtyard_overlap`,
+`edge_clearance` ve yoğunluk ölçümü onlarda sessizce susuyordu.
+
+**3) İçbükey courtyard + SAT (`pcb._read_courtyard_local`, `geom.overlap`).**
+Courtyard'lar dışbükey kabuğa çevrilip SAT ile sınanıyordu; ikisi de L biçimli
+bir konnektörün **boşluğunu dolu sayar**. (2) düzeltilince `pic_programmer`da
+P3'ün L'sinin boşluğuna oturan C7 "çakışıyor" çıktı — KiCad aynı kartta sıfır
+ihlal buluyor. Çözüm: parçaları uç uca **zincirleyerek** gerçek (içbükey
+olabilen) poligonu kurmak, ve `overlap`'i kenar kesişimi + içerme testine
+çevirmek (her basit poligonda kesin; dışbükeyde SAT ile aynı cevap).
+
+**4) Pad açısı çift sayılıyordu (`pcb._read_footprint`, `harness.write_board`).**
+Okuyucu `footprint_dönmesi + kayıtlı_açı` hesaplıyordu; KiCad dönmeyi zaten her
+pad'in açısına işliyor. Dikdörtgen pad'ler 180° simetrik olduğu için hata
+**90/270 dönmüş bileşenlerde** görünür hale gelir. Ölçüldü: `jetson` kartı
+73.8 → **83.9** (üç yanlış açıklık hatası kalktı). Yazma tarafı da eksikti —
+`write_board` gövdeyi döndürüp içindeki metin ve pad açılarını olduğu gibi
+bırakıyordu; KiCad üretilen kartta 12 bileşeni "kütüphanedeki kopyasıyla
+eşleşmiyor" diye işaretledi ve **o 12 bileşen dönmüş olanların tam olarak
+kendisiydi**. Düzeltince `lib_footprint_mismatch` **0**'a indi.
+
+### 23.4 Kalibrasyon: net etki YOK
+
+Dört düzeltmeden sonra 19 kartlık korpus (`uretim` ön ayarı):
+
+| ölçüm | kayıtlı (§21) | şimdi |
+|---|---|---|
+| medyan | 95.9 | **95.9** |
+| çeyrekler | 80.7/95.9/100.0 | **80.7/95.9/100.0** |
+
+Özet aynı ama **tek tek kartlar artık doğru ölçülüyor**: courtyard körlüğü
+skorları yukarı, pad açısı hatası aşağı çekiyordu ve toplamda birbirlerini
+götürüyorlardı. Courtyard çakışması 5 → 6 kartta ateşliyor; §21.3'te adı geçen
+üç kartın sayıları **birebir aynı** kaldı (StickHub 25, tinytapeout 14,
+Feather 4), yani düzeltmeler yanlış alarm eklemedi. Yeni ateşleyen
+`vme-wren`de KiCad'in kendi DRC'si 22, biz 25 diyoruz. `pic_programmer` yine
+**0 bulgu** — "sağlam kartta sessizlik" testi ayakta.
+
+### 23.5 Kalan sınırlar
+
+- **Yönlendirme yok** (Evre 3b öncesi verilecek karar): bakır kuralları susuyor,
+  skor yarım konuşuyor. Üretilen kartın 52 bağlanmamış bakır kalemi bundan.
+- **Mikron seviyesi değme** (Kicad-4ro): CM5 demosunda 0.005–0.006 mm'lik
+  ortüşmeler "çakışma" sayılıyor. Tasarımcı bunları `.kicad_pro`da DRC
+  muafiyetine almış — yani KiCad de görüyor, kabul etmiş. Eşik **uydurulmadı**;
+  kaynak (IPC-7351B toleransı ya da üretici verisi) bulunana kadar kural
+  yapılandırıldığı gibi davranıyor (`clearance_mm: 0.0`).
+- **İpek baskı çakışması** (Kicad-ywm): yerleştirici referans metinlerini
+  görmüyor; %25 yoğunlukta 18 + 12 uyarı çıkıyor.
+- **Çok birimli semboller** üretilemiyor (birimlerin sayfaya dağıtılması ayrı
+  bir karar); plan bunu engel olarak bildirir, sessizce atlamaz.
+
+### 23.6 Testler
+
+`python -m unittest discover -s tests` → **553 test**, hepsi geçiyor
+(oturum başında 485). Yeni: `test_intent` 31, `test_generate` 23,
+`test_courtyard` 13, `test_sch_add` +1 (türev sembol birim adları).
+## 24. Evre 3b — üretim-değerlendirme döngüsü (2026-08-28)
+
+### 24.1 Önce kapatılan karar: yönlendirme (Kicad-805)
+
+**Karar: dış autorouter entegre edilmeyecek.** Gerekçe ölçüm:
+`kicad-cli`'de Specctra **DSN dışa aktarımı yok**, ve `pcb import` yalnızca
+pads/altium/eagle/cadstar/fabmaster/pcad/solidworks tanıyor — **SES yok**.
+Yani freerouting turu KiCad 10'da GUI'ye özel; entegrasyon sıfırdan bir DSN
+yazıcı **ve** SES okuyucu yazmak demek.
+
+Peki bu 3b'yi engelliyor mu? **Hayır.** Aynı niyetten üretilen bütün
+varyantlar aynı netlist'e sahip ve hepsi yönlendirilmemiş — bakır körlüğü
+**sabit bir kayma**, karşılaştırmayı bozmaz. Bozduğu şey **mutlak sayı**:
+100 "kusursuz kart" değil, "yerleşimde ihlal yok" demektir. `explore` bunu
+her raporda açıkça yazar.
+
+### 24.2 Ölçüm: skor tek başına varyantları sıralayamıyor
+
+Üretilen 18 bileşenlik F103 kartında skor **doyuyor**:
+
+| kart | skor |
+|---|---|
+| 40 × 28 mm | 100.0 |
+| 50 × 35 mm | 100.0 |
+| 70 × 50 mm | 100.0 |
+| 100 × 70 mm | 100.0 |
+
+Skor bir **ihlal sayacıdır**; ihlal kalmadığı anda ayrım gücü biter. "En
+yüksek skorlu varyantı seç" demek bu dördünü eşit görmek demektir.
+
+İki ölçüm tıkanıklığı açtı:
+
+1. **Tohum gerçek fark yaratıyor.** Sabit 50×35'te altı tohum HPWL'i
+   174.5 – 216.2 mm arasına dağıttı — en iyisi en kötüsünden **%19.3** iyi.
+2. **Skorun çözünürlüğü dar kartta var.** 25×18 → **24.7** (4 uyarı),
+   30×20 → **74.1** (1 uyarı), 35×25 → **100.0**. Yani 35×25 skoru tam
+   tutturan **en küçük** karttır ve 50×35'in yarı alanıdır.
+
+İkincisi asıl kazançtır: aynı kalite, yarı kart alanı. **Kart alanı gerçek
+bir üretim maliyetidir ve skor onu hiç görmez** — bu yüzden seçim ölçütüne
+ayrıca konur.
+
+### 24.3 Seçim ölçütü
+
+Sözlüksel, büyük olan kazanır:
+
+    (skor, -hata, -uyarı, -alan, -HPWL)
+
+Skor önce gelir: kaliteden ödün verilmez. Eşit kalite katmanında **en küçük
+kart** yeğlenir (para). Alan da eşitse HPWL ayırır. Bu, `Evaluation.key`
+sözleşmesinin alan eklenmiş hâli — yeni bir ölçüt icat edilmedi.
+
+### 24.4 `explore.py` — ölçülen kazanç
+
+Şematik **bir kez** üretilir (netlist her varyantta aynıdır); değişen yalnızca
+kart sınırı ve yerleştiricinin tohumu. Kart her denemede taze bir kopyadan
+kurulur ve sınır **dosyaya yazılmadan** modele konur — varyant başına dosya
+yazıp okumak bütçenin önemli kısmını diske harcardı.
+
+Arama sırası bilinçli: **önce boyut, sonra tohum.** Boyut kart alanını
+(parayı) değiştirir; tohum yalnızca aynı kart içinde daha iyi bir yerleşim
+arar. Yani önce geniş, sonra derin.
+
+`--variants 6 --budget 10` ile ölçülen koşum:
+
+| # | yoğunluk | boyut | alan | tohum | skor | HPWL |
+|---|---|---|---|---|---|---|
+| 1 | %40 | 40×30 | 1200 | 0 | 100.0 | 221.6 |
+| 2 | %32 | 45×30 | 1350 | 0 | 100.0 | 177.9 |
+| 3 | %25 | 50×35 | 1750 | 0 | 100.0 | 174.5 |
+| 4 | %18 | 55×40 | 2200 | 0 | 100.0 | 200.0 |
+| **5** | **%40** | **40×30** | **1200** | **1** | **100.0** | **148.9** |
+| 6 | %32 | 45×30 | 1350 | 1 | 100.0 | 189.8 |
+
+Kazanan **40×30 mm**: en büyük adaydan **%45**, tek atışlık `generate`'in
+seçtiği 50×35'ten **%31 küçük**, üstelik altısının **en kısa** teli
+(148.9 mm, 174.5'e karşı **%15** iyi). Aynı boyutta tohum 0 → 221.6,
+tohum 1 → 148.9: tohum ekseni tek başına **%33** fark.
+
+Yazılan kart doğrulandı: `--schematic-parity` **0 fark**, kendi kurallarımız
+**0 bulgu**, tek `Edge.Cuts` dikdörtgeni.
+
+### 24.5 Bunun 3c/3d için anlamı
+
+Skorun doyması **ML katmanını doğrudan ilgilendiriyor**: eğitim etiketi olarak
+ham skor kullanılamaz — üretilen kartların hepsi 100 alır, yani etiket sabittir
+ve model hiçbir şey öğrenemez. 3c'de toplanan veri **etiketi `Variant.key`
+üzerinden** (ya da doğrudan HPWL/alan üzerinden) taşımalı. Bu, `learned`
+yerleştirici dersinin (§21.10) tekrarını önler: sinyal ölçülebilir olmadan
+model terfi etmez.
+
+### 24.6 Kalan sınırlar
+
+- Varyant ekseni **yalnızca boyut ve tohum**. Devre topolojisi (alternatif
+  şablon, farklı LDO, farklı paket) henüz varyant üretmiyor — şablon
+  kütüphanesi büyüdükçe doğal genişleme yolu bu.
+- **En-boy oranı sabit** (`BOARD_ASPECT = 1.4`). Kare ya da uzun kart bazı
+  tasarımlarda daha iyi olabilir; ölçülmedi.
+- Bütçe varyant sayısıyla **doğrusal** çarpılıyor (`N × budget`). Paralel
+  koşum yok.
+
+### 24.7 Testler
+
+`python -m unittest discover -s tests` → **566 test**, hepsi geçiyor
+(3b öncesi 553). Yeni `test_explore` 13: seçim ölçütünün sözlüksel sırası
+(skor > hata > alan > HPWL), arama sırası (önce boyut sonra tohum), ve uçtan
+uca kazanan kartın gerçekten yazıldığı.
+## 25. Evre 3c — tasarım seviyesi veri toplama (2026-08-28)
+
+### 25.1 Ne toplanıyor
+
+`ml/collect.py` **hamle** seviyesinde topluyordu (bir yerleştirme aramasındaki
+aday hamleler). `ml/collect_design.py` bir üst katmanda toplar: bir **niyetten**
+üretilen kart **varyantları**. İkisi aynı biçimi (`ml/dataset.py`) paylaşır,
+yani mevcut eğitici (`ml/train.py`) ve sıralama metrikleri (`ml/metrics.py`)
+ikisinde de çalışır — bu doğrulandı.
+
+    grup  = niyetin adı        -> bölme buna göre (model niyeti ezberlemesin)
+    parti = tek keşif koşumu   -> sıralama parti içinde ölçülür
+
+`samples/niyetler/` altında **7 niyet** var (4 – 18 bileşen): tam donanımlı
+F103'ten MCU'suz güç modülüne kadar. Veri çeşitliliği buradan geliyor.
+
+    python -m pcbqa.ml.collect_design --intents samples/niyetler \
+        --out .work/tasarim.jsonl --variants 8 --budget 6
+
+### 25.2 İki tasarım kararı
+
+**Etiket HPWL üzerinden.** Üretilen kartta skor doyuyor (§24.2), yani ham skoru
+etiket yapmak bütün örnekleri aynı etiketle işaretlemek olurdu. Etiket
+`collect.py`'nin sözleşmesini koruyarak parti **medyanına** göre yazılır:
+
+    etiket = d_skor + 0.05 × clamp(−d_HPWL / medyan_HPWL, −1, +1)
+
+Skorlar eşitken (olağan durum) geriye bağıl HPWL iyileşmesi kalır. Ölçek küçük
+ama sıralama metrikleri yalnızca **sırayı** umursar.
+
+**Tohum bilerek öznitelik değil.** Tohum bir tasarım kararı değil, aramanın
+rastgeleliğidir; özniteliğe koymak modeli gürültüyü ezberlemeye davet ederdi.
+Dışarıda bırakınca aynı öznitelik vektörü farklı etiketlerle birden fazla kez
+görünür — bu bir kusur değil, **gürültü tabanının ölçülebilir hale gelmesidir.**
+
+**Lisans zorunlu.** Her kayıt kaynağını taşır; üretilen kartlarda
+`lisans: "uretilmis"`. Dışarıdan gelen bir kayıt lisanssız eklenemez — LM5116
+emsali (§1): lisansı olmayan kart korpusa alınamamıştı.
+
+### 25.3 Ölçüm: öğrenilebilir sinyal zayıf
+
+Bu, 3d'nin kapısıdır ve **model yazılmadan önce** ölçüldü.
+
+**Varyans ayrımı** (F103 kartı, 4 yoğunluk × 5 tohum):
+
+| kaynak | varyans |
+|---|---|
+| yoğunluklar arası (öğrenilebilir) | 87.7 |
+| tohum, yoğunluk içi (indirgenemez) | 321.5 |
+| **açıklanan oran** | **%21.4** |
+
+**Bütçe artırmak yardım etmiyor.** Aynı yoğunlukta 5 tohum:
+
+| bütçe | ort | en iyi | en kötü | std |
+|---|---|---|---|---|
+| 6 sn | 174.4 | 166.1 | 200.4 | 13.0 |
+| 20 sn | 181.8 | 158.5 | 228.5 | **25.3** |
+
+Yayılım azalmadı, arttı. Yani tohum gürültüsü "yakınsamamış arama" değil,
+`auto`'nun kendi doğası: arama yolu bütçeyle tamamen değişiyor ve `auto`'nun
+gerileme garantisi yalnızca **başlangıç kartına** göre, daha kısa bir koşuma
+göre değil.
+
+**Toplanan veri kümesinde gürültü tabanı** (7 niyet × 8 varyant = 56 örnek):
+24 ayrık öznitelik vektörünün 24'ü tekrarlı; **açıklanabilir üst sınır %31.4**.
+
+### 25.4 İlk eğitim koşumu: hiçbir model temel çizgiyi geçmiyor
+
+`python -m pcbqa.ml.train .work/tasarim.jsonl --cv 3` (grup bazlı 3 kat):
+
+| model | spearman | ikili doğruluk |
+|---|---|---|
+| mean (temel çizgi) | 0.000 | 0.500 |
+| ridge | **−0.214** | **0.422** |
+| gbt | **−0.103** | **0.495** |
+
+İkili doğruluk 0.5 = yazı tura. **Varyant sıralayıcı şu hâliyle öğrenmiyor.**
+Bu bir başarısızlık değil ölçülmüş bir sonuçtur ve `learned` yerleştirici
+dersinin (§21.10) birebir tekrarıdır: *model kazanç ölçülmeden terfi etmez.*
+
+Neden sinyal yok, üç aday sebep — hepsi test edilebilir:
+
+1. **Gürültü baskın**: varyansın ~%69'u tohum. Model tek koşumu tahmin etmeye
+   çalışıyor; oysa tahmin edilebilir olan **koşulun ortalamasıdır**. Etiketi
+   tohumlar üzerinden ortalayarak denemek en umut verici sonraki adım.
+2. **Veri küçük**: 7 grup, 56 örnek. Grup bazlı 3 katta her kat 2 – 3 niyet.
+3. **Topoloji tekdüze**: yedi niyetin altısı aynı MCU'yu kullanıyor, yani
+   topoloji öznitelikleri neredeyse yalnızca bileşen sayısıyla değişiyor.
+   Şablon kütüphanesi büyümeden çeşitlilik gelmez.
+
+### 25.5 Bulunan yan hata: `meta` başlığı sessizce eziyordu
+
+`Dataset.save` başlığı `{"kind": ..., **self.meta}` diye yazıyordu. `meta`
+içinde `kind` olan bir veri kümesi **sorunsuz yazılıyor**, sonra `load`
+"pcbqa veri kümesi değil" diye reddediyor ve sebebi hiçbir yerde yazmıyor.
+Bu hataya bu oturumda bizzat düşüldü. `save` artık ayrılmış adları (`kind`,
+`feature_version`, `features`, `count`) gürültülü biçimde reddediyor.
+
+### 25.6 Sıradaki (3d) için hazır olan / olmayan
+
+**Hazır:** veri şeması, toplama CLI'si, 7 niyetlik kütüphane, gürültü tabanı
+ölçümü, ve mevcut eğitici/metriklerin bu veriyi doğrudan tükettiği doğrulaması.
+
+**Hazır değil:** öğrenilebilir bir sinyal. 3d'ye geçmeden önce 25.4'teki üç
+adaydan en az birinin denenmesi gerekir; aksi halde eğitilecek model, ölçümün
+şimdiden "yazı tura" dediği bir işi yapmaya çalışacaktır.
+
+### 25.7 Testler
+
+`python -m unittest discover -s tests` → **586 test**. Yeni `test_collect_design`
+20: öznitelik şeması, tohumun öznitelik OLMADIĞI, etiket sırası (skor > HPWL),
+lisans zorunluluğu, gürültü tabanı hesabı ve ayrılmış `meta` adı tuzağı.
+## 26. API'siz bağlantı — KiCad'in kendi Python'u (2026-08-28)
+
+### 26.1 Neden gerekti
+
+`ipc.py` çalışan KiCad'e **IPC API sunucusu** üzerinden bağlanıyor. Ölçüldü:
+o sunucu KiCad 10'da **varsayılan olarak kapalı** —
+`%APPDATA%\kicad\10.0\kicad_common.json` → `"api": {"enable_server": false}`.
+Yani dağıtılacak bir uygulama ya da eklenti her kullanıcıdan Tercihler'e girip
+bir ayarı açmasını isterdi. Kabul edilemez bir kurulum adımı.
+
+İkinci yol zaten yarı yarıya vardı ama görülmüyordu:
+
+| yol | KiCad ayarı gerekir mi | ne yapar |
+|---|---|---|
+| **dosya tabanlı** (`generate`, `explore`, `pcb_sync`) | hayır | `.kicad_sch`/`.kicad_pcb` yazar, kullanıcı sonra açar |
+| **süreç-içi** (`swig_apply`, YENİ) | hayır | KiCad'in içinde `pcbnew` ile açık kartı yerinde taşır |
+| IPC (`ipc.py`) | **evet** | dışarıdan çalışan editöre bağlanır |
+
+### 26.2 Önündeki tek engel: yorumlayıcı ayrımı
+
+| | KiCad 10.0 python 3.11.5 | proje `.venv` python 3.13 |
+|---|---|---|
+| `pcbnew` (SWIG, süreç-içi) | ✅ 10.0.4 | ❌ |
+| `pyyaml` | ❌ | ✅ |
+
+`import yaml` modül düzeyinde durduğu sürece `pcbqa` KiCad'in içinde **hiç
+import edilemiyordu.** Bağımlılık yüzeyi darmış: yalnızca `rules.py` ve
+`intent.py`, toplam üç çağrı.
+
+### 26.3 Çözüm: YAML kaynak, JSON çalışma zamanı kopyası
+
+`confload.py` sırayla bakar: dosya `.json` ise stdlib → pyyaml varsa YAML →
+yanında `.json` eşi varsa o → hiçbiri yoksa **sebebini söyleyen hata**.
+
+**YAML neden atılmadı:** kural ve şablon dosyalarındaki *yorumlar* bu projenin
+belkemiği — her eşiğin kaynağı orada ("Kaynak: ST AN2586 Bölüm 3.4"). JSON
+yorum taşımaz. Bu yüzden YAML insan için kalır, JSON yalnızca çalışma zamanı
+kopyasıdır. `python -m pcbqa.bundle` üretir (11 dosya), `--check` ayrışmayı
+yakalar ve bir test her koşumda çağırır — çünkü YAML düzeltilip JSON eski
+kalırsa **KiCad'in içinde eski kural koşar, hem de sessizce.**
+
+Kullanıcının kendi kural dosyası da çevrilebilir:
+`python -m pcbqa.bundle benim.rules.yaml`.
+
+### 26.4 `swig_apply.py` — sözleşme `ipc.py` ile aynı
+
+Aynı `Placement` girer, aynı özet çıkar: varsayılan **dry-run**, KiCad'de
+kilitli footprint'e dokunulmaz, tekrar eden referansta durulur, yazdıktan
+sonra kart **geri okunup doğrulanır**. İki yol arasında davranış farkı olsaydı
+hangisinin kullanıldığı sonuca karışırdı.
+
+**GUI gerekmiyor:** `pcbnew.LoadBoard()` başsız çalışıyor (ölçüldü: 63
+footprint). Yani bu yol baştan sona test edilebilir — ve ediliyor.
+
+### 26.5 Uçtan uca ölçüm (KiCad'in kendi Python'unda, API kapalı)
+
+    pyyaml var mı: False        -> kurallar JSON kopyasından okundu
+    1) açık kartın skoru   : 54.9  (0 hata, 2 uyarı)
+    2) yerleştirme sonrası : 100.0 (0 hata, 0 uyarı)
+    3) dry-run             : 18 değişecek, 0 zaten yerinde
+       uygulandı           : 18 | doğrulama hatası: 0 | kaydedildi: True
+    4) diskten geri okunan : 100.0  (beklenen 100.0)
+
+### 26.6 Testler
+
+`tests/test_swig_bridge.py` 14 test. Beşi **alt süreç olarak KiCad'in
+yorumlayıcısını çağırıp orada koşar** — başka türlü bu yol hiç sınanmaz,
+çünkü bizim `.venv`'imizde `pcbnew` yoktur. Korunanlar: pyyaml olmadan kural
+ve şablon okuma, dry-run'ın dosyaya dokunmaması, taşımanın diske yansıması,
+kilitli footprint'in atlanması, ve kopyaların ayrışmaması.
+
+### 26.7 Kalan iş (dağıtım)
+
+Bu bölüm **bağlantıyı** çözdü, **paketlemeyi** değil. Ürün şekli hâlâ açık:
+
+- **Bağımsız uygulama**: kendi Python'unu taşır, dosya tabanlı çalışır, KiCad
+  kapalıyken kullanılır. Bugün hazır, ek iş yok.
+- **KiCad eklentisi (PCM/"DLC")**: `metadata.json` + `plugins/` düzeni, KiCad
+  araç çubuğunda bir düğme. `swig_apply` bunun çalışan çekirdeği; eksik olan
+  paket sarmalayıcı ve PCM metadata'sı.
+## 27. Bağımsız uygulama (2026-08-28)
+
+### 27.1 "Bağımsız" ne demek, ne demek değil
+
+**Ayrı bir Python kurulumu gerektirmez.** "KiCad'siz çalışır" **değil** — o
+mümkün de değil: netlist/ERC/DRC için `kicad-cli`, bileşenler için sembol ve
+footprint kütüphaneleri KiCad'den geliyor.
+
+KiCad zaten kurulu olmak zorunda olduğuna ve kendi Python'unu (3.11.5)
+getirdiğine göre, ikinci bir yorumlayıcı gömmek ya da PyInstaller ile
+paketlemek daha büyük, daha kırılgan ve virüs tarayıcılarını rahatsız eden bir
+çıktı verir; kazancı sıfırdır. Dağıtım = **bu klasör + `pcbqa.cmd`**.
+
+Bunu mümkün kılan §26'daki iş: paketin çalışma zamanı bağımlılığı kaldırıldı.
+
+### 27.2 Yeni parçalar
+
+| dosya | ne yapar |
+|---|---|
+| `pcbqa/app.py` | tek giriş noktası; alt komutlar mevcut modüllerin `main()`ini çağırır |
+| `pcbqa.cmd` | başlatıcı: KiCad'in Python'unu kendi bulur (yeni sürümden eskiye) |
+| `pcbqa/minyaml.py` | bağımlılıksız YAML okuyucu |
+| `KURULUM.md` | son kullanıcı belgesi |
+
+`pcbqa tani` tek komutta ortamı denetliyor: yorumlayıcı, `kicad-cli`, sembol
+ve footprint kütüphaneleri, çalışma zamanı kopyaları, `pcbnew`, şablonlar.
+Engel varsa `!!` ile işaretlenip çıkış kodu 1 dönüyor.
+
+### 27.3 Ortaya çıkan gerçek açık: kullanıcının kendi YAML'ı
+
+`bundle.py`'nin ürettiği JSON kopyaları **paketin kendi** dosyalarını
+kurtarıyordu. Ama başlatıcıyla ilk gerçek denemede şu çıktı:
+
+    pcbqa uret --intent samples\niyetler\f103-asgari.yaml
+    hata: niyet dosyasi okunamadi: pyyaml kurulu degil ve calisma zamani
+          kopyasi (f103-asgari.json) yok
+
+Kullanıcının **kendi niyet ve kural dosyaları** YAML'dır ve "önce JSON'a
+çevir" kabul edilemez bir kullanım adımıdır.
+
+### 27.4 `minyaml.py` — ve neden kendi yazıldı
+
+Önce kullanımımız ölçüldü (21 YAML dosyası taranarak):
+
+| yapı | satır |
+|---|---|
+| iç içe blok eşleşme | 490 |
+| blok liste (`-`) | 105 |
+| satır içi liste `[a, b]` | 23 |
+| satır içi eşleşme `{a: 1}` | 16 |
+| tırnaklı anahtar | 9 |
+| **çapa / çok satırlı / etiket / belge ayracı** | **0** |
+
+Gerçekten dar bir altküme. `sexpr.py` de aynı gerekçeyle sıfırdan yazılmıştı.
+
+**Tehlike ve karşılığı:** böyle bir okuyucunun tek gerçek riski *sessizce
+yanlış okumak*. İki önlem alındı:
+
+1. **Anlamadığını reddeder.** Çapa (`&`/`*`), etiket (`!`), çok satırlı skaler
+   (`|`/`>`), belge ayracı (`---`), girintide sekme → satır numarasıyla hata.
+2. **PyYAML ile diferansiyel test.** Depodaki her YAML iki okuyucudan geçer ve
+   sonuçlar birebir eşit olmalıdır: **21/21 aynı.**
+
+### 27.5 Diferansiyel testin bulduğu iki gerçek ayrışma
+
+Test yazılır yazılmaz iki hata yakaladı — kendi kendine yazılmış bir okuyucuya
+neden güvenilmeyeceğinin kanıtı:
+
+1. **`1e3`**: PyYAML bunu **metin** sayıyor (YAML 1.1'de üs için işaret
+   zorunlu); bizimki float yapıyordu.
+2. **`%50`**: PyYAML hata veriyor, bizimki kabul ediyordu (korpustan çıkarıldı;
+   geçerli YAML değil).
+
+Sonrasında PyYAML'ın çözümleyici düzenli ifadeleri **birebir** alındı, çünkü
+YAML 1.1'in sayı kuralları tuzaklı ve sezgiyle yazmak yanlış olur:
+
+    1e3    -> metin        012  -> 10    (sekizlik!)
+    1.0e3  -> metin        0603 -> 387   (yine sekizlik)
+    1.0e+3 -> 1000.0       0805 -> metin (8 sekizlik değil)
+    1:30   -> 90 (altmışlık)      1_000 -> 1000
+
+Bu tutarsızlıkları "düzeltmek" bizim işimiz değil: amaç **aynı ağacı**
+üretmek, yoksa aynı dosya iki ortamda iki farklı kural yükler. Ölçüm: 26/26
+skaler birebir aynı.
+
+### 27.6 Okuma sırası değişti
+
+    1. .json dosyası    -> stdlib json
+    2. pyyaml varsa     -> yaml
+    3. minyaml          -> yaml   (KAYNAĞI okur)
+    4. .json eşi varsa  -> json   (3 takılırsa emniyet ağı)
+    5. hiçbiri          -> sebebini söyleyen hata
+
+3'ün 4'ten önce gelmesi bilinçli: JSON kopyası **üretilmiş** bir şeydir ve
+bayat olabilir; kendi okuyucumuz dosyanın kendisini okur.
+
+### 27.7 Kapatılan yan açık: karta yazmada kilit koruması yoktu
+
+Şematik tarafında açık-proje koruması baştan beri vardı (`sch_write`), **kart
+tarafında yoktu**. Dağıtılan bir uygulamada bu gerçek bir tehlike: KiCad kartı
+bellekte tutar, biz yazarken kullanıcı kaydederse bir taraf sessizce kaybolur.
+`harness.write_board` artık kilidi görünce reddediyor — bu tek nokta
+`generate`, `explore` ve `yerlestir`'i birden koruyor.
+
+### 27.8 Ölçülen uçtan uca (sanal ortam yok, pyyaml yok)
+
+    > pcbqa tani            -> Python 3.11.5 (KiCad'in kendi yorumlayıcısı), her şey yerinde
+    > pcbqa uret  ...       -> 13 bileşen, 5/5 ağ doğrulandı, skor 2.7 -> 100.0
+    > pcbqa uygula --apply  -> skor 54.9 -> 100.0, 18 footprint, kart kaydedildi
+
+### 27.9 Testler
+
+**638 test** (önceki 600). Yeni: `test_minyaml` 21 (diferansiyel + reddetme),
+`test_app` 17 (komut tablosu tutarlılığı, `tani`, ve **başlatıcının gerçekten
+alt süreç olarak koşturulması** — geliştirici ortam değişkenleri silinerek,
+son kullanıcının göreceği hâliyle).
+## 28. Canlı mod — kurulumda izinle alınan API (2026-08-29)
+
+### 28.1 İhtiyaç
+
+Kullanıcı KiCad açıkken değişiklik yapılabilmesini istedi; gerekçesi şu:
+**eş zamanlı çalışırken kendi hatama müdahale edebilmeli.** Ama "her seferinde
+Tercihler'den API'yi aç" demek yeni kullanıcı için zorlayıcı. Doğru yer
+**kurulum**: izni bir kez, açıkça alıp orada halletmek.
+
+### 28.2 Önce düzeltilen bir yanılgı
+
+İlk incelemede "KiCad 10'da şematik API'si yok" demiştim. Daha derin bakınca
+**yanıldığım** ortaya çıktı ve bunu kaydetmek önemli:
+
+`schematic_commands_pb2` diye ayrı bir dosya **yok** — ama gerek de yok, çünkü
+`common/commands/editor_commands` **belge türünden bağımsız**:
+
+    CreateItems, UpdateItems, DeleteItems, GetItems
+    ParseAndCreateItemsFromString      <- s-expression metnini doğrudan alır
+    BeginCommit / EndCommit            <- tek, GERİ ALINABİLİR işlem
+    RefreshEditor, SaveDocument, RevertDocument
+
+Ve `DOCTYPE_SCHEMATIC = 1` protokolde tanımlı. `BeginCommit`/`EndCommit`
+tam olarak kullanıcının istediği şeyi verir: aracın yaptığı değişiklik
+KiCad'in kendi geri alma yığınına girer, `Ctrl+Z` ile geri alınır.
+
+**Sınır:** kipy 0.7.1'in üst düzey `schematic` sarmalayıcısı bozuk (kendi
+protobuf'unda `BusEntryType` yok) — ama `KiCadClient.send()` ham bir kanal,
+sarmalayıcı atlanabilir. 0.7.1 en güncel sürüm.
+
+**Henüz doğrulanmadı:** KiCad 10.0.4'ün *sunucusunun* bu komutları şematik
+için gerçekten uygulayıp uygulamadığı. Sonda hazır
+(`scratchpad/sonda_canli.py`); API açılır açılmaz dört şeyi ölçecek: bağlantı,
+açık şematik belgesi, öğe okuma, ve boş bir commit ile yazma yolu.
+
+### 28.3 `pcbqa kurulum`
+
+    pcbqa kurulum              ne değişeceğini gösterir (YAZMAZ)
+    pcbqa kurulum --uygula     onaylayıp uygular
+    pcbqa kurulum --geri-al    eski hâline döndürür
+
+**İzin = `--uygula` bayrağı.** Önce tam olarak ne değişeceği gösterilir
+(`api.enable_server` → `true`, dosya yolu dahil), sonra kullanıcı bilerek
+onaylar. Sessiz bir yapılandırma değişikliği yok.
+
+Güvenlik kuralları — bu, projenin **kullanıcının kendi yapılandırmasına
+dokunan tek yeri**:
+
+- **KiCad çalışıyorsa yazılmaz.** Sebep somut: KiCad ayarları bellekte tutar ve
+  *çıkarken* dosyanın üzerine yazar; şimdi yazarsak değişikliğimiz kaybolur.
+  Süreç adı ve pid söylenerek reddedilir (`--kicad-acikken` ile bilerek
+  geçilebilir).
+- **Yalnızca tek alan** değişir; tema, kütüphane yolları, pencere konumları,
+  Türkçe anahtarlar aynen kalır (test bunu `assertEqual` ile bütün sözlük
+  üzerinden koruyor).
+- Yedek alınır, atomik yazılır, sonra **geri okunup doğrulanır**.
+- Her şey geri alınabilir.
+
+### 28.4 İki mod, ikisi de geçerli
+
+| | API'siz mod (varsayılan) | Canlı mod |
+|---|---|---|
+| kurulum adımı | yok | bir kez, izinle |
+| KiCad açıkken | dosyaya yazmaz | çalışan belgeye dokunur |
+| geri alma | dosya yedeği | KiCad'in kendi `Ctrl+Z`'si |
+| şematiğe canlı müdahale | hayır | evet |
+
+Bağımsız uygulamanın dağıtım hikâyesi **değişmedi**: API'siz mod hâlâ sıfır
+ayarla çalışıyor. Canlı mod, isteyen için bir üst basamak.
+
+`pcbqa tani` artık hangi modun açık olduğunu da bildiriyor.
+
+### 28.5 Ölçülen durum
+
+    KiCad süreci     : kicad.exe (pid 12316), başlık "*KicadOtomasyon1 — Şematik"
+    api.enable_server: false  -> IPC bağlantısı: Connection refused
+    kurulum --uygula : REDDEDİLDİ (KiCad çalışıyor), ayar dosyasına dokunulmadı
+
+Baştaki `*` işareti kullanıcının üç bileşeninin **kaydedilmemiş** olduğunu
+gösteriyor — diskteki şematik hâlâ 230 bayt ve 0 sembol.
+
+### 28.6 Testler
+
+**656 test** (önceki 638). Yeni `test_kurulum` 18: tek alanın değiştiği
+(sözlüğün tamamı karşılaştırılarak), Türkçe anahtarların hayatta kaldığı,
+yedeğin eski hâli taşıdığı, bozuk JSON'da hiç yazılmadığı, KiCad çalışırken
+reddedildiği ve reddedilen isteğin dosyaya dokunmadığı.
+
+## 29. Kurulum uygulandı — ve başlatıcıda bulunan gerçek hata (2026-08-30)
+
+### 29.1 `kurulum --uygula` çalıştı
+
+KiCad kapatılmıştı, komut kabul edildi:
+
+    guncellendi: C:\Users\ardaa\AppData\Roaming\kicad\10.0\kicad_common.json
+
+Yedekle karşılaştırma, değişimin gerçekten tek alanla sınırlı kaldığını
+gösteriyor — **1092 alandan 1 tanesi**:
+
+    api.enable_server: False -> True
+
+Kullanıcının şematiği bu arada kaydedilmiş: `KicadOtomasyon1.kicad_sch`
+11699 bayt, üç sembol — `power:+10V`, `Device:R`, `Device:C`.
+
+`pcbqa tani` artık `ok canli mod (IPC) acik` diyor.
+
+### 29.2 Başlatıcı yalnızca kendi klasöründen çalışıyormuş
+
+`tani`'yi başka bir dizinden çağırınca çıktı:
+
+    No module named pcbqa
+
+Kök sebep KiCad'in kendi `sitecustomize.py`'sinde
+(`bin\Lib\site-packages\sitecustomize.py`):
+
+```python
+in_venv = sys.prefix != sys.base_prefix
+if not in_venv:
+    sys.path = []
+```
+
+Site aşamasında `sys.path` **komple siliniyor** ve yeniden kuruluyor. Silinenler
+arasında `PYTHONPATH` girdileri de var. Ölçüm:
+
+    set PYTHONPATH=...\pcbqa
+    python.exe -c "import sys; print(sys.path)"
+    -> ['', DLLs, Lib, site-packages, 3rdparty]        # pcbqa YOK
+
+Yani `pcbqa.cmd`'nin kurduğu `PYTHONPATH` hiçbir zaman işe yaramıyormuş.
+Başlatıcı yalnızca `-m`'in çalışma dizinini site'dan **sonra** eklemesi
+sayesinde ayakta duruyordu — yani yalnızca kullanıcı paket klasöründeyken.
+
+Testler bunu göremedi çünkü `LauncherTests._run` her zaman `cwd=PROJECT`
+veriyordu. İki katmanlı bir körlük: hem geliştirme ortamı `.venv` kullandığı
+için silme hiç tetiklenmiyor (`in_venv` doğru), hem de test çalışma dizinini
+paket klasörü seçiyordu.
+
+### 29.3 Çözüm: `baslat.py`
+
+`pcbqa.cmd` artık `-m pcbqa.app` değil, paketin **yanında** duran
+`baslat.py`'yi çalıştırıyor. CPython betiğin klasörünü site'dan sonra
+`sys.path[0]`'a koyduğu için o girdi silmeden kurtuluyor; `baslat.py` ayrıca
+kendi klasörünü açıkça ekliyor — sıraya değil, bildiğimiz yola güveniyoruz.
+
+Ölçüm, dört ayrı dizinden:
+
+    C:\Windows                          -> 0
+    C:\Users                            -> 0
+    ...\Kicad          (proje kökü)     -> 0
+    ...\Kicad\pcbqa    (paket klasörü)  -> 0
+
+### 29.4 Aynı kök sebep ikinci yerde
+
+`tests/test_swig_bridge.py` içindeki `run_in_kicad` da KiCad'in Python'una
+`env={"PYTHONPATH": PROJECT}` veriyordu. O da hiç işe yaramıyormuş; testler
+yalnızca çalışma dizini paket klasörü olduğu için geçiyordu. Artık yol betiğin
+önsözünde ekleniyor ve `cwd` bilerek `PROJECT.parent` yapıldı — böylece test
+çalışma dizinine **yaslanmadığını kendisi kanıtlıyor**.
+
+### 29.5 Yeni testler
+
+`test_app` 17 -> 20:
+
+- `test_launcher_runs_from_an_unrelated_directory` — cwd'yi elinden alır
+- `test_pythonpath_alone_is_not_relied_upon` — KiCad'in Python'unun
+  `PYTHONPATH`'i hâlâ yok saydığını doğrular; bir gün sayarsa test düşer ve
+  `baslat.py`'nin gerekçesini gözden geçirmemizi söyler
+- `test_bootstrap_sits_next_to_the_package`
+
+Bead: `Kicad-i6z` (kapatıldı). Hafıza: `kicad-python-sys-path-silme`.
+
+## 30. Karar katmanı ve canlı düzenlemenin gerçek sınırı (2026-08-30)
+
+### 30.1 İki yeni modül
+
+Kullanıcının sorusu şuydu: *"bu bağlantıyı yaparken kendi zihnini de kullandın
+mı yoksa uygulama mı tüm işi yaptı"*. Dürüst cevap: **topoloji kararı bendeydi**,
+uygulamada onu verecek bir katman yoktu. Bu bölüm o boşluğu kapatıyor.
+
+- **`propose.py`** — sayfaya bakıp bağlantı **önerir**. Dosyada niyet yazmaz ama
+  **yerleşim yazar**: iki pin tam aynı hizadaysa bu tesadüf değil.
+  - `hizalama` — iki boş pin aynı x ya da y'de, aralarında engel yok, **ve
+    birbirinin en yakın hizalı komşusu**. Karşılıklılık şartı bilinçli: tek
+    yönlü yakınlık, hangisinin doğru olduğunu bilmediğimiz bir seçim demek.
+  - `guc-inisi` — güç sembolünün boş pini, bir tel parçasının **ortasına** dik
+    iniyorsa.
+  - Kanıtı olmayan hiçbir şey önerilmez ve **atlanan pin adıyla söylenir**;
+    sessizce atlanan bir pin, kullanıcının fark etmediği eksik bağlantıdır.
+
+- **`connect.py`** (`pcbqa bagla`) — kararı yürütür. İki giriş: `--ag` (beyan)
+  ve `--oner` (çıkarım). Yolu `sch_wire.route` çıkarır, junction'ı KiCad'in
+  kendi kuralıyla sayar, `sch_write` yazar, sonra **`kicad-cli` netlist'i
+  hakemdir**.
+
+### 30.2 Ölçüm iki gerçek hata buldu
+
+**Kısa devre.** İlk sürümde öneri `R1.1 - R1.2` diyordu — yani direncin kendi
+iki ucunu birleştiriyordu. Sebep: en yakın hizalı komşu R1 için R1.2 (7.62 mm),
+C1.1 değil (15.24 mm). Kural eklendi: **aynı sembolün pinleri asla eşleşmez** —
+o hizalama sembolün *geometrisinden* gelir, kullanıcının yerleşiminden değil,
+yani hiçbir niyet taşımaz. Testle korunuyor.
+
+**Hakemin yanlış aradığı şey.** `#PWR01.1 R1.1 C1.1` ağı doğru tellenmişti ama
+hakem reddetti. Sebep: KiCad netlist'inde **güç sembolleri düğüm olarak hiç
+görünmez** — ağ `+10V → C1.1, R1.1` diyor, `#PWR01.1` listede yok. Hakem
+sağlanamayacak bir şey arıyordu. Düzeltme: güç için ağın **adına** bakılıyor
+(KiCad ağı güç sembolünün değeriyle adlandırır). `NetCheck.power_name`.
+
+### 30.3 Sonuç: uygulama aynı kararı verdi
+
+Aynı üç parça üzerinde `--oner`, elle verdiğim kararın **aynısını** üretti —
+üç tel, aynı koordinatlar, `(39.37, 45.72)`'de aynı junction — ve her birinin
+gerekçesiyle. `kicad-cli` netlist'i onayladı.
+
+Kalan sınır dürüstçe duruyor: sayfada yalnızca R ve C varsa seri mi paralel mi
+olacağı **dosyada yazmıyor**. Burada eksik olan yetenek değil bilgi; uygulama
+öneri üretmez ve nedenini söyler.
+
+### 30.4 Canlı düzenleme: şematikte yok, PCB'de VAR
+
+Şematik tarafı kapandı (§29, `Kicad-5be`): `GetItems` handler'ı yok, ve
+`BeginCommit` mesajının **hiç alanı yok** — belgeye bağlanamıyor, yönlendirilemiyor.
+Sondalama KiCad'i iki kez çökertti (dosya her ikisinde de sağlam kaldı).
+
+Ama PCB tarafı ölçüldü ve **çalışıyor**:
+
+    GetItems(KOT_PCB_FOOTPRINT)              -> 18 oge okundu
+    begin_commit + update_items + push_commit -> kabul; J1 8.000 -> 9.000 mm
+    pcbqa uygula-ipc --apply                  -> 16 footprint CANLI tasindi,
+                                                 kilitli J1/J2 atlandi,
+                                                 undo gecmisine TEK islem
+
+Yani kullanıcının istediği *"ben bakarken araç çalışsın, hatasına `Ctrl+Z` ile
+müdahale edeyim"* akışı **PCB tarafında zaten gerçekleşiyor** — `ipc_apply`
+yazılmıştı ama API kapalı olduğu için hiç doğrulanmamıştı.
+
+### 30.5 Düzelen bir tespit
+
+"Bağımsız editör API sunucusuna kaydolmuyor" demiştim — **yanlış**. Tek başına
+çalışan `pcbnew.exe` soketi kendisi barındırıyor. Önceki `eeschema` denemesinde
+`kicad.exe` soketi zaten tutuyordu; o bir çakışmaydı. Kural: canlı çalışırken
+**aynı anda tek KiCad örneği**.
+
+kipy notu: `Vector2(x=..., y=...)` yok; `Vector2.from_xy()` / `from_xy_mm()`.
+
+### 30.6 Testler
+
+`test_propose` 9 + `test_connect` 19. Örnek eklendi: `samples/uc_parca/` —
+üç bağlantısız sembol (`power:+10V`, `R1`, `C1`), öneri katmanının sabit sınavı.
+
+## 31. Serena çıktı, graphify girdi — bilgi grafiği hafızası (2026-08-31)
+
+### 31.1 Serena kaldırıldı
+
+MCP sunucusu kullanıcı kapsamından silindi, `.serena/` hem diskten hem git
+indeksinden kaldırıldı (10 dosya). İçeriği kaybolmadı: `.serena/memories/`
+dosyaları zaten *"Hepsi HANDOFF.md / README.md'de gerekçesiyle birlikte
+kayıtlı"* diyordu. Projenin hafıza sistemi zaten `bd`; Serena ikinci ve
+gereksiz bir kayıt yeriydi. Belgelerdeki tek sarkan atıf düzeltildi.
+
+### 31.2 Beads bilgisi dosyaya aktarıldı
+
+Beads bir Dolt veritabanında duruyor, yani **hiçbir dosya tarayıcısı onu
+göremiyor** — oysa projenin ölçülmüş bilgisinin çoğu orada. 8 hafıza + 32 kayıt
+`pcbqa/docs/hafiza/` altına yazıldı; her hafıza **ayrı dosya**, çünkü grafikte
+her biri kendi düğümü olsun istiyoruz.
+
+Tazeleme mantığı: `bd recall <anahtar>` + `bd list --status open,closed --json`.
+Not: `bd` bir npm shim'i; Windows'ta `subprocess` uzantısız adı bulamıyor,
+`bd.cmd` vermek gerekiyor.
+
+### 31.3 Grafik
+
+    3423 dugum, 7350 kenar, 174 topluluk
+      3006 AST      tree-sitter, YEREL, 0 jeton, LLM yok
+       417 anlamsal 4 alt-ajan, 664.798 jeton
+       417/417 anlamsal dugum GEREKCE tasiyor
+
+Kimlik çakışması **0** — alt-ajanlara verilen düğüm-kimliği kuralı AST'nin
+ürettiğiyle birebir uyuştu. Sağlık: 336 sarkan uçlu, 480 çökmüş kenar; bunlar
+AST'nin grafik dışı sembollere (stdlib, üçüncü parti) referansları.
+
+Asıl kazanç kod haritası değil **gerekçe haritası**. Örnek: `graphify explain
+pcbqa_handoff_sessiz_hata_sinifi` çağrısı, HANDOFF'un dört ayrı bölümündeki
+altı gerçek hatayı (`pinfunction` hiç okunmuyordu, bayat `move-v2.json` yolu,
+`decoupling_counts()` çağrılmıyordu, KiCad 5 körlüğü, iz/via netleri numara
+okunuyordu) **tek kavram altında** bağlıyor. Böyle bir liste hiçbir dosyada
+yok; grafik onu kendisi kurdu.
+
+### 31.4 Her oturumda açık — dört katman
+
+| katman | ne yapar |
+|---|---|
+| `CLAUDE.md` `## graphify` bölümü | her oturumda yüklenir |
+| `PreToolUse` kancaları | `Bash\|Grep` ve `Read\|Glob` öncesi hatırlatma **enjekte eder** (engellemez — ölçüldü, çıkış 0) |
+| `SessionStart` kancası | `.claude/graphify-durum.py` — düğüm/kenar/topluluk, yaş, commit edilmemiş `.py` sayısı |
+| `graphify hook install` | post-commit / post-checkout otomatik tazeleme |
+
+Üçüncüsünü biz yazdık. Sebep: graphify'ın kendi kurulumu grafiğin *var
+olduğunu* söylüyor ama **ne kadar bayat olduğunu** söylemiyor. Bayat grafik,
+güvenle sorgulanan yanlış bir haritadır.
+
+### 31.5 Tuzaklar
+
+- `graph.json` **node-link** biçiminde: kenarlar `links` altında, `edges`
+  altında **değil**. `edges` diye okuyunca sessizce `0` çıkıyor (bu bize oldu).
+- Kümeleme her yeniden kurulumda baştan koşuyor (174 → 165 ölçüldü);
+  **topluluk numaraları değişiyor** ve elle verilen adlar **siliniyor** —
+  yerine en yüksek dereceli düğümün adı geçiyor (`Design`, `load_design`,
+  `parse_with_stats`). Yani post-commit kancasını kurup bırakırsak grafik her
+  commit'te biraz daha okunmaz hale gelir, sessizce.
+
+  Çözüm: adlar topluluk numarasına değil **çapa düğümüne** bağlandı
+  (`.claude/graphify-etiketler.json`). Çapa kimlikleri dosya yolundan türediği
+  için yeniden kümelemede değişmiyor. `.claude/graphify-etiketle.py` her oturum
+  başında adları geri uyguluyor; çapası olmayan topluluklar graphify'ın kendi
+  türettiği adla kalıyor — uydurma ad vermek yerine. Bir çapa kaybolursa
+  betik bunu **söylüyor**, sessizce atlamıyor.
+- `graphify claude install --project`, projenin **sürüm kontrolündeki**
+  `CLAUDE.md`'sine yazar. `graphify-out/graph.json` bilinçli olarak
+  `.gitignore` dışında bırakıldı: `graphify hook install` onun için bir
+  birleştirme sürücüsü kaydediyor, yani izlenmesi bekleniyor.
+
+### 31.6 Çalışma anlaşması — graphify entegre (2026-08-31)
+
+Kullanıcının kalıcı talimatı: her karar, her hata düzeltmesi ve her gelecek
+planı graphify'a işlenecek, ve bu her oturumda hatırlanacak.
+
+Bir söz olarak bırakılmadı, **mekanizma** kuruldu — çünkü davranış kuralları
+unutulur, oturum başında koşan bir kanca unutulmaz:
+
+```
+bd create / bd remember              beads = KANONİK kaynak
+python .claude/graphify-bilgilendir.py
+        beads → pcbqa/docs/hafiza/*.md
+        graphify update .
+        .claude/graphify-etiketle.py
+```
+
+`pcbqa/docs/hafiza/` **üretilmiş çıktıdır, elle düzenlenmez.** Betik beads'ten
+silinen bir hafızanın dosyasını da siler — yoksa grafik artık geçerli olmayan
+bir kararı doğruymuş gibi taşırdı.
+
+Kural üç yerde birden duruyor (`CLAUDE.md` §Çalışma Anlaşması, beads hafızası
+`calisma-anlasmasi-graphify-entegre`, ajanın kendi dosya hafızası) ve ayrıca
+`SessionStart` çıktısında her oturum görünüyor.
+
+**Betiğin sınırı çıktıda söyleniyor, saklanmıyor:** yeni kaydın *metnini*
+dosyaya düşürür ve aranabilir yapar, ama **kavram düğümü ve gerekçe kenarları
+oluşturmaz** — onlar anlamsal tarama ister (`/graphify --update`, alt-ajan
+gerektirir, kullanıcı onayı ile).
+
+Çapa çakışmaları da sessiz geçmiyor: iki çapa aynı kümeye düşerse betik bunu
+yazıyor (`Varyant kesfi -> Niyetten kart uretimi`). İki ayrı kavramın tek kümeye
+düşmesi, kümelemenin kaydığını ve adlandırmanın gözden geçirilmesi gerektiğini
+söyler.
+
+## 32. İki dilli bileşen sözlüğü (2026-08-31)
+
+`lexicon.py` — KiCad'in açık kaynak kütüphanelerinden bileşen adlarını
+çıkarır: kısaltma, tam ad, İngilizce ve Türkçe. Amaç ileriki makine
+öğrenimi: bir bileşeni *adından* tanımak. `C`, `kondansator`, `capacitor` ve
+`Device:C_Polarized` aynı şeyi söylüyor; model bunu bilmiyorsa öğrenemez.
+
+### 32.1 Üç katman, üçü de farklı güvenilirlikte
+
+| katman | nasıl kuruldu | büyüklük |
+|---|---|---|
+| `DESIGNATORS` | elle, **ama ölçümle** | 67 önek |
+| `TERMS` + `PHRASES` | elle, seçim ölçüme dayalı | 252 + 31 |
+| `semboller` | KiCad kütüphanelerinden çıkarıldı | 22.776 |
+
+**Önek adları ezberden yazılmadı.** Her önek için, o öneki kullanan
+sembollerin açıklamalarında en sık geçen kelimeler ölçüldü ve ad ona göre
+verildi. Tablodaki `ornek` alanı o ölçümün izidir — `TR` gerçekten
+"transformer, secondary, balanced, mhz" diye kullanılıyor, biz öyle
+sandığımız için değil.
+
+**Terim seçimi de ölçüme dayalı:** 45.187 açıklama alanında 266.284 kelime
+sayıldı, sıklık listesinin başı alındı.
+
+### 32.2 Uydurulmayan şey
+
+22.776 sembolün çoğu parça numarasıdır (`STM32F103C8Tx`, `TPS54331`).
+Bunların "Türkçesi" yoktur. Bir sembolün Türkçe alanı **ancak `TERMS`'ten
+gerçek bir eşleşme çıktığında** dolar; çıkmazsa boş kalır. `kapsam()` bu
+oranı söyler ve test `%100`'ü **şüpheli** sayar — parça numaralarının
+Türkçesi olmamalı.
+
+Ölçülen kapsam: kategorisi bilinen **%100.0**, Türkçe karşılığı **%94.6**.
+
+Paket adları (SOT-223, LQFP, QFN) ve üretici adları (STMicroelectronics)
+bilinçli olarak çevrilmez; `CEVRILMEZ` listesi bunu belgeler ve bir test
+o kelimelerin `TERMS`'e sızmadığını korur.
+
+### 32.3 Ölçümün bulduğu iki şey
+
+**Kelime kelime çeviri bozuyordu.** `Through hole` → `Through delik`,
+`Single solar cell` → `tek solar cell`. Çözüm: `PHRASES` — çok kelimeli
+kalıplar, uzundan kısaya, kelime değişiminden **önce** uygulanıyor.
+
+**`U6`, `RL2`, `MES?` ayrı önek değil.** Bazı sembollerin `Reference`
+alanına örnek numarası ya da soru işareti sızmış (7 varyant, 71 sembol).
+`normalize_designator()` bunları kırpıyor — ama **yalnızca sonuç tanımlı bir
+öneke düşüyorsa**, yoksa gerçekten yeni bir önek sessizce yutulurdu.
+Bu düzeltmeyle kategori kapsaması %99.5 → %100.
+
+### 32.4 Kullanım
+
+```
+pcbqa sozluk                 özet
+pcbqa sozluk --uret          sözlüğü üret (data/kicad-sozluk.json.gz, 424 KB)
+pcbqa sozluk --ara direnc    iki dilde ara
+```
+
+Arama **tam kelime** eşler, alt dizi değil: ölçüldü, alt dizi araması `C`
+için 41 önek döndürüyordu (`Capacitor`, `Circuit`, `Microphone`… hepsinde
+`c` var) ve bu bilgi değil gürültüdür.
+
+Üretilen dosya izleniyor (424 KB): ML için sabit bir sözcük dağarcığı sürümü
+olması, yeniden üretilebilir olmasından daha değerli. KiCad sürümü değişince
+`--uret` ile tazelenir.
+
+Testler: `test_lexicon` 20.
+
+## 33. Sentetik MPN ve fiyat alanları (2026-08-31)
+
+`mpn.py` — bileşenlere parça numarası ve fiyat alanı yazar. Kullanıcı açıkça
+*"gerçekçi bir şekilde fiyat ya da mpn numarası göstermesi gerekmiyor, şu
+anlık test için"* dedi; sınanan şey **alan yazma yolu**, tedarik verisinin
+doğruluğu değil.
+
+### 33.1 Uydurma veri uydurma görünmeli
+
+Bu modülün en büyük riski teknik değil: birinin bu fiyatları gerçek sanması.
+Üç koruma:
+
+- Her MPN `SENT-` ile başlar.
+- Her sembole `MPN_Kaynak = sentetik-test` alanı yazılır. Gerçek bir tedarikçi
+  bağlandığında bu işareti taşıyan her kayıt **güvenle** üzerine yazılabilir.
+- Üretici adları uydurmadır (`SentCo`, `TestParts`, `MockElec`, `DemoComp`) —
+  uydurma bir fiyatın yanına gerçek bir marka yazmak yanlış izlenim bırakır.
+  Bir test bu adların gerçek firma adlarına benzemediğini korur.
+
+### 33.2 Süsleme, istenen değişmezi bozdu
+
+İlk iki sürümde fiyata "gerçekçi dursun" diye deterministik bir sapma
+ekliyordum (±%2). Ölçüm gösterdi ki üst kademelerde adımlar küçülüyor
+(40 µF → 45 µF yalnızca %0.4) ve sapma **sıralamayı ters çeviriyordu**:
+C10 (45 µF), C9'dan (40 µF) ucuz çıktı.
+
+Kullanıcının istediği tam olarak sıralamaydı ("en ucuzdan pahalıya"). Görsel
+bir süslemenin istenen değişmezi bozmasına izin verilmez — sapma **kaldırıldı**.
+Fiyat artık saf bir `(değer, paket)` fonksiyonu; bir test on değeri sırayla
+karşılaştırıp monotonluğu koruyor.
+
+Aynı hikâyenin ikinci yarısı: `_base_price` değeri okunamayan bileşene `0.10`
+sabiti veriyordu, yani `Device:C`'nin varsayılan `"C"` değeri de fiyat
+alıyordu — hakkında hiçbir şey bilinmeyen parçaya güvenle fiyat yazmak.
+Artık `None` dönüyor ve o bileşen **engel olarak raporlanıyor**, sessizce
+atlanmıyor.
+
+### 33.3 Ölçülen sonuç
+
+`KicadOtomasyon1` üzerinde 10 kondansatöre uygulandı, 40 alan yazıldı:
+
+```
+C2   5uF  SENT-C9783-0402  $0.5559      <- en ucuz
+...
+C11 50uF  SENT-C2973-0402  $0.6359      <- en pahali
+C1  (deger 'C' okunamadi)  -> fiyat atanmadi
+```
+
+Sıralama istisnasız. KiCad'in kendi netlist'i alanları `MPN` / `Price` /
+`Manufacturer` / `MPN_Kaynak` olarak geri okuyor.
+
+Yeni alanlar **gizli** yazılıyor (`hide yes`): şematikte görünseler sayfa
+okunmaz hale gelirdi, ama KiCad BOM'da yine görüyor.
+
+Testler: `test_mpn` 14.
+
+## 34. Doğal dil komutu — `pcbqa yap` (2026-09-03)
+
+Kullanıcı şunu istedi: *"ben şu anki modelimize 10 adet kapasitör koy dedim,
+bunu anlayacak ve uygulayacak hale getirmeliyiz"*.
+
+Altta duran her şey **zaten hazırdı**: `sch_add.add_symbols` sembolü
+kütüphaneden getiriyor, sayfada boş yer buluyor, netlist kalkanını
+çalıştırıyor, yedek alıyor, atomik yazıyor. Eksik olan tek şey **cümleyi o
+çağrıya çeviren katmandı**. `komut.py` yalnızca onu yapar; hiçbir dosyayı
+kendisi yazmaz.
+
+### 34.1 Neden modelsiz
+
+Üç kısıt, üçü de ölçülmüş bir gerçeğe dayanıyor:
+
+1. `pcbqa`nın **çalışma zamanı bağımlılığı yok** ve KiCad'in kendi
+   Python'unda koşuyor (§27). Bir model istemcisi bunu bozardı.
+2. Testler sessizliği korur — aynı cümle her koşuda **aynı** planı üretmeli.
+3. "Basit görev" dağarcığı **kapalı** bir küme: fiil, adet, tür, değer,
+   paket. Kapalı küme için çözümleyici hem daha doğru hem hesapsız.
+
+Yine de çıktı **tipli bir sözleşmedir**:
+
+```
+anla(metin) -> Yorum{ eylemler: [Eylem], notlar, engeller }
+uygula(yorum, sch) -> [sch_add.AddResult]
+```
+
+İleride bir model cümleyi doğrudan `Eylem` listesine çevirebilir;
+uygulayıcı, kalkan ve testler değişmez. Kapı açık, bağımlılık yok.
+
+### 34.2 Anlaşılmayan görünür
+
+Projenin geri kalanıyla aynı doktrin:
+
+| durum | sonuç |
+|---|---|
+| bilinmeyen fiil | ENGEL, bilinen fiiller listelenir |
+| bilinmeyen bileşen | ENGEL, bilinen türler listelenir |
+| belirsiz sözcük (`transistör`) | ENGEL + adaylar (NPN mi PNP mi MOSFET mi) |
+| tanımsız paket (`1206 bobin`) | ENGEL |
+| eşleşmeyen kelime | NOT olarak dökülür, yutulmaz |
+| değer verilmemiş | NOT — **uydurulmaz**, kütüphanedeki değer kullanılır |
+
+İlk sürüm yalnızca **ekliyordu**; `bağla` §34.6'da geldi. `sil` / `taşı` /
+`değiştir` hâlâ tanınır ama reddedilir: *"anlamadım"* ile *"henüz
+yapmıyorum"* ayrı şeylerdir.
+
+### 34.3 Dört gerçek hata — üçünü test yakaladı
+
+- **`"on"` dolgu kelimesi sanıldı.** İngilizce edat diye `DOLGU`ya konmuştu;
+  Türkçe *"on adet kapasitör"* komutundaki **10 sessizce 1'e düştü**. Artık
+  bir nöbetçi test `DOLGU ∩ SAYILAR = ∅` olduğunu koruyor.
+- **`Device:Ferrite_Bead` diye bir sembol yok** — KiCad'de adı
+  `Device:FerriteBead`. `test_every_lib_id_resolves` ilk koşuda yakaladı.
+  Tablodaki her `lib_id` ve her footprint gerçek kütüphaneye karşı sınanıyor;
+  uydurma sembol adı yazılamaz.
+- **Değer sadeleştirilmiş kelimeden okunuyordu**, yani `10M` (mega) ile
+  `10m` (mili) aynı şeye düşüyordu — 10 megaohm'luk direnç şematiğe 10
+  miliohm diye yazılırdı. Değer artık **ham** kelimeden okunur, tür sözcüğü
+  sadeleştirilmişten.
+- **Virgül koşulsuz ayraçtı.** Türkçe ondalık ayracı da virgüldür; `4,7k`
+  ikiye bölünüp değer kayboluyordu. Ayraç artık `(?<!\d)[,;](?!\d)`.
+
+### 34.4 Türkçe iki yerde ısırıyor
+
+- `"İ".lower()` ayrı bir birleştirici nokta (U+0307) bırakır ve tablo
+  eşleşmesi kaçar. Bu yüzden **önce** büyük Türkçe harfler ASCII küçüğe
+  çevrilir, **sonra** `lower()` çalışır.
+- Türkçe eklemelidir: `kapasitör`, `kapasitörler`, `kapasitörü`,
+  `kapasitörden` aynı sözcüktür. Hepsini tabloya yazmak tabloyu okunmaz
+  ederdi. Kırpma kuralı `lexicon.normalize_designator` ile **aynı**: kırpma
+  yalnızca sonucu tabloda **tanımlı** bir sözcüğe düşürüyorsa kabul edilir —
+  böylece gerçekten bilmediğimiz bir kelime sessizce bir bileşene bağlanmaz.
+  (`zımbırtı` engel olarak kalır.)
+
+### 34.5 Ölçülen sonuç
+
+```
+> pcbqa yap "şu anki modelimize 10 adet kapasitör koy" --sch ..\KicadOtomasyon1
+anlasilan: "şu anki modelimize 10 adet kapasitör koy"
+  10 x Kondansator (Device:C)
+  not: deger verilmedi - kutuphanedeki deger kullanilacak
+  C12 @ (15.24, 16.51) ... C21 @ (129.54, 16.51)
+  kalkan: mevcut devre degismedi, yalnizca yeni bilesenler eklendi
+  (dry-run - yazmak icin --uygula)
+```
+
+Çok istekli cümle de tek geçişte:
+
+```
+pcbqa yap "5 adet 100nF 0603 kondansatör ve 3 adet 10k direnç ekle" --uygula
+  -> C8..C13 (footprint doğrulandı: C_0603_1608Metric), sonra R22..R24
+```
+
+İkinci eylem birincinin **yazılmış** halini okur; yoksa iki plan da aynı
+referansları verirdi. Bir eylem engele takılırsa sonrakiler **çalışmaz** —
+yarım uygulanmış bir cümle, hiç uygulanmamış olandan zor toparlanır.
+
+Testler: `test_komut` 41 (çözümleme testleri KiCad'siz koşar; kütüphane ve
+uçtan uca testleri KiCad kuruluysa).
+
+### 34.6 Bağlama fiili — eklenen sembol artık bağlantısız değil (2026-09-04)
+
+`Kicad-d8f`in ilk maddesi. Ölçülen eksik şuydu: `pcbqa yap "10 kapasitör
+ekle"` sayfaya **on tane bağlantısız sembol** bırakıyordu; kullanıcının
+gerçekten istediği cümle *"…ve hepsini VCC-GND arasına bağla"*ydı.
+
+Alt katman yine hazırdı: `sch_add.add_symbols(connect=["1=VCC", "2=GND"])`
+etiketi/telleri çiziyor, `_expected_joins` ile kalkana *"bu pin şu pinlerle
+aynı ağa girmeli"* diyor. Eksik olan tek şey **kalıbı o çağrıya çeviren
+katmandı**.
+
+```
+pcbqa yap "6 adet 100nF kondansatör ekle ve hepsini VCC ile GND arasına bağla"
+  6 x Kondansator (Device:C)  deger=100nF  bagla: 1=VCC, 2=GND
+  C8 @ (15.24, 16.51) ... C14 @ (78.74, 16.51)
+  baglanti: C8.1 -> VCC (etiket)   ... 12 bağlantı
+  kalkan: mevcut devre degismedi, yalnizca yeni bilesenler eklendi
+```
+
+Ölçü şematikteki etiket değil, KiCad'in çıkardığı **netlist**tir: uçtan uca
+test altı kapasitörün ikişer pinini `net_of` üzerinden `VCC` ve `GND`de
+doğrular ve **eski her pinin ağının değişmediğini** ayrıca ölçer.
+
+**Kalıp cümleden EN BAŞTA ayrılır**, ekleme çözümlemesinden önce. İki
+ölçülmüş sebep:
+
+1. Ayraç `"ve"`dir. `"VCC ve GND arasına"` cümlenin ortasında kalırsa
+   `_AYRAC` onu ikiye böler ve iki yarım istek çıkar.
+2. `"toprak"` hem bir **ağ adı** hem bir **bileşen türü**dür (`power:GND`).
+   Kalıp ayrılmazsa `"VCC ile toprak arasına bağla"` sayfaya istenmeyen bir
+   toprak sembolü de eklerdi.
+
+#### İki gerçek hata
+
+- **Yapı sözcüğü ağ adı sanıldı.** Ayraç `" ve "` olduğu ve regex en soldan
+  eşleştiği için `"2 diyot ekle ve VCC-GND arasına bağla"` cümlesinde
+  hedefler `("ekle", "VCC-GND")` diye okundu — iki diyotun katoduna `ekle`
+  adında bir ağ yazılacaktı. Hedef artık yapı sözcüğü (fiil, dolgu, kapsam,
+  sayı) olamaz; **bileşen sözcükleri bu listeye girmez**, çünkü `LED` ya da
+  `CLOCK` gerçek ağ adlarıdır. Reddedilen eşleşmeden sonra tarama hedefin
+  **sonundan** devam eder: başından devam edince `"ekle"` bu kez `"kle"`
+  diye eşleşti.
+- **`uygula` aşamasındaki notlar hiç basılmıyordu.** `main()` önce
+  `yorum.describe()` yazıyor, sonra `uygula`yı çağırıyordu; `uygula`nın
+  eklediği notlar — *"VCCC diye bir ağ YOK"* uyarısı ve daha eski olan
+  dry-run numaralama notu — ekrana **hiç** çıkmıyordu. Artık `uygula`dan
+  sonra yeni notlar basılıyor (hata yolunda da).
+
+#### Ağ adının yazımı tahmin edilmez, şematiğe sorulur
+
+KiCad'de ağ adları büyük/küçük harfe **duyarlıdır**: `"vcc"` yazan kullanıcı
+`VCC` ağına bağlanmış olmaz, on kapasitör boş bir `vcc` adasında kalır.
+**Netlist kalkanı bunu yakalamaz** — yeni bir ağ oluşturmak da geçerli bir
+işlemdir ve kalkan yalnızca *eski* devrenin değişmediğini ölçer. Bu yüzden
+`uygula` hedefleri şematikteki gerçek yazımla eşler:
+
+| durum | sonuç |
+|---|---|
+| `VCC` (birebir var) | aynen kullanılır |
+| `vcc` (yalnız harf farkı) | `VCC` yapılır + NOT |
+| `VCCC` (hiç yok) | **UYARI** + mevcut adlar listelenir |
+| `toprak` / `ground` | `GND` okunur + NOT (`AG_ADLARI`) |
+
+#### Reddedilenler
+
+| cümle | sonuç |
+|---|---|
+| `... ekle ve bağla` | ENGEL — kalıp yok; bağlantısız sembol bırakmaktansa hiç eklememek |
+| `C5 ile C6 arasına bağla` | ENGEL — bu katman yalnızca **eklerken** bağlar |
+| `... hepsini C5 ile GND arasına` | ENGEL — `C5` bir referans, ağ adı değil |
+| `5 direnç ve 5 kapasitör ekle ve VCC-GND arasına` | ENGEL — hangi gruba ait belirsiz, `"hepsini"` gerek |
+| `3 toprak ekle ve VCC-GND arasına` | ENGEL — `power:GND` tek uçlu |
+
+Kutuplu bileşende (diyot, LED, polarize kondansatör) yön **elektriksel bir
+karardır** ve cümle onu söylemez: seçilen yön NOT olarak yazılır, sessizce
+seçilmez. `TURLER`deki uç numaraları ve kutup adları kütüphaneye karşı
+sınanır (`test_declared_pins_exist`,
+`test_polarity_names_match_the_library`) — KiCad diyot pin sırasını
+değiştirirse not sessizce yanlışlaşmasın.
+
+Testler: `test_komut` 41 → **67**.
+
+Sonraki adımlar `Kicad-d8f`de: silme (`compare_subtractive` gerekir),
+örneğe referansla konuşma (`C5`, `son eklediklerim` — var olan bir pine
+bağlama da bunu bekliyor), dağarcığı `lexicon`in ölçülmüş 22.776
+sembolünden türetme.
+
+## 35. Masaüstü arayüzü ve parça tablosu (2026-09-03)
+
+Kullanıcı: *"kullanabileceğim bir python arayüzü yaz, işlerimi o arayüz
+üzerinden de gerçekleştirebileyim"* + *"MPN bilgisi, fiyat ve üstünden geçen
+amperi voltajı tablo olarak göstersin her parça için"*.
+
+İki yeni modül: `arayuz.py` (`pcbqa arayuz`) ve `elektrik.py`
+(`pcbqa parcalar`). Arayüz CLI'nin **yerine geçmez, üstüne biner**: her sekme
+aynı modülün aynı fonksiyonunu çağırır, ikinci bir mantık yazılmaz.
+
+### 35.1 Ölçülen kısıt: KiCad'in Python'unda tkinter yok
+
+```
+"C:\Program Files\KiCad\10.0\bin\python.exe" -c "import tkinter"
+-> ModuleNotFoundError: No module named '_tkinter'
+```
+
+Bu §27'yi doğrudan etkiliyor: `pcbqa.cmd` yorumlayıcı olarak **önce KiCad'in
+Python'unu** seçer, yani arayüz başlatıcının varsayılan yorumlayıcısıyla
+açılamaz. Karşılık, sessiz olmayan bir geri çekilme:
+
+- `arayuz.main()` tkinter'ı bulamazsa **çıkmaz**; `py` / `python` /
+  `python3` arasında tkinter'ı olanı arar, `baslat.py` üzerinden oradan
+  açılır ve **ne yaptığını yazar**. Ölçüldü: KiCad'in Python'undan
+  `tkinterli_python()` → `python3`.
+- Hiçbiri yoksa ne yapılacağını söyler (`PCBQA_PYTHON`) ve CLI'ye yönlendirir.
+
+Kullanıcıya üç seçenek sunuldu (tarayıcı arayüzü / tkinter / yalnız API);
+tkinter **bilinerek** seçildi, bu kısıt bilinerek kabul edildi.
+
+### 35.2 İki adımlı güvenlik, düğmeye çevrildi
+
+CLI'de yazmak için `--uygula` yazmak zorundasınız. Arayüzde bunun karşılığı:
+**"Uygula" kapalı başlar**, yalnızca *aynı cümle* + *aynı proje* için bir kuru
+koşum geçtikten sonra açılır, cümle/proje değişince ve yazdıktan sonra tekrar
+kapanır. `_uygula()` düğmenin görünümüne **güvenmez**, imzayı kendisi de
+doğrular — testlerden biri tam olarak bunu, düğmeyi hiç kullanmadan sınar.
+
+### 35.3 `elektrik.py` — asıl soru "neyi bilmiyoruz"
+
+SPICE yok; akım genel halde türetilemez. Kural: her sayının yanında **nereden
+bilindiği** yazılır, türetilemeyen **boş** kalır. Gerçekten türetilebilen üç şey:
+
+1. **Ray gerilimi, net ADINDAN.** `+3V3`→3.3, `+1V8`→1.8, `-12V`→-12;
+   GND ailesi 0 V (referans düğümü *tanımı*); `VBUS` 5 V (USB 2.0 spec 7.2.1).
+   Ad bir kanıttır. Buna karşılık **`VCC` / `VDD` / `VIN` hiçbir şey
+   söylemez** ve boş bırakılır — "VCC 5V'tur" varsayımı 3.3 V'luk bir kartta
+   yanlış akım hesaplatırdı. Bir test tam olarak bu suskunluğu korur.
+2. **Direnç akımı**: iki ucun gerilimi biliniyorsa `I = |ΔV| / R`.
+3. **Kondansatör**: kararlı halde DC akım ≈ 0 — tahmin değil, elemanın tanımı.
+
+Gerisi ("benzetim gerekir") boş kalır. Bir LED'in akımı seri direncinden
+hesaplanabilirdi ama Vf parçaya özgüdür ve kütüphanede yazmaz; Vf uydurmak
+tabloyu kirletirdi. KiCad'in `unconnected-(R2-Pad1)` adları **ağ değildir**,
+tabloda "(bagli degil)" görünür ve sebep olarak yazılır.
+
+### 35.4 Üç gerçek hata — üçü de ölçümle çıktı
+
+- **`mpn.py` çöküyordu.** `_base_price` değeri 0 olan parçada
+  `math.log10(0)` → `ValueError`. Ölçüldü: `samples/pic_programmer` C4'ün
+  değeri `"0"`, yani `pcbqa mpn` o kartta çöküyordu. §33'teki karar ("değeri
+  okunamayan parçaya fiyat yazılmaz") sıfırı kapsamıyordu; düzeltme o kararın
+  **uzantısı**, tersi değil — 0 Ω'luk bir köprünün fiyatı büyüklükten zaten
+  türetilemez.
+- **tkinter iş parçacığı güvenli değil.** İlk sürümde arka plan işi
+  `self.proje.get()` çağırıyordu; dört test `main thread is not in main loop`
+  ile düştü. Artık her Tk değeri **ana iş parçacığında** okunup fotoğrafı
+  arka plana geçiriliyor.
+- **Kapanışta bekleyen `after`.** Pencere yok edildikten sonra zamanlayıcı
+  ateş edip Tcl'de `invalid command name` üretiyordu; testte bir Tk
+  yorumlayıcısını test başına kurup yıkmak ise
+  `Tcl_AsyncDelete: async handler deleted by the wrong thread` ile yıkıyordu.
+  Çözüm: zamanlayıcı kimliği saklanıp kapanışta iptal ediliyor, testler tek
+  Tk yorumlayıcısı altında `Toplevel` kullanıyor.
+
+### 35.5 Ölçülen sonuç
+
+```
+> pcbqa parcalar samples\pic_programmer\pic_programmer.kicad_sch
+C1   100µF  Kondansator  1:VCC, 2:GND         2:0V    ~0   -        kararli halde DC akim gecmez
+R1   10k    Direnc       1:+3V3, 2:GND        3.3 V   330 uA        Ohm yasasi: |3.3 V| / 10k
+D8   RED-LED Diyot       1:GND, 2:Net-(D8-A)  1:0V    -             ag gerilimi bilinmiyor
+J1   DB9    Konnektor    1:(bagli degil), ... 5:0V    -             baglanmamis pin: 1, 2, 6, 9
+```
+
+Testler: `test_elektrik` 24, `test_arayuz` 15 (Tk açılamayan ortamda atlanır).
+
+## 36. Arayüz kısayolu ve ayrı başlatıcısı (2026-09-04)
+
+Kullanıcı: *"açılması için kısayolu klasöre koy"*. İki dosya:
+`pcbqa/pcbqa-arayuz.cmd` (kısayolun hedefi) ve klasördeki
+`pcbqa Arayuz.lnk`. Kısayollar makineye özeldir — içinde mutlak yol gömülü —
+bu yüzden `.gitignore`'a `*.lnk` eklendi; nasıl yeniden yapılacağı
+`KURULUM.md`'de yazıyor.
+
+### 36.1 Neden ayrı bir başlatıcı
+
+§35.1'in doğrudan sonucu: `pcbqa.cmd` yorumlayıcı olarak **önce KiCad'inkini**
+seçer ve KiCad Python'unu Tk olmadan paketler. Arayüz o yorumlayıcıyla
+açılamaz. `pcbqa-arayuz.cmd` tkinter'ı **gerçekten** olan bir Python arar —
+varsaymaz, her adayı çalıştırıp sınar — ve konsol penceresi açılmasın diye
+onun **kendi** `pythonw.exe`'siyle başlatır. Aday sırası: `PCBQA_PYTHON`,
+proje `.venv`'i, `py`, `python`, `python3`.
+
+`--nerede` hangi çiftin seçildiğini yazar; kısayol çalışmadığında ilk
+sorulacak soru bu olduğu için kalıcı bir bayrak.
+
+### 36.2 Üç gerçek hata — üçü de sessizdi
+
+- **Yanlış kurulumun `pythonw`'su.** İlk sürüm `pythonw`'yu PATH'ten
+  alıyordu. Ölçüldü: bu makinede PATH'teki `pythonw`, Microsoft Store takma
+  adı — tkinter'ı sınadığımız `.venv`'den **başka bir kurulum**. `start` onu
+  çalıştıramadığı için **arayüz sessizce hiç açılmıyor**, başlatıcı yine de
+  `0` dönüyordu. En kötü hata türü: başarı gibi görünen başarısızlık.
+  Konsolsuz ikiz artık **yalnızca** seçilen yorumlayıcının kendi klasöründen
+  alınır; bulunamazsa konsollu açılır ve bunu söyler.
+- **`for /f "usebackq"` içindeki iç içe tırnaklar** cmd'de çözümlenmiyordu;
+  `pythonw` yolunu üreten döngü **hiç sonuç üretmedi**, sessizce. Yol artık
+  ara dosyaya yazılıp `set /p` ile okunuyor.
+- **`if exist` yetmiyor.** Store takma adının `sys.executable`'ı
+  `C:\Program Files\WindowsApps\...` altını gösterir ve o klasörün ACL'si
+  yüzünden `if exist` **yanlış olarak** "yok" der. Hem tkinter hem `pythonw`
+  denetimi artık adayı **çalıştırıp** çıkış koduna bakarak yapılıyor.
+
+Ek olarak `baslat.py`: belge dizgesindeki `...\pcbqa`, Python 3.12+
+tarafından geçersiz kaçış dizisi sayılıp **her çalıştırmada**
+`SyntaxWarning` bastırıyordu — kullanıcının gördüğü ilk şey oydu. Dizge ham
+(`r"""`) yapıldı.
+
+### 36.3 Ölçülen sonuç ve ölçümün sınırı
+
+Kısayoldan açılınca:
+
+```
+"...\.venv\Scripts\pythonw.exe"  "...\baslat.py" arayuz     (artık cmd penceresi: 0)
+```
+
+Pencerenin gerçekten haritalandığı **uygulamanın kendisine sorularak**
+doğrulandı (`pythonw` altında, `sys.stdout is None` iken):
+
+```
+winfo_ismapped=1  viewable=1  1180x760
+sekmeler: ['Yap','Parcalar','Analiz','Uret','Ortam']   Uygula: disabled
+```
+
+`EnumWindows` ile doğrulanamadı: bu oturumdan `pythonw` pencereleri
+görünmüyor — **çıplak Tk de** aynı şekilde görünmüyor, yani bu uygulamanın
+değil ölçümün sınırı. Bir yöntem iki farklı şeyi ayırt edemiyorsa kanıt
+üretmiyordur; ayırt edebilen yöntem (uygulamaya sormak) kullanıldı.
+
+Testler: `test_app` içinde `ArayuzLauncherTests` 4 test. Biri yazılırken
+düştü ve **testin kendisi yanlıştı**: seçilen yorumlayıcıyı yol metninde
+`kicad\` aramakla eliyordum, ama kullanıcının proje klasörünün adı da
+`Kicad`. Denetim artık KiCad'in gerçek yorumlayıcı dosyasıyla karşılaştırıyor.

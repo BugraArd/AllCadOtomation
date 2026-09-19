@@ -2,9 +2,18 @@
 __pycache__/
 *.pyc
 .venv/
+.venv-nightly/
+pcbqa/.runtime/
+scratchpad/canli-sematik/
 
 # pcbqa ara dosyalari
 pcbqa/.work/
+
+# Windows kisayollari MAKINEYE OZELDIR: icinde mutlak yollar ve o makinedeki
+# yorumlayicinin ikon yolu gomulu. Izlenirse baska makinede bozuk cikar.
+# Yeniden uretmek icin: pcbqa/pcbqa-arayuz.cmd hedefli bir kisayol olusturun
+# (bkz. pcbqa/KURULUM.md, "Kisayol").
+*.lnk
 
 # KiCad yerel ayar/yedek dosyalari
 *.kicad_prl
@@ -19,3 +28,13 @@ fp-info-cache
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# graphify - yeniden uretilebilen ciktilar izlenmez.
+# graph.json BILINCLI olarak disarida birakilmadi: `graphify hook install`
+# onun icin bir birlestirme surucusu kaydediyor, yani izlenmesi bekleniyor.
+graphify-out/graph.html
+graphify-out/cache/
+graphify-out/cost.json
+graphify-out/.graphify_*
+graphify-out/.parcalar.json
+.claude/settings.json.graphify-bak
