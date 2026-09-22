@@ -526,7 +526,14 @@ def resolve_plan(
             continue
         comp.ref_prefix = symbol.reference_prefix
 
-        by_number = {p.number: p for p in symbol.pins}
+        # Yigin gosterimi acilir: KiCad 10'da bir pin "[2,13]" diye yazilabilir
+        # ve sablonda "#2" denince BULUNMALI. Aranan numara acilmis kumeden
+        # gelir, ama semaya YAZILAN numara pinin HAM hali olmalidir - aksi
+        # halde uretilen sematik kutuphanedeki sembolle eslesmez.
+        by_number = {}
+        for p in symbol.pins:
+            for parca in p.numbers:
+                by_number.setdefault(parca, p)
         by_name: dict[str, list[str]] = {}
         for p in symbol.pins:
             if p.name and p.name != "~":
@@ -543,8 +550,9 @@ def resolve_plan(
                         f"pin yok (pinler: {', '.join(sorted(by_number))})"
                     )
                     continue
-                comp.pin_connect.append((number, net))
-                connected.add(number)
+                ham = by_number[number].number
+                comp.pin_connect.append((ham, net))
+                connected.add(ham)
             else:
                 numbers = by_name.get(key)
                 if not numbers:

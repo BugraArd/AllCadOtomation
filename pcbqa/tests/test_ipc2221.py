@@ -8,13 +8,17 @@ Formul degisirse test kirilir.
 
 from __future__ import annotations
 
+import math
 import unittest
 
 from pcbqa.ipc2221 import (
     FAB_CLASSES,
+    MIL_PER_OZ,
+    MM_PER_MIL,
     clearance_mm,
     current_capacity_a,
     trace_width_mm,
+    via_current_a,
 )
 
 
@@ -146,3 +150,40 @@ class FabClassTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KiCadCaprazDogrulamaTests(unittest.TestCase):
+    """Bagimsiz bir uygulamaya (KiCad PCB Calculator) karsi capraz kontrol.
+
+    Bu sayilar KiCad 9.0 PCB Calculator ekranlarindan alindi. Formulu birisi
+    "sadelestirirse" burasi bagirir; asil degeri bu.
+    """
+
+    # KiCad'in varsayilani 0.035 mm bakir kalinligi; bu ~1 oz'dur
+    OZ = (0.035 / MM_PER_MIL) / MIL_PER_OZ
+
+    def test_track_width_sekmesi(self):
+        # KiCad Track Width: I=1.0 A, dT=10 C, H=0.035 mm
+        for dis, beklenen in ((True, 0.300387), (False, 0.781437)):
+            w = trace_width_mm(1.0, 10.0, copper_oz=self.OZ, outer=dis)
+            self.assertAlmostEqual(w, beklenen, places=5, msg="dis" if dis else "ic")
+
+    def test_via_size_sekmesi_ampacity(self):
+        # KiCad Via Size: D=0.4 mm, T=0.035 mm, dT=10 C -> 2.9993 A
+        # Namlu, kesiti pi*(D+T)*T olan duz bir iz gibi hesaplanir.
+        D, T = 0.4, 0.035
+        esdeger_genislik = math.pi * (D + T) * T / T
+        akim = current_capacity_a(esdeger_genislik, 10.0, copper_oz=self.OZ, outer=True)
+        self.assertAlmostEqual(akim, 2.9993, places=3)
+
+    def test_ti_tablosu_bilincli_olarak_muhafazakar(self):
+        # via_current_a TI SLVA959B'yi kullanir ve IPC-2221'den ~2-3 kat
+        # dusuktur. Bu bir HATA DEGIL, guc yolu icin secilmis tutumdur;
+        # biri "duzeltmeye" kalkarsa test gerekcesi hatirlatsin.
+        D, T = 0.41, 0.035
+        ipc = current_capacity_a(
+            math.pi * (D + T) * T / T, 10.0, copper_oz=self.OZ, outer=True
+        )
+        ti = via_current_a(0.41)
+        self.assertGreater(ipc / ti, 2.0)
+        self.assertLess(ipc / ti, 3.5)

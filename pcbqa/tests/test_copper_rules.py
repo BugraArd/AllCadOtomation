@@ -201,6 +201,40 @@ class ClearanceVoltageRuleTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
+    def test_unknown_skip_beyansiz_agi_kiyaslamaz(self):
+        """`unknown: skip` - beyan edilmeyen ag sessizce 0 V sayilmaz.
+
+        Olculdu (TI TIDA-010025, 174 ag): varsayilan davranis 98 hata
+        uretiyordu, 94'u beyan unutulmus aglardan. skip ile 4'e indi.
+        """
+        ortak = {"voltages": {"^VPP$": 400.0}, "class": "B2"}
+        varsayilan = run(Boards.routed(), "clearance_voltage", ortak)
+        atlayan = run(
+            Boards.routed(), "clearance_voltage", dict(ortak, unknown="skip")
+        )
+        # VPP'nin karsisindaki agler beyansiz oldugu icin kiyaslama kalmaz
+        self.assertTrue(varsayilan, "varsayilan davranis degismis olmali degil")
+        self.assertEqual([f for f in atlayan if f.severity != "info"], [])
+
+    def test_unknown_skip_kapsami_bildirir(self):
+        """Atlamak sessizce yapilmaz: kac ag olculmedi, soylenir."""
+        findings = run(
+            Boards.routed(),
+            "clearance_voltage",
+            {"voltages": {"^VPP$": 400.0}, "class": "B2", "unknown": "skip"},
+        )
+        info = [f for f in findings if f.severity == "info"]
+        self.assertEqual(len(info), 1)
+        self.assertIn("KATILMADI", info[0].message)
+
+    def test_unknown_gecersiz_deger_reddedilir(self):
+        with self.assertRaises(RuleError):
+            run(
+                Boards.routed(),
+                "clearance_voltage",
+                {"voltages": {"^VPP$": 5.0}, "unknown": "belki"},
+            )
+
     def test_empty_voltages_rejected(self):
         with self.assertRaises(RuleError):
             run(Boards.routed(), "clearance_voltage", {"voltages": {}})
@@ -373,3 +407,36 @@ class PadShapeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LengthMatchOlmayanArayuzTests(unittest.TestCase):
+    """Kartta olmayan bir arayuzun kurali SUSMALI.
+
+    Olculdu (TI TIDA-010025, uc fazli evirici, USB/Ethernet yok): eski
+    davranis yuksek-hiz presetinde 4 sahte HATA uretiyordu. Duzeltmeden
+    sonra ayni kartta preset 0 bulgu veriyor.
+    """
+
+    def test_grubun_tamami_yoksa_sessiz(self):
+        findings = run(
+            Boards.routed(),
+            "length_match",
+            {"groups": [["HIC_YOK_P", "HIC_YOK_N"]], "tolerance_mm": 1.0},
+        )
+        self.assertEqual(
+            findings, [], f"olmayan arayuz icin alarm: {[f.message for f in findings]}"
+        )
+
+    def test_grubun_bir_kismi_yoksa_bildirir(self):
+        """Yarim cift gercekten supheli: yazim hatasi ya da kopuk baglanti."""
+        var = next(
+            n for n in Boards.routed().net_names() if n not in IGNORE_GND
+        )
+        findings = run(
+            Boards.routed(),
+            "length_match",
+            {"groups": [[var, "HIC_YOK_N"]], "tolerance_mm": 1.0},
+        )
+        self.assertEqual(len(findings), 1)
+        self.assertIn("HIC_YOK_N", findings[0].message)
+        self.assertIn("eksik", findings[0].message)

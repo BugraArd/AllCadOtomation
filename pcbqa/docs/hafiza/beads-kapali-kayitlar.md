@@ -641,6 +641,13 @@ uc tel, ayni koordinatlar, ayni junction, gerekceleriyle.
 
 Ornek: samples/uc_parca/  Testler: test_propose 9 + test_connect 19.
 
+## Kicad-7i5 - Sematik otomasyon ve canli aktarim temelini incele
+
+- oncelik: P2  |  durum: closed  |  tur: task
+- kapanis: 2026-09-22T20:15:57Z
+
+Kullanici hedefi netlestirdi: inverter, guc elektronigi tabanli motor surucu karti; cumle eksik degil. Sematik/niyet/sablon/generate/canli worker/GUI kaynaklari Graphify sonrasi incelendi. 234 ilgili test 110.477s OK. Gercek nightly headless API ile gecici kopyalarda deger degistirme, 2C, 20C ve 2C+2R onizle/uygula toplam 12 son olcum basarili; asil proje SHA256 ayni. API yazma 16-19ms, onizleme 0.404-2.815s; netlist tekrar maliyeti olculdu. Ek incelemede MCU beslemesi MCU_3V3, LDO cikisi 3V3 iken plan ve gercek netlist dogrulamasi gecti, ERC ek power_pin_not_driven yakaladi (Kicad-mdm). Motor surucu icin instance/typed-port/pin cozumleyici/cok sayfa/cok birimli sembol/onizleme farki/tekrar uretim temeli oneri olarak Kicad-38l icinde. Performans oneri ve olcumleri ayri gorevde. Kaynaklar ST resmi Motor Control Boards Description, KiCad 10.0 schematic docs, Arduino UNO R3 resmi sematik. Uygulama kodu veya asil KiCad proje dosyalari degistirilmedi; benchmark betikleri ve ham sonuc C:/tmp altinda. Canli gorunur editor gecikmesi ve buyuk kart olceklenmesi olculmedi; dogrudan API netlist semantik esdegerligi henuz kanitlanmadi. Inceleme ve beyin firtinasi tamamlandi; duzeltmeler bu gorevin kapsami degil.
+
 ## Kicad-99q - Iki dilli bilesen sozlugu: lexicon.py (KiCad kutuphanelerinden, EN/TR)
 
 - oncelik: P2  |  durum: closed  |  tur: feature

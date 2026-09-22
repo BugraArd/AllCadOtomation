@@ -236,6 +236,9 @@ class ValueRange:
     low: float | None
     high: float | None
     source: str
+    # Hangi E-serisinden oneri yapilmali. Tolerans kontrole gore degisir:
+    # hassas bolucu E96 ister, pull-up E24 yeter, kondansator E12 stoklanir.
+    series: str = "E24"
 
     def contains(self, value: float) -> bool:
         if self.low is not None and value < self.low:
@@ -254,6 +257,8 @@ def i2c_pullup_range(params: dict) -> ValueRange:
         low=i2c_pullup_min_ohms(vdd, float(params.get("iol_ma", 3.0)) * 1e-3),
         high=i2c_pullup_max_ohms(cb, mode),
         source=f"NXP UM10204 ({mode}, VDD={vdd:g} V, Cb={params['bus_capacitance_pf']:g} pF)",
+        # Pull-up genis bir araliktir; %5 (E24) fazlasiyla yeter.
+        series="E24",
     )
 
 
@@ -265,6 +270,9 @@ def crystal_load_range(params: dict) -> ValueRange:
         low=low,
         high=high,
         source=f"Microchip AN826 (CL={params['cl_pf']:g} pF, stray 2-5 pF)",
+        # Seramik kondansator pratikte E6/E12 olarak stoklanir; E24 onermek
+        # bulunamayacak bir deger onermek olur.
+        series="E12",
     )
 
 
@@ -276,6 +284,10 @@ def fb_divider_range(params: dict) -> ValueRange:
         low=None,
         high=fb_divider_max_bottom_ohms(vfb, bias),
         source=f"Richtek AN033 (Vfb={vfb:g} V, Ibias={params['bias_current_na']:g} nA, 100x)",
+        # Geri besleme bolucusu cikis gerilimini DOGRUDAN belirler; %1 (E96)
+        # gerekir. TIDA-010025 olcumu: gercek %1 tasarimlarda E24 onerisi
+        # %3.6'ya varan sapma uretiyor - parca toleransindan buyuk.
+        series="E96",
     )
 
 

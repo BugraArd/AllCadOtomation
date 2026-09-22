@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-from . import circuit, geom, ipc2221, subcircuit, thermal
+from . import circuit, eseri, geom, ipc2221, subcircuit, thermal
 from .confload import ConfigError, load_config
 from .model import Design, PinRef
 
@@ -390,12 +390,25 @@ def _check_length_match(design: Design, rule: Rule) -> list[Finding]:
             raise RuleError(f"{rule.id}: her grup en az iki net adi icermeli")
 
         missing = [n for n in group if n not in known]
+        if len(missing) == len(group):
+            # GRUBUN TAMAMI YOK -> bu arayuz kartta hic yok, kural SUSAR.
+            # USB'si olmayan bir kartta USB kurali hata vermemeli; aksi halde
+            # yuksek-hiz preseti her genel amacli karta 4 sahte hata basiyordu
+            # (olculdu: TI TIDA-010025, uc fazli evirici, USB/Ethernet yok).
+            # Arayuzun BEKLENDIGINI soylemek isteyen bunu niyet dosyasinda
+            # ayrica beyan etmeli; kural kendiliginden varsayamaz.
+            continue
         if missing:
+            # BIR KISMI yok -> arayuz var ama cift eksik. Bu gercekten
+            # supheli: ya ad yazim hatasi ya da kopuk baglanti.
             findings.append(
                 Finding(
                     rule_id=rule.id,
                     severity=rule.severity,
-                    message=f"net bulunamadi: {', '.join(missing)}",
+                    message=(
+                        f"grup eksik: {', '.join(missing)} yok, "
+                        f"{', '.join(n for n in group if n in known)} var"
+                    ),
                 )
             )
             continue
@@ -1030,20 +1043,58 @@ def _check_component_value(design: Design, rule: Rule) -> list[Finding]:
             limit, yon = value_range.low, "en az"
         else:
             limit, yon = value_range.high, "en fazla"
+
+        # Sinir degeri genelde satin alinamaz bir sayidir ("en az 2380 ohm").
+        # Seride o siniri SAGLAYAN ilk degeri oneririz. Yon kritik: alt sinirda
+        # yukari, ust sinirda asagi yuvarlanir; ters yon oneriyi aralik disina
+        # atar. E24 direnc icin dogru varsayim - kondansator cogunlukla E6/E12
+        # olarak stoklanir, o yuzden oneri "en yakin" degil "yeterli" olandir.
+        oneri = _eseri_onerisi(limit, yon, value_range)
+
+        mesaj = (
+            f"{comp.ref} degeri {design.value_of(comp.ref)!r} "
+            f"({value:.4g}); {yon} {limit:.4g} olmali ({value_range.source})"
+        )
+        if oneri is not None:
+            seri = getattr(value_range, "series", eseri.DEFAULT_SERIES)
+            mesaj += f"; {seri}'te {oneri:.4g}"
         findings.append(
             Finding(
                 rule_id=rule.id,
                 severity=rule.severity,
-                message=(
-                    f"{comp.ref} degeri {design.value_of(comp.ref)!r} "
-                    f"({value:.4g}); {yon} {limit:.4g} olmali ({value_range.source})"
-                ),
+                message=mesaj,
                 refs=[comp.ref],
                 measured=value,
                 limit=limit,
             )
         )
     return findings
+
+
+def _eseri_onerisi(
+    limit: float, yon: str, value_range: "circuit.ValueRange"
+) -> float | None:
+    """Siniri saglayan en yakin E24 degeri; yoksa None.
+
+    None donmesinin IKI ayri sebebi var ve ikisi de sessiz kalmayi gerektirir:
+      - sinir zaten seride (oneri gurultu olurdu),
+      - seride araliga SIGAN deger yok (dar aralik). Bu gercek bir tasarim
+        sorunudur ama yanlis sayi onermektense sustuk.
+    """
+    if limit is None or limit <= 0:
+        return None
+    try:
+        seri = getattr(value_range, "series", eseri.DEFAULT_SERIES)
+        aday = (
+            eseri.up(limit, seri) if yon == "en az" else eseri.down(limit, seri)
+        )
+    except eseri.ESeriError:
+        return None
+    if math.isclose(aday, limit, rel_tol=1e-9):
+        return None
+    if not value_range.contains(aday):
+        return None
+    return aday
 
 
 def _check_decoupling_count(design: Design, rule: Rule) -> list[Finding]:
@@ -1484,6 +1535,12 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
         yuzdeki pad'ler ayni x/y'dedir ve farkli netlere baglidir.
       - Via'lar tum katmanlarda varsayilir (kor/gomulu via'da muhafazakar).
       - Poligon dokum (zone) okunmaz -> GND dokumu bu olcume girmez.
+      - BEYAN EDILMEYEN AG: varsayilan olarak `default_voltage` (tipik 0 V)
+        sayilir. Buyuk kartlarda bu SESSIZ bir tuzak: unutulan her ag, yuksek
+        gerilimli agla tam fark varmis gibi kiyaslanir ve SAHTE hata uretir.
+        Olculdu (TI TIDA-010025, 174 ag, 5 desen): bulgularin 23/26'si boyle
+        dogdu. `unknown: "skip"` bunu kapatir - beyansiz ag kiyaslanmaz ve
+        kac ag atlandigi info olarak bildirilir. Susmak, uydurmaktan iyidir.
       - Bu CLEARANCE'tir, CREEPAGE degil. Sebeke izolasyonuna yetmez; kural
         250 V ustunde bulgu metnine ayrica uyari koyar.
     """
@@ -1492,6 +1549,12 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
         raise RuleError(f"{rule.id}: 'voltages' bos olamaz (net deseni -> gerilim)")
     klass = rule.spec.get("class", "B2")
     default_v = float(rule.spec.get("default_voltage", 0.0))
+    unknown = str(rule.spec.get("unknown", "zero"))
+    if unknown not in ("zero", "skip"):
+        raise RuleError(
+            f"{rule.id}: 'unknown' yalnizca 'zero' ya da 'skip' olabilir, "
+            f"verilen: {unknown!r}"
+        )
 
     compiled = [(_rx(pattern), float(v)) for pattern, v in voltages_spec.items()]
 
@@ -1501,7 +1564,14 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
                 return volts
         return default_v
 
+    def beyanli(net_name: str) -> bool:
+        return any(p and p.search(net_name) for p, _ in compiled)
+
     net_names = [n for n in design.net_names() if not rule.net_ignored(n)]
+    atlanan: list[str] = []
+    if unknown == "skip":
+        atlanan = [n for n in net_names if not beyanli(n)]
+        net_names = [n for n in net_names if beyanli(n)]
     declared = {n: voltage_of(n) for n in net_names}
     # Yalnizca gerilim BEYAN EDILMIS netlerden basariz; aksi halde her net
     # ciftini denemek buyuk kartlarda karesel patlar.
@@ -1599,6 +1669,20 @@ def _check_clearance_voltage(design: Design, rule: Rule) -> list[Finding]:
                     )
                 )
     findings.sort(key=lambda f: (f.limit or 0) - (f.measured or 0), reverse=True)
+    if atlanan:
+        # Atlamak SESSIZCE yapilmaz: kapsamin ne kadari olculmedi, soylenir.
+        ornek = ", ".join(sorted(atlanan)[:6])
+        findings.append(
+            Finding(
+                rule_id=rule.id,
+                severity="info",
+                message=(
+                    f"gerilimi beyan edilmemis {len(atlanan)} ag kiyaslamaya "
+                    f"KATILMADI (unknown=skip): {ornek}"
+                    + (" ..." if len(atlanan) > 6 else "")
+                ),
+            )
+        )
     return findings
 
 

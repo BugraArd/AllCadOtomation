@@ -59,6 +59,37 @@ class SymLibError(RuntimeError):
     """Kutuphane ya da sembol bulunamadi / okunamadi."""
 
 
+def expand_pin_numbers(raw: str) -> tuple[str, ...]:
+    """KiCad 10 yigin gosterimini ayirir: "[2,13]" -> ("2", "13").
+
+    KiCad 10'da ayni yerde duran (dahili olarak kisali) pinler tek bir pin
+    uzerinde koseli parantezle yazilabiliyor: "[1-3]", "[1,2,3]", "[1-2,3]"
+    ucu de ayni kumedir. Duz numara oldugu gibi doner.
+
+    Neden gerekli (olculdu 2026-09-23): KiCad 10 kutuphanesinde 7 dosya, 14 pin
+    bu gosterimi kullaniyor; basta Driver_Motor:DRV8434PWP (TI step motor
+    surucusu, 23 pinin 6'si boyle - VM='[2,13]', PGND='[3,12]'). Ayristirmazsak
+    sablonda "#2" yazan bir baglanti pini BULAMAZ.
+    """
+    s = raw.strip()
+    if not (s.startswith("[") and s.endswith("]")):
+        return (s,)
+    out: list[str] = []
+    for parca in s[1:-1].split(","):
+        parca = parca.strip()
+        if not parca:
+            continue
+        if "-" in parca[1:]:  # "1-3"; bastaki eksi isaret olabilir
+            bas, _, son = parca.partition("-")
+            try:
+                out.extend(str(i) for i in range(int(bas), int(son) + 1))
+                continue
+            except ValueError:
+                pass  # sayisal degilse aynen birak
+        out.append(parca)
+    return tuple(out) or (s,)
+
+
 @dataclass
 class LibPin:
     """Kutuphane uzayinda bir sembol pini."""
@@ -71,6 +102,16 @@ class LibPin:
     rotation: float = 0.0
     length: float = 0.0
     unit: int = 1
+    # Pinin secilebilir ikincil islevleri (KiCad "alternate pin function").
+    # STM32F103C8Tx'te 341 adet: TIM1_CH1N, TIM1_BKIN, ADC1_IN0, SYS_JTMS-SWDIO...
+    # Pin planlayicisinin cevre birimi eslemesi BU listeden beslenir; harici
+    # bir veri tabanina gerek yok.
+    alternates: tuple[str, ...] = ()
+
+    @property
+    def numbers(self) -> tuple[str, ...]:
+        """Bu pinin kapsadigi TUM pin numaralari (yigin gosterimi acilmis)."""
+        return expand_pin_numbers(self.number)
 
 
 @dataclass
@@ -428,6 +469,11 @@ def _pins_of(node) -> list[LibPin]:
                     rotation=float(at[3]) if at and len(at) > 3 else 0.0,
                     length=float(child(pin, "length")[1]) if child(pin, "length") else 0.0,
                     unit=unit,
+                    alternates=tuple(
+                        str(a[1]).strip('"')
+                        for a in children(pin, "alternate")
+                        if len(a) > 1
+                    ),
                 )
             )
     return pins

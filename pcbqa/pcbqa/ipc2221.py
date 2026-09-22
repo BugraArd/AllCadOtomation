@@ -146,6 +146,65 @@ FAB_CLASSES: dict[str, FabClass] = {
 }
 
 
+# --- IPC-6012 performans siniflari ------------------------------------------
+#
+# FAB_CLASSES ureticinin ne yapabildigini soyler; bu tablo ise URUNUN hangi
+# guvenilirlik sinifinda oldugunu soyler. Ikisi ayri sorudur: ucuz bir uretici
+# Class 3 geometrisini basabilir, pahali bir uretici Class 1 isi de alir.
+#
+# IPC-6011 performans siniflari:
+#   Class 1 - genel elektronik; kozmetik kusur onemsiz, islev yeterli
+#   Class 2 - adanmis hizmet; kesintisiz calisma ISTENIR ama kritik degil
+#   Class 3 - yuksek guvenilirlik; kesinti KABUL EDILEMEZ (yasam destegi,
+#             ucus kontrolu). Ust siniflar (4-6) daha siki geometridir.
+#
+# Kaynak: IPC-6012B / IPC-6011, KiCad PCB Calculator "Board Classes" sekmesi.
+# Tablo MINIMUM degerleri verir (mm).
+#
+# DIKKAT - CAP FARKI, HHALKA DEGIL: via/pad satirlari "(diam - drill)" yani
+# CAP ile DELIK arasindaki fark. Halka genisligi (annular ring) bunun YARISIDIR.
+# FAB_CLASSES.min_annular_ring_mm ISE yaricap cinsindendir; ikisi dogrudan
+# kiyaslanamaz. Karistirmak 2 kat hata demektir.
+IPC6012_CLASS_NAMES = ("1", "2", "3", "4", "5", "6")
+
+
+@dataclass(frozen=True)
+class IPC6012Class:
+    """Bir IPC-6012 performans sinifinin minimum geometrisi (mm)."""
+
+    name: str
+    min_track_mm: float
+    min_clearance_mm: float
+    # None = standart bu sinif icin deger vermiyor (tabloda "--")
+    via_diam_minus_drill_mm: float | None
+    plated_pad_diam_minus_drill_mm: float | None
+    np_pad_diam_minus_drill_mm: float | None
+
+    @property
+    def via_annular_ring_mm(self) -> float | None:
+        """Via halka genisligi = cap farkinin yarisi."""
+        if self.via_diam_minus_drill_mm is None:
+            return None
+        return self.via_diam_minus_drill_mm / 2.0
+
+    @property
+    def plated_pad_annular_ring_mm(self) -> float | None:
+        """Kaplamali pad halka genisligi = cap farkinin yarisi."""
+        if self.plated_pad_diam_minus_drill_mm is None:
+            return None
+        return self.plated_pad_diam_minus_drill_mm / 2.0
+
+
+IPC6012_CLASSES: dict[str, IPC6012Class] = {
+    "1": IPC6012Class("1", 0.80, 0.68, None, 1.19, 1.57),
+    "2": IPC6012Class("2", 0.50, 0.50, None, 0.78, 1.13),
+    "3": IPC6012Class("3", 0.31, 0.31, 0.45, 0.60, 0.90),
+    "4": IPC6012Class("4", 0.21, 0.21, 0.34, 0.49, None),
+    "5": IPC6012Class("5", 0.15, 0.15, 0.24, 0.39, None),
+    "6": IPC6012Class("6", 0.12, 0.12, 0.20, 0.35, None),
+}
+
+
 # --- Via akim kapasitesi ----------------------------------------------------
 #
 # TI SLVA959B Tablo 3-1 (IPC-2152 tabanli, 10 C artis, 1 oz kart). Bu tablo
