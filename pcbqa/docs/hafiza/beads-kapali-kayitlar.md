@@ -738,6 +738,13 @@ o kural ya da esigi yanlistir.
 Capa olcumu: KiCad pic_programmer demosu kendi kural dosyasiyla 82.7.
 Lisans: korpus buyurken her kartin lisansi kaydedilmeli (HANDOFF 1).
 
+## Kicad-guq - Tum projeyi AllCadOtomation deposuna yayinla
+
+- oncelik: P2  |  durum: closed  |  tur: task
+- kapanis: 2026-09-19T21:54:59Z
+
+Kullanici tum projeyi origin main dalina push istedi. Contributors yalniz BugraArd R00kie_RealG olacak. Yayin gecmisinde tek eposta var ve co-author yok; gecmis korunacak. Kaynaklar, belgeler ve canli proje dosyalari dahil; makine ayarlari, yedekler, sanal ortamlar ve gecici kopyalar haric. Graphify metin ve AST aktarimi yapilacak.
+
 ## Kicad-j78 - graphify update elle verilen topluluk adlarini siliyor
 
 - oncelik: P2  |  durum: closed  |  tur: bug

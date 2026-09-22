@@ -780,9 +780,9 @@
     "semantic_hash": ""
   },
   "pcbqa/docs/hafiza/beads-kapali-kayitlar.md": {
-    "mtime": 1788855599.4395418,
-    "seen": 1788855620.0226483,
-    "ast_hash": "b8b4d538556a4c5183c6ab39c73e794c",
+    "mtime": 1789854915.2860258,
+    "seen": 1789854939.2068439,
+    "ast_hash": "32acbf855a32e00c49ebbda3f2234e4e",
     "semantic_hash": ""
   },
   "pcbqa/docs/hafiza/canli-mod-ve-sematik-api.md": {
@@ -1125,12 +1125,6 @@
     "mtime": 1788796560.4339087,
     "seen": 1788796581.9384005,
     "ast_hash": "e35274237178baca25af661aa8b9ae69",
-    "semantic_hash": ""
-  },
-  "CanliProjeler/KicadOtomasyon1-c77c93ac/.pcbqa-canli.json": {
-    "mtime": 1788819304.1839366,
-    "seen": 1788855390.7038093,
-    "ast_hash": "bc2005ca8e8b4d0d5d70c362f2aecf38",
     "semantic_hash": ""
   },
   "pcbqa/pcbqa/canli_sematik.py": {
