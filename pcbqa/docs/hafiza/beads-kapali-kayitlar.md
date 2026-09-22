@@ -556,6 +556,13 @@ IKI RISK - atlanirsa is yarim kalir:
 
 Ayrinti: pcbqa/docs/yol-haritasi-skorlama.md
 
+## Kicad-00m - AllCadOtomation proje dosyalarini guncel haliyle push et
+
+- oncelik: P2  |  durum: closed  |  tur: task
+- kapanis: 2026-09-22T20:02:25Z
+
+2026-09-22 kullanici tum proje dosyalarini BugraArd/AllCadOtomation deposuna push istedi. Yerel yayin dali origin main ile eslesti; 231 dosya (kaynak, KiCad proje ve ornekleri, testler, belgeler, Graphify ve Beads disa aktarimi) izleniyor. Mevcut ignore kurallari korundu: sanal ortam, indirilmis runtime, onbellek, yerel ayar ve yedekler haric. .beads/issues.jsonl pasif disa aktarimdir; kanonik Dolt DB yerelde, Dolt remote yapilandirilmamis. 29ae4b5 commit origin main dalina normal push ile gonderildi. git diff --cached --check temiz; JSON/JSONL ayrisma ve dosya boyutu kontrolleri gecti; bilinen erisim anahtari desenleri eslesmedi. Uygulama kodu degismedigi icin testler tekrar kosulmadi. Graphify explain 7 baglanti ile calisti; aktarim betigi metni ve yerel ASTyi guncelledi, yeni anlamsal tarama yapilmadi. Git eski .git/worktrees/yayin-wt kaydini otomatik temizlerken Permission denied uyarisi verdi; commit ve push basarili. Son kapanis kaydi da ayni depoya aktariliyor.
+
 ## Kicad-0nb - Faz 1c: on ayar kurallarina kaynakli agirlik ver
 
 - oncelik: P2  |  durum: closed  |  tur: task
