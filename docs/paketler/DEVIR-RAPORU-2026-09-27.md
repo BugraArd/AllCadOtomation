@@ -2,14 +2,14 @@
 
 **Tarih:** 2026-09-27
 **Dal:** `main`
-**Son bilinen taban:** Paket 02 ilk STM32G0 profili
+**Son bilinen taban:** `9d07626` — Paket 02 P02-03 kaynaklı BOM kabul kapısı
 **Amaç:** Başka bir AI’ın bu dosyayı okuyup projeyi tekrar keşfetmeden sürdürmesi.
 
 ## 1. Mevcut durum
 
 - Paket 01 pushlandı: `78610a5` — bulgu/düzeltme/doğrulama çekirdeği.
 - Paket 02 ilk dilimi pushlandı: `0d07694` — `STM32G031K8T6` LQFP-32 profili.
-- Bu çalışma turunda P02-03 için provenance-aware BOM kapısı eklendi ve bu raporla birlikte commit/pushlandı.
+- Bu çalışma turunda P02-03 için provenance-aware BOM kapısı eklendi ve `9d07626` ile commit/pushlandı.
 - KiCad 10.0.6, Python 3.13.15 ve proje sanal ortamı çalışıyor.
 - Güncel tam regresyon: **930 test OK, 50 skipped**.
 - Çalışma ağacı push sonrasında temiz olmalıdır; doğrulama komutu aşağıda verilmiştir.
