@@ -44,6 +44,7 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("canli-pcb", "pcbqa.canli_pcb", "Acik PCB'yi oku; komutla konum/aci/kilit/deger yaz"),
     ("canli-sematik","pcbqa.canli_sematik", "Ayri KiCad nightly ile acik sematige komut uygula"),
     ("analiz", "pcbqa.__main__", "Bir KiCad projesinin kalitesini olc ve raporla"),
+    ("duzelt", "pcbqa.duzelt", "Bir bulguyu kanitli ve guvenli bicimde duzelt"),
     ("arayuz", "pcbqa.arayuz", "Masaustu arayuzunu ac (tkinter)"),
     ("yap", "pcbqa.komut", 'Dogal dil komutunu anla ve uygula ("10 adet kapasitor ekle")'),
     ("parcalar", "pcbqa.elektrik", "Her parca icin ag, gerilim, akim, MPN ve fiyat tablosu"),

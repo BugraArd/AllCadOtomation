@@ -94,6 +94,7 @@ pcbqa kurulum                    canlı modu aç (bir kez, izinle)
 pcbqa canli                      açık PCB bağlantısını kontrol et
 pcbqa arayuz                     masaüstü arayüzünü aç (pencere)
 pcbqa analiz  <proje>            kaliteyi ölç ve raporla
+pcbqa duzelt  <proje>            bulguyu kanıtla, önizle ve güvenli düzelt
 pcbqa yap     "<cümle>"          doğal dil komutunu anla ve uygula
 pcbqa parcalar <şematik>         ağ / gerilim / akım / MPN / fiyat tablosu
 pcbqa uret    <niyet.yaml>       niyetten çalışır bir kart üret
@@ -114,15 +115,36 @@ Her komutun kendi yardımı var: `pcbqa <komut> --help`
 pcbqa arayuz
 ```
 
-Beş sekme, hepsi aynı projeyi hedefler: **Yap** (doğal dil komutu),
+Yedi sekme, hepsi aynı projeyi hedefler: **Yap** (doğal dil komutu),
 **Parçalar** (ağ / gerilim / akım / MPN / fiyat tablosu), **Analiz**,
-**Üret** (niyetten kart), **Ortam** (tanı + sözcük dağarcığı).
+**Düzelt** (bulgu kanıtı + güvenli düzeltme), **Üret** (niyetten kart),
+**Canlı** (PCB IPC bağlantısı) ve **Ortam** (tanı + sözcük dağarcığı).
 
 Komut satırındaki iki adımlı güvenlik arayüzde de aynen geçerli: **"Uygula"
 düğmesi kapalı başlar** ve yalnızca *aynı cümle* + *aynı proje* için bir
 kuru koşum geçtikten sonra açılır. Cümleyi ya da projeyi değiştirirseniz
 tekrar kapanır — ekranda gördüğünüz planla yazılan plan hep aynıdır.
 Yazmadan önce ayrıca onay sorulur.
+
+### Bulgu düzeltme akışı
+
+Önce bulguları kimlikleriyle listeleyin:
+
+```
+pcbqa duzelt C:\projeler\kart --liste
+```
+
+Sonra seçili bulgu için dry-run öneri alın:
+
+```
+pcbqa duzelt C:\projeler\kart --finding F-123456789abc
+```
+
+`--uygula` verilirse dosyaya yazmadan önce mevcut dosyanın yanına
+`.pcbqa-bak` yedeği alınır. Uygulama sonrası hedef bulgu ve netlist tekrar
+doğrulanır. Kartta mevcut track/via/zone varsa otomatik dosya uygulaması
+bilinçli olarak reddedilir; yönlendirilmiş kartın bakırını koruyan akış henüz
+Paket 01 kapsamı değildir.
 
 ### Kısayol
 

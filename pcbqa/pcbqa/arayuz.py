@@ -2,11 +2,12 @@
 
     pcbqa arayuz
 
-Alti sekme, hepsi ayni projeyi hedefler:
+Yedi sekme, hepsi ayni projeyi hedefler:
 
     Yap       dogal dil komutu -> plan -> uygula        (`komut.py`)
     Parcalar  ag / gerilim / akim / MPN / fiyat tablosu (`elektrik.py`)
     Analiz    kalite raporu ve skor                     (`__main__.py`)
+    Duzelt    bulgu kaniti + guvenli duzeltme            (`duzelt.py`)
     Uret      niyet dosyasindan kart uret / kesfet      (`generate`, `explore`)
     Canli     acik PCB oku/yaz, yerlestir; sematik komut (`canli`, `canli_pcb`,
               `canli_sematik`)
@@ -128,6 +129,8 @@ class Arayuz:
         self.kuru_yorum = None
         self.canli_plan = None
         self.canli_proje = None
+        self.duzelt_imza: tuple[str, str] | None = None
+        self.duzelt_hazir = False
         self.sematik_plan = None
         self.sematik_imza = None
         self.pcb_plan = None
@@ -154,12 +157,14 @@ class Arayuz:
         self._sekme_yap()
         self._sekme_parcalar()
         self._sekme_analiz()
+        self._sekme_duzelt()
         self._sekme_uret()
         self._sekme_canli()
         self.sematik_komut.trace_add("write", lambda *_: self._sematik_sifirla())
         self.proje.trace_add("write", lambda *_: self._sematik_sifirla())
         self.pcb_komut.trace_add("write", lambda *_: self._pcb_sifirla())
         self.proje.trace_add("write", lambda *_: self._pcb_sifirla())
+        self.proje.trace_add("write", lambda *_: self._sil_silah())
         self._sekme_ortam()
         self._durum_cubugu()
 
@@ -247,6 +252,8 @@ class Arayuz:
             self.kuru_yorum = None
             if not self.mesgul:
                 self.b_uygula.config(state="disabled")
+        if self.duzelt_imza != (self.proje.get().strip(), self.duzelt_finding.get().strip()):
+            self._duzelt_sifirla()
 
     def _hedef_sematik(self, proje_metni: str):
         """Proje metninden kok sematik. Metin ARGUMANDIR, Tk degiskeni degil.
@@ -513,6 +520,134 @@ class Arayuz:
 
         self._calistir("analiz", is_,
                        lambda s: self._basit_bitti(s, self.analiz_cikti, "analiz"))
+
+    # -- sekme: Duzelt -----------------------------------------------------
+
+    def _sekme_duzelt(self):
+        tk, ttk = self.tk, self.ttk
+        sayfa = ttk.Frame(self.defter)
+        self.defter.add(sayfa, text="Duzelt")
+        self.duzelt_finding = tk.StringVar(value="")
+
+        ust = ttk.Frame(sayfa)
+        ust.pack(fill="x", padx=8, pady=8)
+        ttk.Label(ust, text="Finding ID:").pack(side="left")
+        giris = ttk.Entry(ust, textvariable=self.duzelt_finding, width=20)
+        giris.pack(side="left", padx=6)
+        giris.bind("<KeyRelease>", lambda _e: self._duzelt_sifirla())
+        tara = ttk.Button(ust, text="Bulgulari tara", command=self._duzelt_liste)
+        tara.pack(side="left")
+        onizle = ttk.Button(ust, text="Oneriyi onizle", command=self._duzelt_onizle)
+        onizle.pack(side="left", padx=4)
+        self.b_duzelt_uygula = ttk.Button(
+            ust, text="Uygula", command=self._duzelt_uygula, state="disabled"
+        )
+        self.b_duzelt_uygula.pack(side="left")
+        self.dugmeler += [tara, onizle]
+        ttk.Label(
+            sayfa,
+            text="Once Bulgulari tara ile kimlikleri alin; sonra secili bulgu icin oneri alin.",
+            foreground="#666",
+        ).pack(anchor="w", padx=8)
+        self.duzelt_cikti = self._metin_alani(sayfa)
+
+    def _duzelt_sifirla(self):
+        self.duzelt_imza = None
+        self.duzelt_hazir = False
+        if hasattr(self, "b_duzelt_uygula"):
+            self.b_duzelt_uygula.config(state="disabled")
+
+    def _duzelt_liste(self):
+        from . import duzelt
+
+        proje = self.proje.get().strip()
+        self._duzelt_sifirla()
+
+        def is_():
+            if not proje:
+                raise RuntimeError("once bir proje secin")
+            return _yakala(duzelt.main, [proje, "--liste"])
+
+        self._calistir(
+            "bulgu taramasi",
+            is_,
+            lambda s: self._duzelt_bitti(s, "bulgu taramasi"),
+        )
+
+    def _duzelt_onizle(self):
+        from . import duzelt
+
+        proje = self.proje.get().strip()
+        finding = self.duzelt_finding.get().strip()
+        if not proje or not finding:
+            self._yaz(self.duzelt_cikti, "proje ve Finding ID gerekli.")
+            return
+        self._duzelt_sifirla()
+        imza = (proje, finding)
+
+        def is_():
+            return _yakala(duzelt.main, [proje, "--finding", finding])
+
+        def finished(s: Sonuc):
+            if s.hata:
+                self._duzelt_bitti(s, "duzeltme onizlemesi")
+                return
+            code, output = s.deger
+            self._yaz(self.duzelt_cikti, output)
+            if code == 0 and imza == (self.proje.get().strip(), self.duzelt_finding.get().strip()):
+                self.duzelt_imza = imza
+                self.duzelt_hazir = True
+                self.b_duzelt_uygula.config(state="normal")
+                self.durum.set("duzeltme onizlemesi hazir - 'Uygula' acildi")
+            else:
+                self._duzelt_sifirla()
+                self.durum.set("duzeltme onizlemesi gecmedi")
+
+        self._calistir("duzeltme onizlemesi", is_, finished)
+
+    def _duzelt_uygula(self):
+        from tkinter import messagebox
+        from . import duzelt
+
+        imza = (self.proje.get().strip(), self.duzelt_finding.get().strip())
+        if not self.duzelt_hazir or self.duzelt_imza != imza:
+            messagebox.showwarning(
+                BASLIK, "Bu bulgu icin once ayni projede yeni bir onizleme alin."
+            )
+            self._duzelt_sifirla()
+            return
+        if not messagebox.askokcancel(
+            BASLIK,
+            f"{imza[1]} icin guvenli duzeltme dosyaya uygulanacak.\n\n"
+            "Yedek alinacak ve analiz tekrar calistirilacak. Devam edilsin mi?",
+        ):
+            return
+
+        self._duzelt_sifirla()
+
+        def is_():
+            return _yakala(duzelt.main, [imza[0], "--finding", imza[1], "--uygula"])
+
+        self._calistir(
+            "duzeltme uygulamasi",
+            is_,
+            lambda s: self._duzelt_bitti(s, "duzeltme uygulamasi"),
+        )
+
+    def _duzelt_bitti(self, s: Sonuc, ad: str):
+        if s.hata:
+            self._yaz(self.duzelt_cikti, f"hata: {s.hata}\n\n{s.cikti}")
+            self.durum.set(f"{ad}: hata")
+            return
+        deger = s.deger
+        if isinstance(deger, tuple) and len(deger) == 2:
+            _code, cikti = deger
+        else:
+            cikti = str(deger)
+        self._yaz(self.duzelt_cikti, cikti)
+        if "UYGULANDI:" in cikti:
+            self._duzelt_sifirla()
+        self.durum.set(f"{ad} bitti")
 
     # -- sekme: Uret -------------------------------------------------------
 
@@ -937,6 +1072,7 @@ class Arayuz:
             d.config(state="disabled")
         self.b_uygula.config(state="disabled")
         self.b_canli_uygula.config(state="disabled")
+        self.b_duzelt_uygula.config(state="disabled")
         self.durum.set(f"{ad} calisiyor...")
         self.b_sematik_uygula.config(state="disabled")
         self.b_pcb_uygula.config(state="disabled")
@@ -972,6 +1108,8 @@ class Arayuz:
                     and self.sematik_imza == (self.proje.get().strip(), self.sematik_komut.get().strip()) else "disabled")
                 self.b_pcb_uygula.config(state="normal" if self.pcb_plan is not None
                     and self.pcb_imza == (self.proje.get().strip(), self.pcb_komut.get().strip()) else "disabled")
+                self.b_duzelt_uygula.config(state="normal" if self.duzelt_hazir
+                    and self.duzelt_imza == (self.proje.get().strip(), self.duzelt_finding.get().strip()) else "disabled")
                 geri = getattr(self, "_bitince", None)
                 if geri:
                     try:

@@ -192,6 +192,20 @@ def _finding_moves(
     return moves
 
 
+def candidate_moves_for_finding(
+    finding: Any,
+    placement: Placement,
+    ctx: PlacementContext,
+) -> list[Move]:
+    """Bir bulgudan üretilebilecek tek bileşenli güvenli adayları döndürür.
+
+    Ürün düzeltme katmanı, yerleşim cilasının kendi aday üretimini kullanır.
+    Böylece `pcbqa duzelt` ile `auto` aynı geometri/outline davranışını
+    paylaşır; yeni bir hareket repertuarı sessizce farklı sonuçlar üretmez.
+    """
+    return _finding_moves(finding, placement, ctx)
+
+
 def _nudge_moves(
     ref: str,
     placement: Placement,

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import math
 import re
+import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -63,8 +65,79 @@ class Finding:
     # kilar. `run_rules` doldurur.
     scale_max: float | None = None
 
+    @property
+    def finding_id(self) -> str:
+        """Tekrar kosularinda kararlı kalan kısa bulgu kimliği.
+
+        Mesaj tek başına kimlik değildir: sayı biçimi veya çeviri değişebilir.
+        Kural, kaynak, etkilenen referans/pinler ve ölçüm birlikte kullanılır.
+        Aynı kural aynı referans çiftinde birden fazla kez ateşlenebildiği için
+        mesaj da son ayrıştırıcı olarak kimliğe dahil edilir.
+        """
+        payload = {
+            "source": self.source,
+            "rule_id": self.rule_id,
+            "rule_type": self.rule_type,
+            "refs": self.refs,
+            "pins": self.pins,
+            "measured": self.measured,
+            "limit": self.limit,
+            "message": self.message,
+        }
+        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                         separators=(",", ":"))
+        return "F-" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+    @property
+    def evidence(self) -> dict[str, Any]:
+        """Arayüz ve düzeltme motorunun kullanacağı kanıt özeti."""
+        evidence: dict[str, Any] = {
+            "refs": list(self.refs),
+            "pins": list(self.pins),
+            "message": self.message,
+        }
+        if self.measured is not None:
+            evidence["measured"] = self.measured
+        if self.limit is not None:
+            evidence["limit"] = self.limit
+        if self.measured is not None and self.limit is not None:
+            evidence["relation"] = "over_limit" if self.measured > self.limit else "under_limit"
+        return evidence
+
+    @property
+    def confidence(self) -> str:
+        """Bulgunun otomatik düzeltmeye uygunluk güveni.
+
+        Sayısal ölçüme ve kendi kural motorumuza dayanan bulgular yüksek,
+        yalnızca dış araç mesajından gelenler orta güvenlidir.
+        """
+        if self.source == "pcbqa" and self.measured is not None and self.limit is not None:
+            return "high"
+        if self.source == "pcbqa":
+            return "medium"
+        return "medium"
+
+    @property
+    def auto_fixable(self) -> bool:
+        """Paket 01'in ilk güvenli düzeltme sınıfı.
+
+        İlk sürüm yalnızca ölçülmüş, iki bileşenli proximity ihlalini aday
+        yerleşime çevirebilir. Diğer bulgular yine kanıtlı öneri olarak
+        gösterilebilir ama otomatik yazma kapısı açılmaz.
+        """
+        return bool(
+            self.source == "pcbqa"
+            and self.rule_type == "proximity"
+            and len(self.refs) >= 2
+            and len(self.pins) >= 2
+            and isinstance(self.measured, (int, float))
+            and isinstance(self.limit, (int, float))
+            and self.measured > self.limit > 0
+        )
+
     def as_dict(self) -> dict[str, Any]:
         return {
+            "finding_id": self.finding_id,
             "rule_id": self.rule_id,
             "rule_type": self.rule_type,
             "severity": self.severity,
@@ -76,6 +149,9 @@ class Finding:
             "limit": self.limit,
             "weight": self.weight,
             "scale_max": self.scale_max,
+            "evidence": self.evidence,
+            "confidence": self.confidence,
+            "auto_fixable": self.auto_fixable,
         }
 
 

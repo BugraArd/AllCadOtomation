@@ -145,9 +145,23 @@ class PencereTests(unittest.TestCase):
 
     # -- kurulum -----------------------------------------------------------
 
-    def test_all_six_tabs_are_present(self):
+    def test_all_tabs_are_present(self):
         adlar = [self.a.defter.tab(t, "text") for t in self.a.defter.tabs()]
-        self.assertEqual(adlar, ["Yap", "Parcalar", "Analiz", "Uret", "Canli", "Ortam"])
+        self.assertEqual(adlar, ["Yap", "Parcalar", "Analiz", "Duzelt", "Uret", "Canli", "Ortam"])
+
+    def test_fix_apply_needs_preview(self):
+        self.a.duzelt_finding.set("F-123456789abc")
+        self.a._duzelt_uygula()
+        self.assertEqual(str(self.a.b_duzelt_uygula["state"]), "disabled")
+        self.assertTrue(any(ad == "showwarning" for ad, _ in self.diyaloglar))
+
+    def test_fix_project_or_finding_change_disarms_preview(self):
+        self.a.duzelt_imza = (str(self.proje), "F-123456789abc")
+        self.a.duzelt_hazir = True
+        self.a.b_duzelt_uygula.config(state="normal")
+        self.a.duzelt_finding.set("F-other")
+        self.a._sil_silah()
+        self.assertEqual(str(self.a.b_duzelt_uygula["state"]), "disabled")
 
     def test_live_apply_needs_preview(self):
         self.assertEqual(str(self.a.b_canli_uygula["state"]), "disabled")
