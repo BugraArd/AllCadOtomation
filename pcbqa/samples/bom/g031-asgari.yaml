@@ -1,0 +1,50 @@
+# Bu dosya canli stok/fiyat kaynagi degildir; uretim oncesi provenance kapisidir.
+version: 1
+profile: mcu-stm32g031k8
+status: draft
+
+items:
+  - id: mcu
+    template: mcu-stm32g031k8/mcu
+    value: STM32G031K8T6
+    footprint: Package_QFP:LQFP-32_7x7mm_P0.8mm
+    status: verified
+    mpn: STM32G031K8T6
+    manufacturer: STMicroelectronics
+    source: https://www.st.com/en/microcontrollers-microprocessors/stm32g031k8.html
+    evidence: ST product page and KiCad library symbol match
+
+  - id: vdd-decoupling
+    template: mcu-stm32g031k8/vdd-decoupling
+    value: 100nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    status: needs_selection
+    notes: Manufacturer, dielectric, voltage, tolerance and MPN are not locked.
+
+  - id: bulk
+    template: mcu-stm32g031k8/bulk
+    value: 4.7uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    status: needs_selection
+    notes: Manufacturer, voltage, dielectric, tolerance and MPN are not locked.
+
+  - id: nrst-kondansator
+    template: mcu-stm32g031k8/nrst-kondansator
+    value: 100nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    status: needs_selection
+    notes: Optional reset capacitor; confirm EMC/reset requirement before sourcing.
+
+  - id: ldo
+    template: ldo-ams1117-3v3/ldo
+    value: AMS1117-3.3
+    footprint: Package_TO_SOT_SMD:SOT-223-3_TabPin2
+    status: needs_selection
+    notes: Regulator family is a compatibility placeholder, not a production MPN.
+
+  - id: power-header
+    template: guc-girisi-header/header
+    value: GUC-5V
+    footprint: Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
+    status: needs_selection
+    notes: Connector orientation, locking and mating part are not selected.

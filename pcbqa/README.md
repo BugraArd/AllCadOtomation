@@ -59,6 +59,9 @@ pcbqa duzelt C:\yol\projem --finding F-123456789abc
 
 # İlk STM32G0 profilinden geçici KiCad projesi üret
 pcbqa uret --intent samples\niyetler\g031-asgari.yaml --out C:\yol\g031-kart
+
+# BOM'da yalnızca kaynağı doğrulanmış kalemleri üretime kabul et
+pcbqa bom samples\bom\g031-asgari.yaml --fail-on-open
 ```
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
@@ -102,6 +105,12 @@ temel SWD bağlantısını üretir. LQFP-32 varyantında USB ve HSE varsayılmaz
 PA14’ün SWCLK/BOOT0 çoklaması nedeniyle BOOT0 pulldown otomatik eklenmez.
 Gerçek ürün BOM’u ve çevresel pin seçimi elektriksel gereksinim onayından
 sonra kilitlenecektir.
+
+### BOM kaynak kapısı
+
+`pcbqa bom` fiyat veya stok uydurmaz. Her kalem `verified`, `needs_selection`,
+`blocked` veya `synthetic` olarak görünür. `verified` kalemlerde MPN, üretici
+ve kaynak zorunludur; `--fail-on-open` açık kalem varsa çıkış kodu `1` döndürür.
 
 ## Aşama 5: makine öğrenimi altyapısı
 

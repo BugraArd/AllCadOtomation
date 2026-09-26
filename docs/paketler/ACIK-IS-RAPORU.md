@@ -1,6 +1,6 @@
 # Açık İş Raporu
 
-**Son güncelleme:** 2026-09-26
+**Son güncelleme:** 2026-09-27
 **Aktif paket:** Paket 02 — STM32G0 ilk üretim profili
 **Durum:** İlk STM32G0 dikey dilimi uygulandı; elektriksel kabul ve sourcing açık
 
@@ -8,7 +8,7 @@
 
 - KiCad 10.0.6 ve Python ortamı kuruldu.
 - `pcbqa tani` kütüphane ve canlı PCB ortamını doğruluyor.
-- 927 test başarılı, 50 test isteğe bağlı demo eksikliği nedeniyle atlanıyor.
+- 930 test başarılı, 50 test isteğe bağlı demo eksikliği nedeniyle atlanıyor.
 - Gerçek PCB üzerinde canlı IPC bağlantısı doğrulandı; 63 bileşenli kart okundu.
 - Paket başlamadan önce Git çalışma ağacı temizdi; bu teslimatın değişiklikleri tek mantıksal commit olarak gönderilecek.
 - KiCad proje dosyaları kaynak gerçeklik olarak korunuyor.
@@ -27,7 +27,7 @@
 | P01-08 | P1 | Skoru üretime hazır olma durumundan ayırma | Bekliyor | 01 |
 | P02-01 | P0 | İlk STM32G0 parçası ve paketinin seçilmesi | İlk aday seçildi: STM32G031K8T6 / LQFP-32; stok ve sıcaklık sınıfı açık | 02 |
 | P02-02 | P0 | STM32G0 şablon ve üretim profili | İlk dilim tamam; elektriksel kabul açık | 02 |
-| P02-03 | P1 | Gerçek MPN/BOM veri kaynağı | Planlandı | 02 |
+| P02-03 | P1 | Gerçek MPN/BOM veri kaynağı | İlk provenance kapısı tamam; canlı stok/fiyat entegrasyonu açık | 02 |
 | P03-01 | P1 | Lisans, kök README, kurulum paketi ve CI | Planlandı | 03 |
 | P03-02 | P1 | KiCad içi daha doğal panel/plugin deneyimi | Planlandı | 03 |
 | P04-01 | P2 | Kabul edilmiş düzeltmelerden öğrenme verisi | Ertelendi | 04 |
@@ -42,6 +42,7 @@
 - MPN ve fiyat verileri üretim/pazar verisi değildir.
 - ML altyapısı vardır ancak üretim yerleşiminde kanıtlanmış uçtan uca kazanç yoktur.
 - STM32G0 için ilk G031K8T6 profili var; gerçek BOM/sourcing ve kullanıcı elektriksel gereksinimleri henüz kilitli değildir.
+- `bom` manifesti artık doğrulanmış MPN ile seçilmemiş/sentetik kalemleri ayırır; canlı distributor stok/fiyat entegrasyonu yoktur.
 
 ## Paket tamamlanınca rapora eklenecek kanıtlar
 
@@ -60,6 +61,7 @@
 - Bakır/via/zone içeren yönlendirilmiş kartlarda otomatik dosya yazımı güvenlik nedeniyle reddedilir.
 - `bench_bad.kicad_pcb` üzerinde decoupling bulgusu kapatıldı, yedek oluşturuldu ve netlist paritesi korundu.
 - Paket 01 sonrası uçtan uca regresyon: `Ran 927 tests ... OK (skipped=50)`.
+- BOM provenance kapısı sonrası güncel uçtan uca regresyon: `Ran 930 tests ... OK (skipped=50)`.
 - Uygulama sonrası örnek kartta başka bulgular kaldığı için genel sonuç kodu `1` dönebilir; hedef bulgunun kapanması ve netlist paritesi ayrı doğrulama kapılarıdır.
 
 ## Paket 02 ilk dilim kanıtı
@@ -69,6 +71,7 @@
 - `g031-asgari.yaml` geçici KiCad projesi üretti; 4 planlanan ağın tamamı KiCad netlist’inde doğrulandı.
 - G031 profili bilinçli olarak USB/HSE üretmiyor; PA14/SWCLK ile BOOT0 çoklaması nedeniyle otomatik BOOT0 pulldown eklemiyor.
 - Paket 02’ye özel 3 sözleşme testi ve runtime JSON ayrışma kontrolü geçti.
+- `pcbqa bom samples\\bom\\g031-asgari.yaml --fail-on-open` üretim öncesi açık BOM kalemlerini bilinçli olarak reddeder; U1 dışındaki pasif/regülatör kalemleri henüz açık durumdadır.
 
 ## Commit politikası
 
@@ -90,6 +93,5 @@ Açık iş raporu:
 - docs/paketler/ACIK-IS-RAPORU.md güncellendi
 ```
 
-Paket 01 onaylanıp pushlandı. Paket 02’nin bu ilk dilimi için commit ve push
-yapılacaktır. Sonraki paketlerde aynı rapor güncellenmeden üretim koduna
-başlanmayacaktır.
+Paket 01 ve Paket 02’nin bu ilk dilimi pushlandı. Sonraki paketlerde aynı rapor
+güncellenmeden üretim koduna başlanmayacaktır.

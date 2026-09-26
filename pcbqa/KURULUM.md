@@ -102,6 +102,7 @@ pcbqa kesfet  <niyet.yaml>       N varyant üret, en iyisini seç
 pcbqa bagla   <şematik>          var olan sembolleri telle birleştir
 pcbqa sozluk                     bileşen adları sözlüğü (kısaltma, EN/TR)
 pcbqa mpn     <şematik>          parça numarası + fiyat alanları (sentetik)
+pcbqa bom     <manifest.yaml>   kaynaklı BOM raporu + açık kalem kapısı
 pcbqa sablonlar                  şablon kütüphanesini listele
 pcbqa yerlestir <kart>           var olan bir kartı yerleştir ve puanla
 pcbqa uygula  <kart>             yerleştirip pcbnew ile uygula (API gerekmez)
@@ -261,6 +262,10 @@ blocks:
 İlk STM32G0 profili `mcu-stm32g031k8`’dir. LQFP-32 varyantı için güç, reset
 ve temel SWD bağlantısını üretir; USB ve HSE pinleri bu pakette varsayılmaz.
 Hazır örnek: `samples\niyetler\g031-asgari.yaml`.
+
+BOM kaynağı için `samples\bom\g031-asgari.yaml` örneğini kullanın.
+`pcbqa bom <manifest> --fail-on-open` verified olmayan kalemleri üretim öncesi
+bilinçli olarak engeller; bu komut canlı stok/fiyat verisi çekmez.
 
 ## KiCad açıkken
 
