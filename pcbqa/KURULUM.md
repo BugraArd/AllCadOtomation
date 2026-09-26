@@ -258,6 +258,10 @@ blocks:
       freq: 8MHz
 ```
 
+İlk STM32G0 profili `mcu-stm32g031k8`’dir. LQFP-32 varyantı için güç, reset
+ve temel SWD bağlantısını üretir; USB ve HSE pinleri bu pakette varsayılmaz.
+Hazır örnek: `samples\niyetler\g031-asgari.yaml`.
+
 ## KiCad açıkken
 
 Dosyaya yazan komutlar (`uret`, `kesfet`, `yerlestir`, `uygula --apply`)
@@ -270,8 +274,8 @@ birinin değişikliği sessizce kaybolur. Projeyi kapatın ve tekrar deneyin.
 - **Üretilen kart yönlendirilmez** (bakır yol çizilmez). Bileşenler doğru
   ağlarda ve düzgün yerleştirilmiş olarak gelir; yönlendirmeyi KiCad'de siz
   yaparsınız. Bu yüzden skor yalnızca yerleşimi yargılar.
-- **Şablon kütüphanesi şimdilik STM32F103 ailesi** ve temel güç/bağlantı
-  blokları. `pcbqa sablonlar` güncel listeyi verir.
+- **Şablon kütüphanesi STM32F103 ve ilk STM32G031K8 profili** ile temel
+  güç/bağlantı bloklarını içerir. `pcbqa sablonlar` güncel listeyi verir.
 - Üretilen kartta **referans yazıları çakışabilir** (ipek baskı); yerleştirici
   metinleri hesaba katmıyor.
 

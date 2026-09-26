@@ -1,0 +1,84 @@
+# STM32G031K8T6 cekirdek blogu: STM32G0 minimum calisan sistem.
+#
+# Kaynaklar:
+#   - ST AN5096: STM32G0 hardware development reference design
+#   - STM32G031x4/x6/x8 DS12992: pinout, 1.7-3.6 V besleme, SWD
+#
+# Bu profil bilincli olarak LQFP-32 ile sinirlidir:
+#   - tek VDD/VSS besleme cifti vardir; bir 100 nF + bir 4.7 uF kullanilir
+#   - PF2 reset olarak ayrilir ve SWD icin PA13/PA14 kullanilir
+#   - PA14, BOOT0 ile coklanir; bu nedenle varsayilan sablonda BOOT0'a
+#     ayri pulldown baglanmaz. Option byte/boot politikasi ayri bloktur.
+#   - bu pakette USB ve HSE pini uydurulmaz; LSE ve diger arayuzler opsiyoneldir.
+
+version: 1
+id: mcu-stm32g031k8
+description: "STM32G031K8T6 (LQFP-32) cekirdegi: guc, reset ve SWD"
+
+provides: [mcu]
+requires: [guc-3v3]
+
+params:
+  vdd: "3V3"
+  gnd: "GND"
+  nrst: "NRST"
+  lse_in: "LSE_IN"
+  lse_out: "LSE_OUT"
+  swdio: "SWDIO"
+  swclk: "SWCLK"
+  scl: "I2C1_SCL"
+  sda: "I2C1_SDA"
+  usart_tx: "USART2_TX"
+  usart_rx: "USART2_RX"
+
+components:
+  - name: mcu
+    lib_id: MCU_ST_STM32G0:STM32G031K8Tx
+    value: STM32G031K8T6
+    footprint: Package_QFP:LQFP-32_7x7mm_P0.8mm
+    connect:
+      VDD: "${vdd}"
+      VSS: "${gnd}"
+      PF2: "${nrst}"
+
+  # AN5096: her besleme grubuna 100 nF seramik kondansator.
+  - name: vdd-decoupling
+    lib_id: Device:C
+    value: 100nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    count: 1
+    connect: {"#1": "${vdd}", "#2": "${gnd}"}
+
+  # AN5096 referans tasarimi: VDD icin 4.7 uF bulk kondansator.
+  - name: bulk
+    lib_id: Device:C
+    value: 4.7uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    connect: {"#1": "${vdd}", "#2": "${gnd}"}
+
+  # Harici reset butonu/debug reset icin onerilen filtre kondansatoru.
+  - name: nrst-kondansator
+    lib_id: Device:C
+    value: 100nF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    connect: {"#1": "${nrst}", "#2": "${gnd}"}
+
+# Kristal ve arayuz pinleri yalnizca ilgili blok niyette varsa etiketlenir.
+# LQFP-32 varyantinda HSE pinleri yoktur; PC14/PC15 yalnizca LSE icindir.
+interfaces:
+  lse-pinleri:
+    mcu:
+      PC14: "${lse_in}"
+      PC15: "${lse_out}"
+  swd:
+    mcu:
+      PA13: "${swdio}"
+      PA14: "${swclk}"
+  i2c1:
+    mcu:
+      PB6: "${scl}"
+      PB7: "${sda}"
+  usart2:
+    mcu:
+      PA2: "${usart_tx}"
+      PA3: "${usart_rx}"

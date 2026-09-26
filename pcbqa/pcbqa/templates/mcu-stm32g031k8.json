@@ -1,0 +1,94 @@
+{
+  "components": [
+    {
+      "connect": {
+        "PF2": "${nrst}",
+        "VDD": "${vdd}",
+        "VSS": "${gnd}"
+      },
+      "footprint": "Package_QFP:LQFP-32_7x7mm_P0.8mm",
+      "lib_id": "MCU_ST_STM32G0:STM32G031K8Tx",
+      "name": "mcu",
+      "value": "STM32G031K8T6"
+    },
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${gnd}"
+      },
+      "count": 1,
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "lib_id": "Device:C",
+      "name": "vdd-decoupling",
+      "value": "100nF"
+    },
+    {
+      "connect": {
+        "#1": "${vdd}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0805_2012Metric",
+      "lib_id": "Device:C",
+      "name": "bulk",
+      "value": "4.7uF"
+    },
+    {
+      "connect": {
+        "#1": "${nrst}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "lib_id": "Device:C",
+      "name": "nrst-kondansator",
+      "value": "100nF"
+    }
+  ],
+  "description": "STM32G031K8T6 (LQFP-32) cekirdegi: guc, reset ve SWD",
+  "id": "mcu-stm32g031k8",
+  "interfaces": {
+    "i2c1": {
+      "mcu": {
+        "PB6": "${scl}",
+        "PB7": "${sda}"
+      }
+    },
+    "lse-pinleri": {
+      "mcu": {
+        "PC14": "${lse_in}",
+        "PC15": "${lse_out}"
+      }
+    },
+    "swd": {
+      "mcu": {
+        "PA13": "${swdio}",
+        "PA14": "${swclk}"
+      }
+    },
+    "usart2": {
+      "mcu": {
+        "PA2": "${usart_tx}",
+        "PA3": "${usart_rx}"
+      }
+    }
+  },
+  "params": {
+    "gnd": "GND",
+    "lse_in": "LSE_IN",
+    "lse_out": "LSE_OUT",
+    "nrst": "NRST",
+    "scl": "I2C1_SCL",
+    "sda": "I2C1_SDA",
+    "swclk": "SWCLK",
+    "swdio": "SWDIO",
+    "usart_rx": "USART2_RX",
+    "usart_tx": "USART2_TX",
+    "vdd": "3V3"
+  },
+  "provides": [
+    "mcu"
+  ],
+  "requires": [
+    "guc-3v3"
+  ],
+  "version": 1
+}

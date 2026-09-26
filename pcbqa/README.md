@@ -56,6 +56,9 @@ pcbqa duzelt C:\yol\projem --liste
 
 # Bir bulgu için dry-run düzeltme önerisi üret
 pcbqa duzelt C:\yol\projem --finding F-123456789abc
+
+# İlk STM32G0 profilinden geçici KiCad projesi üret
+pcbqa uret --intent samples\niyetler\g031-asgari.yaml --out C:\yol\g031-kart
 ```
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
@@ -90,6 +93,15 @@ düzeltme adayıdır. Varsayılan davranış dry-run'dır; gerçek yazma için a
 `--uygula` gerekir. Her uygulama öncesi yedek alınır ve sonrasında hedef
 bulgu ile netlist tekrar kontrol edilir. Mevcut track/via/zone bulunan
 yönlendirilmiş kartlar otomatik dosya uygulamasına alınmaz.
+
+### STM32G0 ilk profil
+
+Paket 02’nin ilk dikey dilimi `mcu-stm32g031k8` şablonudur. Hedef parça
+`STM32G031K8T6`, paket `LQFP-32_7x7mm_P0.8mm`’dir. Profil; güç, reset ve
+temel SWD bağlantısını üretir. LQFP-32 varyantında USB ve HSE varsayılmaz;
+PA14’ün SWCLK/BOOT0 çoklaması nedeniyle BOOT0 pulldown otomatik eklenmez.
+Gerçek ürün BOM’u ve çevresel pin seçimi elektriksel gereksinim onayından
+sonra kilitlenecektir.
 
 ## Aşama 5: makine öğrenimi altyapısı
 

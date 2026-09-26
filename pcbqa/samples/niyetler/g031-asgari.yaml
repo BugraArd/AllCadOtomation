@@ -1,0 +1,7 @@
+# Ilk STM32G0 dikey dilim: guc + STM32G031K8T6 + temel reset.
+version: 1
+name: g031-asgari
+blocks:
+  - mcu-stm32g031k8
+  - ldo-ams1117-3v3
+  - guc-girisi-header

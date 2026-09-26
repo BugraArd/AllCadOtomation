@@ -1,14 +1,14 @@
 # Açık İş Raporu
 
 **Son güncelleme:** 2026-09-26
-**Aktif paket:** Paket 01 — Bulgu / Düzeltme / Doğrulama Çekirdeği
-**Durum:** Paket 01 çekirdeği uygulandı; STM32G0 kabul testi ve Paket 02 planı bekliyor
+**Aktif paket:** Paket 02 — STM32G0 ilk üretim profili
+**Durum:** İlk STM32G0 dikey dilimi uygulandı; elektriksel kabul ve sourcing açık
 
 ## Mevcut doğrulanmış taban
 
 - KiCad 10.0.6 ve Python ortamı kuruldu.
 - `pcbqa tani` kütüphane ve canlı PCB ortamını doğruluyor.
-- 911 test başarılı, 50 test isteğe bağlı demo eksikliği nedeniyle atlanıyor.
+- 927 test başarılı, 50 test isteğe bağlı demo eksikliği nedeniyle atlanıyor.
 - Gerçek PCB üzerinde canlı IPC bağlantısı doğrulandı; 63 bileşenli kart okundu.
 - Paket başlamadan önce Git çalışma ağacı temizdi; bu teslimatın değişiklikleri tek mantıksal commit olarak gönderilecek.
 - KiCad proje dosyaları kaynak gerçeklik olarak korunuyor.
@@ -25,8 +25,8 @@
 | P01-06 | P0 | Gerçek STM32 kartı uçtan uca kabul testi | Açık — örnek kart testi tamam, STM32 testi bekliyor | 01 |
 | P01-07 | P1 | Kart kenarı ve courtyard önerileri | Bekliyor | 01 |
 | P01-08 | P1 | Skoru üretime hazır olma durumundan ayırma | Bekliyor | 01 |
-| P02-01 | P0 | Kesin STM32G0 parçası ve paketinin seçilmesi | Planlandı | 02 |
-| P02-02 | P0 | STM32G0 şablon ve üretim profili | Planlandı | 02 |
+| P02-01 | P0 | İlk STM32G0 parçası ve paketinin seçilmesi | İlk aday seçildi: STM32G031K8T6 / LQFP-32; stok ve sıcaklık sınıfı açık | 02 |
+| P02-02 | P0 | STM32G0 şablon ve üretim profili | İlk dilim tamam; elektriksel kabul açık | 02 |
 | P02-03 | P1 | Gerçek MPN/BOM veri kaynağı | Planlandı | 02 |
 | P03-01 | P1 | Lisans, kök README, kurulum paketi ve CI | Planlandı | 03 |
 | P03-02 | P1 | KiCad içi daha doğal panel/plugin deneyimi | Planlandı | 03 |
@@ -41,7 +41,7 @@
 - Doğal dil desteği sınırlı, deterministik bir komut sözlüğüdür.
 - MPN ve fiyat verileri üretim/pazar verisi değildir.
 - ML altyapısı vardır ancak üretim yerleşiminde kanıtlanmış uçtan uca kazanç yoktur.
-- Mevcut üretim şablonları STM32F103 ağırlıklıdır; STM32G0 henüz ürün profili değildir.
+- STM32G0 için ilk G031K8T6 profili var; gerçek BOM/sourcing ve kullanıcı elektriksel gereksinimleri henüz kilitli değildir.
 
 ## Paket tamamlanınca rapora eklenecek kanıtlar
 
@@ -59,8 +59,16 @@
 - `--finding <id>` varsayılan olarak dry-run üretir; dosyaya dokunmaz.
 - Bakır/via/zone içeren yönlendirilmiş kartlarda otomatik dosya yazımı güvenlik nedeniyle reddedilir.
 - `bench_bad.kicad_pcb` üzerinde decoupling bulgusu kapatıldı, yedek oluşturuldu ve netlist paritesi korundu.
-- Uçtan uca regresyon: `Ran 911 tests ... OK (skipped=50)`.
+- Paket 01 sonrası uçtan uca regresyon: `Ran 927 tests ... OK (skipped=50)`.
 - Uygulama sonrası örnek kartta başka bulgular kaldığı için genel sonuç kodu `1` dönebilir; hedef bulgunun kapanması ve netlist paritesi ayrı doğrulama kapılarıdır.
+
+## Paket 02 ilk dilim kanıtı
+
+- KiCad sembolü `MCU_ST_STM32G0:STM32G031K8Tx` çözüldü.
+- `Package_QFP:LQFP-32_7x7mm_P0.8mm` footprint’i çözüldü.
+- `g031-asgari.yaml` geçici KiCad projesi üretti; 4 planlanan ağın tamamı KiCad netlist’inde doğrulandı.
+- G031 profili bilinçli olarak USB/HSE üretmiyor; PA14/SWCLK ile BOOT0 çoklaması nedeniyle otomatik BOOT0 pulldown eklemiyor.
+- Paket 02’ye özel 3 sözleşme testi ve runtime JSON ayrışma kontrolü geçti.
 
 ## Commit politikası
 
@@ -82,5 +90,6 @@ Açık iş raporu:
 - docs/paketler/ACIK-IS-RAPORU.md güncellendi
 ```
 
-Paket 01 onaylandı; bu teslimatta commit ve push yapılacaktır. Sonraki paketlerde
-aynı rapor güncellenmeden üretim koduna başlanmayacaktır.
+Paket 01 onaylanıp pushlandı. Paket 02’nin bu ilk dilimi için commit ve push
+yapılacaktır. Sonraki paketlerde aynı rapor güncellenmeden üretim koduna
+başlanmayacaktır.
