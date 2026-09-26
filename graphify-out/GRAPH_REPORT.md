@@ -1,16 +1,16 @@
-# Graph Report - Kicad  (2026-09-23)
+# Graph Report - Kicad  (2026-09-25)
 
 ## Corpus Check
-- 173 files · ~233,562 words
+- 175 files · ~236,055 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4124 nodes · 8707 edges · 203 communities (169 shown, 34 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 449 edges (avg confidence: 0.92)
+- 4174 nodes · 8866 edges · 203 communities (164 shown, 39 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 458 edges (avg confidence: 0.92)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b7a352db`
+- Built from commit: `b6e7717b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,20 +20,20 @@
 - JunctionTests
 - kurulum.py
 - minyaml.py
-- load_templates
+- canli_pcb.py
 - anla
 - elektrik.py
-- add_symbols
+- read_schematic
 - .routed
 - Repertoire
 - symlib.py
 - intent.py
-- IncludeTests
-- PricingTests
+- load_rules
+- ipc_apply.py
 - _Model
-- SyntheticDiscreteBuckTests
+- sync
 - YiginGosterimiTests
-- PlacementContext
+- codex.py
 - geom.py
 - ipc.py
 - connect.py
@@ -42,69 +42,69 @@
 - ipc2221.py
 - sch_add.py
 - sch_move.py
-- canli_sematik.py
+- train.py
 - KicadCli
 - test_decoupling_count.py
 - mpn.py
-- _Engine
+- cluster.py
 - expand_intent
 - sch_wire.py
 - synth.py
-- set_api_enabled
-- pcb_sync.py
+- .f
+- parse_with_stats
 - refine.py
 - MoveFeaturizer
 - run
 - propose.py
 - Schematic
-- test_sch_place.py
+- sch_place.py
 - swig_apply.py
 - anneal.py
 - parse_value
 - ComponentValueRuleTests
 - Arayuz
 - BuildPlan
-- ConfigFile
+- penalty_of
 - PencereTests
 - CopperAreaRuleTests
-- Sample
-- LiveDepsTests
+- polish
+- test_repertoire.py
 - sch_apply.py
 - Lineer regulator, motor surucu, koruma, sensor, HV (Bolum 4)
-- penalty_of
+- .probe
 - lexicon.py
 - ml/collect_design.py: tasarim seviyesi veri
-- circuit.py
+- test_circuit.py
 - load_design
-- SchematicArena
+- ArenaTests
 - eseri.py
-- OverlapTests
-- explore.py
-- _boxes_overlap
+- test_courtyard.py
+- PlacementContext
+- kok_sematik
 - komut.py
-- compare_additive
+- Connectivity
 - auto: uretim yerlestiricisi
 - metrics.py
 - schematic.py
 - WorkerTests
 - RidgeModel
 - generate.py
-- canli.py
+- arayuz.py
 - Yuksek hizli ve hassas sinyal arayuzleri (Bolum 3)
 - bench_context
 - Bagimsiz uygulama: KiCad'in Python'una yaslanmak
 - decoupling_count: mesafe degil ADET
 - KiCad'in kendi araclari son hakemdir
 - test_collect_design.py
-- crystal_load_capacitor_f
+- verify_against_plan
 - Sessiz hata sinifi: yazilmis ama baglanmamis kod
 - KutuphaneTests
-- optimize_and_apply
-- arayuz.py
-- test_ipc_apply.py
-- ray_gerilimi
-- ConnectivityDiff
-- test_courtyard.py
+- Yorum
+- .durdur
+- test_canli_pcb.py
+- SchAddError
+- RegressionGuardTests
+- EndToEndTests
 - uygula
 - Model
 - test_eseri.py
@@ -115,24 +115,24 @@
 - bench.rules.yaml - sentetik tezgah kural seti
 - Devre tipine gore PCB tasarim kurallari - kaynakli derleme
 - app.py
-- ValueRange
+- RedTests
 - Netlist degismezligi kalkani (sch_verify)
 - generate.py: plandan gercek KiCad projesine
 - Oznitelik semasi v3 (75 oznitelik)
 - Pad
-- find_buck_converters
+- test_subcircuit.py
 - LauncherTests
-- fb_divider_max_bottom_ohms
+- .evaluate
 - netlistte-gorunmeyeni-netlistte-arama.md
 - Agirliklar kanit gucune gore bantlanir
 - GBTModel
 - graphify-bilgilendir.py
-- collect_design.py
-- Zone
+- intent_files
+- TermTableTests
 - SchSymbol
 - learned - ogrenilmis hamle siralayicisi
 - f103-usb-swd niyeti
-- DiscreteBuckTests
+- ExploreResult
 - IpcApplyError
 - default_rules.yaml - pcbqa varsayilan kurallari
 - ZoneReadTests
@@ -141,38 +141,38 @@
 - Kicad-5be: Eeschema 10.0.4 canli sematik yazmayi uygulamiyor
 - deger_coz
 - test_lexicon.py
-- features.py
+- BuiltLexiconTests
 - graphify-etiketle.py
 - decoupling-mesafe (proximity, 10 mm, error)
 - CorpusCalibrationTests
 - test_app.py
 - keep_apart - kaynaklarin 'uzaklastir' dedigi bosluk
 - ipc_apply: calisan KiCad'e yazma hatti
-- .test_no_false_clearance_error_on_interf_u
-- explore
+- GlossTests
+- explore.py
 - graphify-kurulumu-ve-hafiza-akisi.md
-- read_schematic
-- ValueClassificationTests
+- ReaderTests
+- next_references
 - ArayuzLauncherTests
-- RealBoardDetectionTests
+- CommandTests
 - runtime_twin
 - Pad bakir sekli tam modelleme (copper_shape)
-- atomic_write_text
-- RunningKicadTests
-- find_demo
+- SilenceTests
+- CurveTests
+- BuckLayoutRuleTests
 - Renderer
-- rules_with
-- test_zones.py
+- RequiredAreaTests
+- Variant
 - post-commit
 - graphify-durum.py
 - Creepage - IEC 60664-1 / IEC 62368-1
 - thermal kurali - esik yerine hesap
-- _satir
+- label_of
 - pcbqa/__init__.py
 - calisma-anlasmasi-graphify-entegre.md
 - post-checkout
-- Variant
-- RealEnvironmentTests
+- label_of
+- FrontTests
 - decoupling_count kurali - mesafe degil adet
 - post-merge
 - pre-commit
@@ -189,34 +189,34 @@
 - Bozuk s-expression dayanikliligi
 - Sematik pin konumu donusumu - deneysel dogrulama
 - Genis hamle repertuari varsayilan kapali
-- _variant
+- test_explore.py
 - place_point
-- HotLoopTests
+- FakeSymbol
 - DagarcikTests
 - UcHaneliSeriTests
 - Decoupling max mesafe < 6.35 mm
-- ._geometry_findings
+- SyntheticMarkerTests
 - _Convergence
 - Connection
 - IPC6012Tests
-- MetricTests
+- test_ml.py
 - BoardWriteTests
 - canli-pcb-arayuzu-ve-dogrulama.md
 - sentetik-veri-isaretlenmeli.md
 - canli-sematik-nightly-dogrulandi.md
 - ConnectionParsingTests
-- test_circuit.py
+- test_propose.py
+- Eylem
 - GercekKartTests
 - README.md
-- DatasetTests
 - YorumlayiciTests
 - Dataset
 - noise_floor
-- ModelRanker
+- Evaluation
 - ParseTests
 - YonTests
 - st-motor-kontrol-model-eslemesi.md
-- parse_with_stats
+- write_tree
 - _turet
 
 ## God Nodes (most connected - your core abstractions)
@@ -229,7 +229,7 @@
 7. `add_symbols()` - 63 edges
 8. `anla()` - 57 edges
 9. `read_board()` - 57 edges
-10. `children()` - 53 edges
+10. `Arayuz` - 54 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `CLAUDE.md proje talimatlari` --semantically_similar_to--> `AGENTS.md ajan talimatlari`  [INFERRED] [semantically similar]
@@ -260,187 +260,187 @@
 - **Canli mod yigini: baglanti yollari, kurulum izni ve olculmus sematik sinirlamasi** — pcbqa_docs_hafiza_kicad_baglanti_yollari_uc_baglanti_yolu, pcbqa_docs_hafiza_canli_mod_ve_sematik_api_kurulum_kurallari, pcbqa_docs_hafiza_sematik_canli_yazma_mumkun_degil, pcbqa_kurulum_iki_calisma_modu, pcbqa_kurulum_acik_proje_korumasi [INFERRED 0.85]
 - **Niyetten karta uretim akisi (niyet -> sablon -> komut)** — pcbqa_samples_niyetler_f103_usb_swd, pcbqa_pcbqa_templates_usb_micro_b, pcbqa_pcbqa_templates_swd_header, pcbqa_kurulum_komut_seti, pcbqa_kurulum_bilinen_sinirlar [INFERRED 0.85]
 
-## Communities (203 total, 34 thin omitted)
+## Communities (203 total, 39 thin omitted)
 
 ### Community 0 - "rules.py"
 Cohesion: 0.04
-Nodes (75): Design, PinRef, Birlestirilmis tasarim: sematik + PCB., Netlist'teki her pini, PCB'deki pad konumuyla eslestirir., Sematikte var, PCB'de yok., PCB'de var, sematikte yok., Yari-cevre tel uzunlugu (Half-Perimeter Wire Length). Netin tum pinlerini…, Fiziksel konumu cozulmus bir pin. (+67 more)
+Nodes (76): Design, PinRef, Birlestirilmis tasarim: sematik + PCB., Netlist'teki her pini, PCB'deki pad konumuyla eslestirir., Sematikte var, PCB'de yok., PCB'de var, sematikte yok., Yari-cevre tel uzunlugu (Half-Perimeter Wire Length). Netin tum pinlerini…, Fiziksel konumu cozulmus bir pin. (+68 more)
 
 ### Community 1 - "Kaynak kalitesi uyarisi: sayisal kriter veren tek sistematik kaynak"
 Cohesion: 0.05
 Nodes (72): .beads/config.yaml yapilandirmasi, placer-cluster: kumeleme tabanli hiyerarsik yerlestirme ajani, AGENTS.md ajan talimatlari, Beads sync mimarisi (Dolt + refs/dolt/data), Karar kayitlari ilkesi (Beads decision records), Kod ve yorum yazim ilkeleri, pcbqa katmanli mimarisi, CLAUDE.md proje talimatlari (+64 more)
 
 ### Community 3 - "kurulum.py"
-Cohesion: 0.18
-Nodes (20): apply(), build_parser(), config_files(), install_live_deps(), kicad_python(), live_deps(), live_deps_details(), main() (+12 more)
+Cohesion: 0.05
+Nodes (42): apply(), build_parser(), config_files(), ConfigFile, describe(), install_live_deps(), kicad_python(), live_deps() (+34 more)
 
 ### Community 4 - "minyaml.py"
 Cohesion: 0.05
 Nodes (41): _fail(), _lines(), MiniYamlError, _parse_block(), parse_flow(), _parse_list(), _parse_map(), parse_scalar() (+33 more)
 
-### Community 5 - "load_templates"
-Cohesion: 0.13
-Nodes (13): build_parser(), load_templates(), main(), plan_from_file(), ArgumentParser, Path, Acikca beyan edilenler + arayuz adlari. Bir arayuz tanimlamak onu saglamak…, Klasordeki tum sablonlar: id -> Template. (+5 more)
+### Community 5 - "canli_pcb.py"
+Cohesion: 0.16
+Nodes (26): apply_edit(), _count(), describe_plan(), Edit, _field_text(), format_table(), FpState, index() (+18 more)
 
 ### Community 6 - "anla"
-Cohesion: 0.05
-Nodes (23): anla(), Dogal dil cumlesini eylem listesine cevirir. KUTUPHANEYE DOKUNMAZ. Cozumleme…, AnlaTests, BaglamaTests, on" bir dolgu kelimesi sayilirsa Turkce 10 kaybolur., Turkce ondalik ayraci virguldur; "4,7k" bolunurse deger kaybolur., kapasitorleri" taninir; "zimbirti" TANINMAZ ve engel olur., Reddedilmesi gerekenler. Bir cozumleyicinin degeri buradadir. (+15 more)
+Cohesion: 0.07
+Nodes (19): anla(), Dogal dil cumlesini eylem listesine cevirir. KUTUPHANEYE DOKUNMAZ. Cozumleme…, AnlaTests, BaglamaTests, on" bir dolgu kelimesi sayilirsa Turkce 10 kaybolur., Turkce ondalik ayraci virguldur; "4,7k" bolunurse deger kaybolur., kapasitorleri" taninir; "zimbirti" TANINMAZ ve engel olur., Baglama EKLEME ile ayni cumlede yapilir. Buradaki tehlike ekleme… (+11 more)
 
 ### Community 7 - "elektrik.py"
-Cohesion: 0.09
-Nodes (28): ag_metni(), _akim(), bagli_mi(), build_parser(), csv_yaz(), ElektrikError, _gerilim(), main() (+20 more)
-
-### Community 8 - "add_symbols"
 Cohesion: 0.06
-Nodes (21): add_symbols(), Path, Proje klasorunu gecici dizine kopyalar; yeni kok sematik yolunu doner., Kutuphaneden sembol(ler) ekler. Varsayilan DRY-RUN'dir. `verify` acikken…, _sandbox_copy(), AddSymbolsTests, EndToEndTests, skipUnless (+13 more)
+Nodes (36): ag_metni(), _akim(), bagli_mi(), build_parser(), csv_yaz(), ElektrikError, _gerilim(), main() (+28 more)
+
+### Community 8 - "read_schematic"
+Cohesion: 0.04
+Nodes (30): add_symbols(), Kutuphaneden sembol(ler) ekler. Varsayilan DRY-RUN'dir. `verify` acikken…, Path, Ayni dosyayi kullanan sayfa yollari. Bir .kicad_sch birden fazla kez…, Bir .kicad_sch dosyasini (ve tum alt sayfalarini) okur. Klasor verilirse…, read_schematic(), WriteTests, AssignmentTests (+22 more)
 
 ### Community 9 - ".routed"
 Cohesion: 0.06
 Nodes (28): Boards, ClearanceVoltageRuleTests, KeepApartRuleTests, LengthMatchOlmayanArayuzTests, PadShapeTests, Bakir kurallari: iz genisligi, via akimi, gerilim acikligi, keep_apart. Bu…, 0.6 mm via TI tablosunda 1.1 A'de sabitlenir; 5 A tasiyamaz., Katman degistirmeyen net icin via kurali anlamsiz - sessiz kalmali. (+20 more)
 
 ### Community 10 - "Repertoire"
-Cohesion: 0.08
-Nodes (30): cluster_moves(), _extent(), Compound, Placement, Random, GENIS HAMLE REPERTUARI - takas, kume tasima, bolge sicramasi (Asama 6, Faz A).…, Bilesenin bagli oldugu bilesenlerin agirlik merkezi., Iki bilesenin yer degistirmesi. Ortaklar, `ref`in bagli oldugu bilesenlerin… (+22 more)
+Cohesion: 0.10
+Nodes (23): cluster_moves(), _extent(), Compound, Placement, Random, GENIS HAMLE REPERTUARI - takas, kume tasima, bolge sicramasi (Asama 6, Faz A).…, Bilesenin bagli oldugu bilesenlerin agirlik merkezi., Iki bilesenin yer degistirmesi. Ortaklar, `ref`in bagli oldugu bilesenlerin… (+15 more)
 
 ### Community 11 - "symlib.py"
 Cohesion: 0.06
-Nodes (59): merge_lib_symbol(), Tanimi `lib_symbols` bolumune ekler. Zaten varsa dokunmaz. Doner: gercekten…, head(), Dugumun etiketi: ['at','1','2'] -> 'at'., _deep_copy(), environment(), expand(), expand_pin_numbers() (+51 more)
+Nodes (62): merge_lib_symbol(), Tanimi `lib_symbols` bolumune ekler. Zaten varsa dokunmaz. Doner: gercekten…, head(), Dugumun etiketi: ['at','1','2'] -> 'at'., _deep_copy(), environment(), expand(), expand_pin_numbers() (+54 more)
 
 ### Community 12 - "intent.py"
-Cohesion: 0.12
-Nodes (21): _check_keys(), IntentError, RuntimeError, Niyet beyani -> bilesen/baglanti plani (Evre 3a, uretken tasarim). Kullanici…, Bilinmeyen anahtar = buyuk olasilikla yazim hatasi; sessizce yutulmaz., Tek bir sablon dosyasini okur ve bicimini dogrular., Niyet beyanini okur ve bicimini dogrular., ${param} referanslarini cozer; bilinmeyeni engel yapar. (+13 more)
+Cohesion: 0.08
+Nodes (29): build_parser(), _check_keys(), IntentError, load_templates(), main(), plan_from_file(), ArgumentParser, Path (+21 more)
 
-### Community 13 - "IncludeTests"
-Cohesion: 0.26
-Nodes (3): IncludeTests, Path, Sessizce ezilen bir kural, fark edilmeyen bir bosluktur.
+### Community 13 - "load_rules"
+Cohesion: 0.07
+Nodes (17): load_rules(), Path, YAML kural dosyasini okur ve dogrular. `include:` ile baska kural dosyalari…, IncludeTests, PresetLoadTests, Path, On ayar kutuphanesi ve `include` mekanizmasi. En onemli olcut: `uretim` on…, Sessizce ezilen bir kural, fark edilmeyen bir bosluktur. (+9 more)
 
-### Community 14 - "PricingTests"
-Cohesion: 0.25
-Nodes (4): PricingTests, Istenen degismez: buyuk deger daha pahali. Olculdu: ilk iki surumde "gercekci…, Deger bilinmiyorsa fiyat UYDURULMAZ., Ayni girdi ayni katalog - iki kosuda fiyat degisirse guven biter.
+### Community 14 - "ipc_apply.py"
+Cohesion: 0.13
+Nodes (22): render(), Score, build_parser(), Candidate, _competitive_placers(), _load_or_run_candidate(), load_placement_json(), main() (+14 more)
 
 ### Community 15 - "_Model"
 Cohesion: 0.08
 Nodes (24): _diff_partner(), ForcePlacer, _Group, _is_ground(), _Item, _Model, Placement, Random (+16 more)
 
-### Community 16 - "SyntheticDiscreteBuckTests"
-Cohesion: 0.14
-Nodes (12): hot_loop_area_mm2(), hot_loop_polygon(), Giris sicak dongusunun cevreledigi dortgen - ya da None. TI AN-2155 bu alani…, Sicak dongu alani (mm2) - olculemiyorsa None., Ayrik dongu ALTIGENI - analitik dogrulama. Neden sentetik kart: korpusta ayrik…, Sira YANLIS olsaydi shoelace baska (kucuk) bir alan verirdi. Ayni alti noktayi…, Bootstrap diyodu SW'dedir ama GND'de pad'i YOKTUR., Ayrik denetleyicilerde faz pini cogu zaman "SW" YAZMAZ. Intersil/Renesas… (+4 more)
+### Community 16 - "sync"
+Cohesion: 0.18
+Nodes (10): Sematikte olup kartta olmayan bilesenleri karta ekler. Varsayilan DRY-RUN.…, sync(), KicadAcceptsTheBoardTests, MultiUnitSyncTests, skipUnless, Cok birimli sembol kartta TEK paket olmali., KiCad'in KENDI dogrulamasi: DRC + sematik paritesi., SandboxProject (+2 more)
 
 ### Community 17 - "YiginGosterimiTests"
 Cohesion: 0.15
 Nodes (6): KutuphaneTests, KiCad 10 sembol ozellikleri: alternate fonksiyonlar ve yigin pin numaralari. Bu…, Saf metin ayristirmasi - KiCad kurulumu gerekmez., Kurulu KiCad kutuphanesine karsi - yoksa atlanir., _sembol(), YiginGosterimiTests
 
-### Community 18 - "PlacementContext"
-Cohesion: 0.09
-Nodes (46): Component, Karta yerlestirilmis bir bilesen (footprint)., Courtyard'in sinir kutusu (hizli on eleme ve yogunluk icin)., Kapladigi alan. Courtyard yoksa pad'lerin sinir kutusuna duser., PlacementContext, Placement, Yerlestiriciye verilen her sey. Salt-okunur kabul edin. `design` uzerinden…, Tasinabilir bilesenlerin referanslari. (+38 more)
+### Community 18 - "codex.py"
+Cohesion: 0.11
+Nodes (38): Component, Karta yerlestirilmis bir bilesen (footprint)., Bileseni yeni konuma tasir; pad ve courtyard mutlak konumlarini yeniden…, Courtyard'in sinir kutusu (hizli on eleme ve yogunluk icin)., Kapladigi alan. Courtyard yoksa pad'lerin sinir kutusuna duser., _clamp_center(), Codex, _cost() (+30 more)
 
 ### Community 19 - "geom.py"
-Cohesion: 0.16
-Nodes (21): area(), bbox(), contains(), convex_hull(), distance(), overlap(), Point, Kucuk geometri yardimcilari: dısbukey kabuk, cakisma ve mesafe. Neden gerekli:… (+13 more)
+Cohesion: 0.15
+Nodes (22): area(), bbox(), contains(), convex_hull(), distance(), overlap(), Point, Kucuk geometri yardimcilari: dısbukey kabuk, cakisma ve mesafe. Neden gerekli:… (+14 more)
 
 ### Community 20 - "ipc.py"
-Cohesion: 0.20
-Nodes (16): _angle_delta(), apply_placement_to_board(), apply_placement_to_running_kicad(), _index_footprints(), IpcApplySummary, _orientation_degrees(), _pose_changed(), _position_mm() (+8 more)
+Cohesion: 0.18
+Nodes (15): apply_placement_to_board(), apply_placement_to_running_kicad(), _index_footprints(), IpcApplySummary, _orientation_degrees(), _pose_changed(), _position_mm(), Any (+7 more)
 
 ### Community 21 - "connect.py"
-Cohesion: 0.09
-Nodes (34): apply_to_file(), build_nodes(), build_parser(), ConnectError, ConnectPlan, edit_tree(), main(), _net_check() (+26 more)
+Cohesion: 0.08
+Nodes (37): apply_to_file(), build_nodes(), build_parser(), ConnectError, ConnectPlan, edit_tree(), junctions_for(), main() (+29 more)
 
 ### Community 22 - "children"
-Cohesion: 0.07
-Nodes (49): Footprint icindeki metin ve pad acilarini `delta` kadar dondurur. KiCad bir…, _turn_parts(), _chain(), _edges_of(), _local_points(), _node_net(), _pad_copper_layers(), _pad_net() (+41 more)
+Cohesion: 0.08
+Nodes (46): Footprint icindeki metin ve pad acilarini `delta` kadar dondurur. KiCad bir…, _turn_parts(), _chain(), _edges_of(), _local_points(), _node_net(), _pad_copper_layers(), _pad_net() (+38 more)
 
 ### Community 23 - "__main__.py"
-Cohesion: 0.07
-Nodes (33): describe_violation(), (severity, kod, aciklama) uclusu dondurur., analyze(), build_parser(), default_rules_path(), discover_project(), kicad_findings(), main() (+25 more)
+Cohesion: 0.11
+Nodes (26): describe_violation(), load_violations(), ERC/DRC JSON raporunu duz bir ihlal listesine cevirir. Iki dosyanin yapisi…, (severity, kod, aciklama) uclusu dondurur., analyze(), build_parser(), default_rules_path(), discover_project() (+18 more)
 
 ### Community 24 - "ipc2221.py"
 Cohesion: 0.06
 Nodes (29): clearance_mm(), current_capacity_a(), decoupling_max_distance_mm(), FabClass, IPC6012Class, IPC-2221B hesaplari: akima gore iz genisligi, gerilime gore aciklik. Neden…, IPC-2221B Tablo 6-1: bu gerilimde minimum iletken acikligi (mm). voltage_v: DC…, Bir uretim sinifinin minimumlari (mm). (+21 more)
 
 ### Community 25 - "sch_add.py"
-Cohesion: 0.06
-Nodes (51): AddPlan, allocate_units(), build_parser(), build_symbol_node(), _copy(), edit_tree(), _expected_joins(), free_slots() (+43 more)
+Cohesion: 0.08
+Nodes (43): AddPlan, build_connections(), build_parser(), build_symbol_node(), _copy(), edit_tree(), free_slots(), _instances_for() (+35 more)
 
 ### Community 26 - "sch_move.py"
-Cohesion: 0.07
-Nodes (35): apply_move(), _at_of(), build_parser(), _edit_tree(), main(), MovePlan, MoveResult, plan_move() (+27 more)
+Cohesion: 0.05
+Nodes (44): apply_move(), _at_of(), build_parser(), _edit_tree(), main(), MovePlan, MoveResult, plan_move() (+36 more)
 
-### Community 27 - "canli_sematik.py"
-Cohesion: 0.38
-Nodes (9): configuration(), environment(), main(), open_copy(), Canli sematik icin ayri, surumu eslesen KiCad/Python ortami., Deneysel dosya bicimini kullanicinin asil projesinden ayirir., request(), Calisan KiCad surecleri ("ad (pid)"). Bulunamazsa bos liste. (+1 more)
+### Community 27 - "train.py"
+Cohesion: 0.13
+Nodes (20): Veri kumesi: JSONL depolama + KART BAZLI bolme. Alan bagimsizdir - burada ne…, Asama 5 - makine ogrenimi altyapisi. Katmanlar bilerek ayri tutuldu; ust katman…, build(), _ensure_registry(), load(), Model sozlesmesi + JSON kaydet/yukle + kayit defteri. Modeller **JSON** olarak…, Ada gore bos bir model ornegi uretir., Kayit defterini doldurur (dairesel import olmasin diye gec yapilir). (+12 more)
 
 ### Community 28 - "KicadCli"
-Cohesion: 0.24
-Nodes (9): CliResult, KicadCli, load_violations(), Path, KiCad'in kendi elektriksel kural kontrolu (JSON rapor)., KiCad'in kendi tasarim kurali kontrolu (JSON rapor)., ERC/DRC JSON raporunu duz bir ihlal listesine cevirir. Iki dosyanin yapisi…, kicad-cli cagrilarini saran ince katman. (+1 more)
+Cohesion: 0.29
+Nodes (7): CliResult, KicadCli, Path, KiCad'in kendi elektriksel kural kontrolu (JSON rapor)., KiCad'in kendi tasarim kurali kontrolu (JSON rapor)., kicad-cli cagrilarini saran ince katman., Sematikten XML netlist. Neyin neye bagli oldugunu buradan ogreniyoruz.
 
 ### Community 29 - "test_decoupling_count.py"
-Cohesion: 0.12
-Nodes (13): bulk(), BulkFloorTests, ceramic(), ConfigTests, GroundExclusionTests, `decoupling_count` kurali (TI SPRABV2 6). Bu kural MESAFE degil ADET olcuyor -…, Bu projenin en onemli olcutu: gereksiz yerde susmak., U1'in VCC_PIC pini 10.64 mm otede C6'ya (100nF) sahip. 6.35 mm'de bulgu VAR,… (+5 more)
+Cohesion: 0.09
+Nodes (19): decoupling_counts(), (gereken 0.1 uF sayisi, gereken bulk sayisi) - TI SPRABV2 6. TI: her 2 guc topu…, DecouplingCountTests, TI SPRABV2 6: her 2 guc topu icin 0.1 uF, her ~10 icin bulk., bulk(), BulkFloorTests, ceramic(), ConfigTests (+11 more)
 
 ### Community 30 - "mpn.py"
-Cohesion: 0.10
-Nodes (30): apply_assignment(), Assignment, AssignPlan, _base_price(), build_parser(), candidates(), main(), parse_value() (+22 more)
-
-### Community 31 - "_Engine"
 Cohesion: 0.11
-Nodes (17): _cap_value(), _Engine, _Node, _Part, Placement, Random, Kume agacinin bir dugumu., Netleri turlerine ayirir: toprak / guc / saat / diferansiyel / sinyal. (+9 more)
+Nodes (27): apply_assignment(), Assignment, AssignPlan, _base_price(), build_parser(), candidates(), main(), parse_value() (+19 more)
+
+### Community 31 - "cluster.py"
+Cohesion: 0.08
+Nodes (23): _bin_edges(), _Builder, _predict_tree(), Nicem tabanli kutu sinirlari (artan, tekrarsiz)., Tek bir agaci kurar. Histogramlar dugum bazinda yeniden hesaplanir., _cap_value(), _Engine, _Node (+15 more)
 
 ### Community 32 - "expand_intent"
-Cohesion: 0.16
-Nodes (11): expand_intent(), Intent, IntentBlock, Niyeti plana acar. Kutuphaneye DOKUNMAZ (onu `resolve_plan` yapar)., EndToEndTests, skipUnless, Kucuk bir niyetten gercek proje - KiCad kendi netlist'iyle dogruluyor., ExpandTests (+3 more)
+Cohesion: 0.14
+Nodes (13): expand_intent(), Intent, IntentBlock, ${param} referanslarini cozer; bilinmeyeni engel yapar., Niyeti plana acar. Kutuphaneye DOKUNMAZ (onu `resolve_plan` yapar)., _substitute(), EndToEndTests, skipUnless (+5 more)
 
 ### Community 33 - "sch_wire.py"
-Cohesion: 0.10
-Nodes (36): junctions_for(), plan_from_proposals(), Ucten fazla oge bulusan noktalar - KiCad'in kendi kurali. Sayilanlar: bu…, Onerileri yollara cevirir. Oneriler zaten dik ve temiz yollardir. Guc inisi TEK…, build_connections(), Baglanti dugumleri (tel + etiket + junction) uretir. Iki yol var ve ikisi de…, blocked_points(), candidates() (+28 more)
+Cohesion: 0.12
+Nodes (26): blocked_points(), candidates(), existing_pin_point(), junction_node(), junctions_needed(), label_node(), label_rotation(), pin_position() (+18 more)
 
 ### Community 34 - "synth.py"
 Cohesion: 0.14
 Nodes (30): _apply(), BoardSpec, build_bench(), crystal(), _fmt(), header(), main(), PadSpec (+22 more)
 
-### Community 35 - "set_api_enabled"
-Cohesion: 0.25
-Nodes (5): Tek bir ayar dosyasinda bayragi degistirir. Doner: degisti mi. Dosyanin geri…, set_api_enabled(), ConfigWriteTests, Tema, kutuphane yollari, pencere ayarlari AYNEN kalmali., KiCad'in ayarlarinda Turkce anahtarlar var; ensure_ascii bozmamali.
+### Community 35 - ".f"
+Cohesion: 0.18
+Nodes (10): overshoot_factor(), Ihlalin BUYUKLUGUNE gore ceza carpani (Faz 1b). asim = |measured - limit| /…, OvershootFactorTests, Ihlalin buyuklugune gore ceza carpani (Faz 1b)., Net uzunlugu gibi: measured > limit., Iz genisligi gibi: measured < limit. Ayni oran, ayni carpan., Tavan olmasa via_current'ta tek bulgu butun skoru yutardi., Cakisan bakir (negatif aciklik), dar aciklikitan daha kotudur. (+2 more)
 
-### Community 36 - "pcb_sync.py"
+### Community 36 - "parse_with_stats"
 Cohesion: 0.07
 Nodes (41): board_paths(), board_refs(), build_footprint_node(), build_parser(), _copy(), _drop(), free_positions(), main() (+33 more)
 
 ### Community 37 - "refine.py"
-Cohesion: 0.05
-Nodes (50): Move, label_of(), Iki degerlendirme arasindaki farki tek sayiya indirir (bkz. modul basi).…, Evaluation, Hakemin bir yerlestirme icin verdigi gercek olcum. Yerlestiriciler vekil…, Siralamada kullanilan anahtar; buyuk olan daha iyidir., Sozluksel siralamayi TEK SAYIYA indirir: pozitif = bu daha iyi. `key` sozluksel…, _as_compounds() (+42 more)
+Cohesion: 0.12
+Nodes (27): Move, _as_compounds(), _centroid(), _extent_of(), _finding_moves(), _inside(), keep_best(), _limit_of() (+19 more)
 
 ### Community 38 - "MoveFeaturizer"
-Cohesion: 0.09
-Nodes (17): MoveFeaturizer, Any, KiCad donme konvansiyonu (Y asagi) - `pcb._rotate` ile ayni formul. Burada…, Bir tasarim icin oznitelik cikarici. Kullanim: fz = MoveFeaturizer(design,…, Yerlesim onbelleklerini tazeler. Yerlesim her degistiginde cagirin., Verilen bilesenlerin dokundugu netler (tekrarsiz, kararli sirada)., Verilen netlerin HPWL toplami ve net basina degerleri. `moved` verilirse o…, Ayni nete bagli bilesenlere en kisa ve ortalama mesafe. `proximity`… (+9 more)
+Cohesion: 0.07
+Nodes (25): _bbox_of(), _CompStatic, _kind_index(), _log1p(), MoveFeaturizer, Any, DONMUS OZNITELIK SEMASI - bir aday hamleyi sayilara cevirir. Bu dosya…, KiCad donme konvansiyonu (Y asagi) - `pcb._rotate` ile ayni formul. Burada… (+17 more)
 
 ### Community 39 - "run"
-Cohesion: 0.06
-Nodes (24): is_area_dependent(), junction_temp_c(), Termal hesaplar: bakir alanindan jonksiyon sicakligina. `ipc2221.py` ile ayni…, Tj'yi sinirda tutan EN KUCUK bakir alani. None doner: * paketin alan…, Bu paket icin theta_JA'nin bakir alanina bagimliligi OLCULMUS mu?, Verilen bakir alaninda theta_JA (C/W). Ara degerler log10(alan) uzerinde…, Tj = TA + P * theta_JA(alan). Kararli hal, tek isi kaynagi. Komsu bilesenlerin…, required_area_mm2() (+16 more)
+Cohesion: 0.12
+Nodes (10): skipUnless, Yazim hatasi kurali SESSIZCE etkisiz birakmamali. Bu projede ayni sinif hata…, Secici hicbir seye uymuyorsa sessizlik korunur - beyan denetlenmez., Bu projenin en onemli olcutu: saglam kartta sessizlik., Gercek SOT-223 regulator: TLV1117LV33, tab pin 2 -> +3V3., Yapilandirma hatasi SESSIZ gecmemeli - gorunmez etkisiz kural olurdu., RealBoardTests, RuleConfigTests (+2 more)
 
 ### Community 40 - "propose.py"
-Cohesion: 0.14
-Nodes (24): _aligned(), alignment_pairs(), _clear_between(), _distance(), free_pins(), occupied_points(), PinRef, power_drops() (+16 more)
+Cohesion: 0.13
+Nodes (26): _aligned(), alignment_pairs(), _clear_between(), _distance(), free_pins(), occupied_points(), PinRef, power_drops() (+18 more)
 
 ### Community 41 - "Schematic"
-Cohesion: 0.18
-Nodes (12): Sematigin yapisal saglamligini kontrol eder. `schematic` bir…, run_schematic_checks(), Bir dosyadaki alt sayfa kutusu., Bir sematik hiyerarsisinin tamami., Tel uclarinin sayfa bazinda sayim tablosu., Schematic, SchSheetRef, Asama 4a/4b: sematik okuyucu ve netlist degismezligi kalkani. (+4 more)
+Cohesion: 0.19
+Nodes (10): Sematigin yapisal saglamligini kontrol eder. `schematic` bir…, run_schematic_checks(), Bir sematik hiyerarsisinin tamami., Tel uclarinin sayfa bazinda sayim tablosu., Schematic, Asama 4a/4b: sematik okuyucu ve netlist degismezligi kalkani., Sematigin yapisal kontrolleri (rules.run_schematic_checks)., #PWR ve #FLG'nin footprint'i olmaz - bunlari isaretlemek gurultudur. (+2 more)
 
-### Community 42 - "test_sch_place.py"
-Cohesion: 0.20
-Nodes (11): changed_only(), improve(), improve_file(), Path, Schematic, SchPlacement, Bir sayfanin yerlesimini iyilestirir. `(placement, onceki_olcum,…, Yalnizca gercekten yeri degisen sembol orneklerini birakir. Anahtar UUID'dir:… (+3 more)
+### Community 42 - "sch_place.py"
+Cohesion: 0.08
+Nodes (26): changed_only(), _context_for(), improve(), improve_file(), _key(), Path, Schematic, SchPlacement (+18 more)
 
 ### Community 43 - "swig_apply.py"
-Cohesion: 0.12
-Nodes (22): _angle_delta(), apply_placement(), board_name_of(), build_parser(), index_footprints(), load_pcbnew(), open_board(), _pose_changed() (+14 more)
+Cohesion: 0.13
+Nodes (23): _angle_delta(), apply_placement(), board_name_of(), build_parser(), index_footprints(), load_pcbnew(), main(), open_board() (+15 more)
 
 ### Community 44 - "anneal.py"
-Cohesion: 0.23
-Nodes (9): _accept(), _build_proximity_group(), Placement, Random, Benzetimli tavlama (simulated annealing) yerlestirici. Fikir:…, Benzetimli tavlama ile detayli yerlesim iyilestirmesi. Maliyet = agirlikli HPWL…, `proximity` kuralinin ayni netteki hedef/partner eslesmesini onceden cikarir…, SimulatedAnnealing (+1 more)
+Cohesion: 0.27
+Nodes (7): _accept(), _build_proximity_group(), Placement, Random, Benzetimli tavlama (simulated annealing) yerlestirici. Fikir:…, `proximity` kuralinin ayni netteki hedef/partner eslesmesini onceden cikarir…, _snapshot()
 
 ### Community 45 - "parse_value"
-Cohesion: 0.16
-Nodes (9): parse_value(), Bir bilesen degerini SI taban birimine cevirir (ohm / farad / henry). Birimi…, ParseValueTests, Deger alanina serbest metin yazmak yaygin; hata saymak gurultu uretir., KiCad deger alanlari duzensizdir; ayristirici bunu yutmali., IEC 60062: carpan harfi ONDALIK NOKTANIN yerine gecer., Deger alanina gerilim/tolerans/paket yazmak yaygin., M' mega, 'm' mili. Karistirmak 10^9 kat hata demek. (+1 more)
+Cohesion: 0.10
+Nodes (14): parse_value(), Bir bilesen degerini SI taban birimine cevirir (ohm / farad / henry). Birimi…, ParseValueTests, Deger alanina serbest metin yazmak yaygin; hata saymak gurultu uretir., KiCad deger alanlari duzensizdir; ayristirici bunu yutmali., IEC 60062: carpan harfi ONDALIK NOKTANIN yerine gecer., Deger alanina gerilim/tolerans/paket yazmak yaygin., M' mega, 'm' mili. Karistirmak 10^9 kat hata demek. (+6 more)
 
 ### Community 46 - "ComponentValueRuleTests"
 Cohesion: 0.13
@@ -448,15 +448,15 @@ Nodes (10): ComponentValueRuleTests, `component_value` kural tipi - hesabi devre
 
 ### Community 47 - "Arayuz"
 Cohesion: 0.10
-Nodes (4): Arayuz, ayar_oku(), Cumle ya da proje degisti - gosterilen plan artik gecerli degil., Sonuc
+Nodes (3): Arayuz, Cumle ya da proje degisti - gosterilen plan artik gecerli degil., Sonuc
 
 ### Community 48 - "BuildPlan"
-Cohesion: 0.16
-Nodes (12): BuildPlan, PlannedComponent, Plandaki tek bir somut bilesen. Referans numarasi (C1, C2...) BURADA verilmez -…, Niyetin acilmis hali - yazilabilir, gosterilebilir, sorgulanabilir., Ag adi -> [(bilesen etiketi, pin anahtari)]. Cozumlemeden once pin anahtarlari,…, Pin anahtarlarini kurulu KiCad kutuphanesine karsi cozer. "#3" pin numarasidir;…, resolve_plan(), _plan_two_resistors() (+4 more)
+Cohesion: 0.14
+Nodes (15): BuildPlan, PlannedComponent, Plandaki tek bir somut bilesen. Referans numarasi (C1, C2...) BURADA verilmez -…, Niyetin acilmis hali - yazilabilir, gosterilebilir, sorgulanabilir., Ag adi -> [(bilesen etiketi, pin anahtari)]. Cozumlemeden once pin anahtarlari,…, Pin anahtarlarini kurulu KiCad kutuphanesine karsi cozer. "#3" pin numarasidir;…, resolve_plan(), _plan_two_resistors() (+7 more)
 
-### Community 49 - "ConfigFile"
-Cohesion: 0.33
-Nodes (6): ConfigFile, describe(), Tek bir KiCad surumunun ayar dosyasi., SetupStatus, Canli mod kurulumu: KULLANICININ ayar dosyasina dokunuyor. Bu modul projedeki…, ReportTests
+### Community 49 - "penalty_of"
+Cohesion: 0.16
+Nodes (9): penalty_of(), 0-100 arasi kalite skoru. Ceza, bilesen sayisina bolunerek normalize edilir;…, Bir bulgunun skora yazacagi ceza. Kural kendi `weight` degerini verdiyse o…, PenaltyOfTests, Kural bazli agirlik (Faz 1a). Skor eskiden yalnizca severity sayiyordu: her…, `penalty_of` saf bir fonksiyon - once onu tek basina sinayalim., Agirlik ne olursa olsun `info` sifirdir. Somut nedeni: `max_findings` sinirina…, Agirlik severity sirasini bilerek bozabilir - amac bu. (+1 more)
 
 ### Community 50 - "PencereTests"
 Cohesion: 0.12
@@ -466,25 +466,25 @@ Nodes (6): PencereTests, skipUnless, Arka plan isi bitene kadar olay dongusunu c
 Cohesion: 0.21
 Nodes (5): CopperAreaRuleTests, SW bakir alani <= 100 mm2 (ROHM 66AN015E) bu bicimde ifade edilir., Termal bakir alani (Richtek AN044) bu bicimde ifade edilir., Bakiri olmayan net sessiz gecilir - min_mm2 orada yanlis alarm olurdu., run()
 
-### Community 52 - "Sample"
-Cohesion: 0.19
-Nodes (6): Any, Ornekleri aday listesine gore gruplar (siralama metrikleri icin)., Tek bir egitim ornegi., Sample, `meta` baslikta ayrilmis bir adi ezerse dosya SESSIZCE bozulur. Olculdu:…, ReservedMetaTests
+### Community 52 - "polish"
+Cohesion: 0.23
+Nodes (5): polish(), `polish_scored`in yalnizca yerlesimi donduren sarmalayicisi. Eski cagri yolu;…, AutoPlacerTests, context_for(), PolishTests
 
-### Community 53 - "LiveDepsTests"
-Cohesion: 0.17
-Nodes (4): LiveDepsTests, Canli modun ISTEMCI tarafi - sunucuyu acmak yetmiyor. Olcum (KiCad 10.0.4):…, Surum SABIT olmali - 0.7.1 ile olculdu., Yorumlayici bulunamasa bile her modul icin bir cevap donmeli.
+### Community 53 - "test_repertoire.py"
+Cohesion: 0.22
+Nodes (7): bench_context(), CompoundApplyTests, CompoundSafetyTests, polish_wide(), Asama 6 / Faz A: genis hamle repertuari. En onemli test `CompoundSafetyTests`:…, Genis repertuar Asama 3'un monotonluk garantisini bozmamali., Sematik tarafi (Asama 4e) takas/kume kavramlarina sahip degil.
 
 ### Community 54 - "sch_apply.py"
-Cohesion: 0.15
-Nodes (19): apply_placement(), ApplyPlan, ApplyResult, build_parser(), _drag_map(), _edit_sheet(), main(), _pt() (+11 more)
+Cohesion: 0.08
+Nodes (30): apply_placement(), ApplyPlan, ApplyResult, build_parser(), _drag_map(), _edit_sheet(), main(), optimize_and_apply() (+22 more)
 
 ### Community 55 - "Lineer regulator, motor surucu, koruma, sensor, HV (Bolum 4)"
 Cohesion: 0.09
 Nodes (27): ESD/CMC yerlesim sirasi: konnektor -> ESD -> CMC -> R/C, Lineer regulator, motor surucu, koruma, sensor, HV (Bolum 4), Creepage / clearance ve HV slot genisligi, Elektrolitik kondansator vent bosluğu ve end-seal yasagi, ESD'de belirleyici buyukluk mesafe degil enduktanstir, Gate izi genisligi >= 0.508 mm ve SiC surge korumasi <= 20 mm, Guc izi 0.381 mm/A ve 1 via / 200 mA, IPC-7351B courtyard excess ve govdeler arasi bosluk (+19 more)
 
-### Community 56 - "penalty_of"
-Cohesion: 0.05
-Nodes (25): overshoot_factor(), penalty_of(), 0-100 arasi kalite skoru. Ceza, bilesen sayisina bolunerek normalize edilir;…, Bir bulgunun skora yazacagi ceza. Kural kendi `weight` degerini verdiyse o…, Ihlalin BUYUKLUGUNE gore ceza carpani (Faz 1b). asim = |measured - limit| /…, OvershootFactorTests, PenaltyOfTests, Ihlalin buyuklugune gore ceza carpani (Faz 1b). (+17 more)
+### Community 56 - ".probe"
+Cohesion: 0.12
+Nodes (7): Uctan uca: buyuk ihlal, kucuk ihlalden daha pahali olmali., Ayni kural, olcekleme kapali -> Faz 1a davranisi., BULGU BASINA ceza; cezalar dogrudan toplanir. Bulgu sayisina bolmek sart:…, Bulgu basina ceza, ihlal buyudukce artmali. Faz 1b'nin butun gerekcesi bu:…, Olcekleme cezayi yalnizca BUYUTUR, asla azaltmaz., ScaledScoreTests, WeightedScoreTests
 
 ### Community 57 - "lexicon.py"
 Cohesion: 0.14
@@ -494,41 +494,41 @@ Nodes (21): build(), build_parser(), Entry, gloss(), harvest(), kapsam(), load()
 Cohesion: 0.13
 Nodes (20): ml/collect_design.py: tasarim seviyesi veri, Etiket parti medyanina gore HPWL uzerinden, Etiket secimi model seciminden onemli, explore.py: once boyut sonra tohum, Her sira bilgisiz degildir - modeli her yere sokmayin, Kart/grup bazli capraz dogrulama bolmesi, Kart siniri tahmin degil olcum, learned hala auto'yu gecmiyor (+12 more)
 
-### Community 59 - "circuit.py"
-Cohesion: 0.16
-Nodes (11): i2c_needs_current_source(), i2c_pullup_max_ohms(), i2c_pullup_min_ohms(), i2c_pullup_range(), Devre dogrulugu hesaplari: bilesen DEGERI dogru mu? Mevcut kural tipleri…, Yukselme suresi butcesinin izin verdigi EN BUYUK pull-up direnci., Surucunun sifira cekebilmesi icin gereken EN KUCUK pull-up direnci., 200 pF ustunde duz direnc yetmez (UM10204 7.1). UM10204: 200-400 pF arasi Fast-… (+3 more)
+### Community 59 - "test_circuit.py"
+Cohesion: 0.07
+Nodes (30): crystal_load_capacitor_f(), crystal_load_capacitor_range_f(), crystal_load_range(), fb_divider_max_bottom_ohms(), fb_divider_range(), i2c_needs_current_source(), i2c_pullup_max_ohms(), i2c_pullup_min_ohms() (+22 more)
 
 ### Community 60 - "load_design"
 Cohesion: 0.05
-Nodes (68): apply_placement(), best_result(), discover_boards(), evaluate_design(), load_design(), locked_refs(), main(), make_evaluator() (+60 more)
+Nodes (56): discover_boards(), evaluate_design(), load_design(), locked_refs(), main(), make_evaluator(), Path, HAKEM - bir yerlestiriciyi calistirir, oncesi/sonrasi puanlar. python -m… (+48 more)
 
-### Community 61 - "SchematicArena"
-Cohesion: 0.08
-Nodes (12): Sematik uzerinde hizli yerlestirme degerlendirmesi. `refine.polish`in bekledigi…, Yerlestirmeyi taban konumlarla birlestirir (eksikler yerinde kalir). Konumlar…, Kural motorunun anlayacagi hafif bir Schematic goruntusu uretir. Yalnizca…, Bir yerlestirmeyi puanlar. Hizli: kicad-cli calistirmaz., SchematicArena, ArenaTests, Arama ile son olcum ayni koordinatlari gormeli. Kayan noktali bir konum…, Izgara disi adim her denemeyi kural ihlaline dusurur. (+4 more)
+### Community 61 - "ArenaTests"
+Cohesion: 0.10
+Nodes (10): _boxes_overlap(), Iki sinir kutusu ust uste biniyor mu? Tam temas cakisma SAYILMAZ., ArenaTests, Arama ile son olcum ayni koordinatlari gormeli. Kayan noktali bir konum…, 1.27 mm izgarasinda bitisik semboller cok yaygin; tam temas cakisma sayilirsa…, Izgara disi adim her denemeyi kural ihlaline dusurur., Cok birimli bilesenin her birimi ayri girdidir. Referansla anahtarlamak U2'nin…, Guc sembolleri pine kaynakli; bagimsiz hareketleri baglantiyi koparir. (+2 more)
 
 ### Community 62 - "eseri.py"
 Cohesion: 0.21
 Nodes (16): _adimlar(), _dogrula(), down(), ESeriError, _mantis(), nearest(), ValueError, IEC 60063 E-serisi: hesaplanan degeri SATIN ALINABILIR degere yuvarlar. Neden… (+8 more)
 
-### Community 63 - "OverlapTests"
-Cohesion: 0.20
-Nodes (4): OverlapTests, Icbukey boslukta duran kucuk bir sekil cakismaz., Kenarlar kesismese de icerme cakismadir., Bitisik duran iki courtyard cakismis sayilmaz (clearance_mm: 0.0).
+### Community 63 - "test_courtyard.py"
+Cohesion: 0.13
+Nodes (9): _courtyard(), CourtyardReadTests, OverlapTests, Courtyard okuma ve cakisma geometrisi. Bu dosyadaki testlerin tamami Evre 3a'da…, Icbukey boslukta duran kucuk bir sekil cakismaz., Kenarlar kesismese de icerme cakismadir., Bitisik duran iki courtyard cakismis sayilmaz (clearance_mm: 0.0)., Iki kosegen kose dort koseye acilmali - yoksa sekil dusuyordu. (+1 more)
 
-### Community 64 - "explore.py"
-Cohesion: 0.05
-Nodes (49): Uretim-degerlendirme dongusu (Evre 3b): ayni niyetten N varyant, en iyisi.…, Tek bir varyanti yerlestirir ve olcer. Dosyaya DOKUNMAZ. Kart her denemede taze…, run_variant(), build_design(), Tasarim modeli: sematik BAGLANTI bilgisi + PCB KONUM bilgisi ayni yerde. KiCad…, ref_kind(), Net, Netlist (+41 more)
+### Community 64 - "PlacementContext"
+Cohesion: 0.08
+Nodes (30): Benzetimli tavlama ile detayli yerlesim iyilestirmesi. Maliyet = agirlikli HPWL…, SimulatedAnnealing, Auto, Placement, AUTO - uretim yerlestiricisi (Asama 3'un ciktisi). Yarisan dort motorun tek tek…, Kaba yerlesim + hakem gudumlu cila + regresyon tabani., PlacementContext, DONMUS ARAYUZ - yerlestirme motorlarinin uymak zorunda oldugu sozlesme. Bu… (+22 more)
 
-### Community 65 - "_boxes_overlap"
-Cohesion: 0.50
-Nodes (3): _boxes_overlap(), Iki sinir kutusu ust uste biniyor mu? Tam temas cakisma SAYILMAZ., 1.27 mm izgarasinda bitisik semboller cok yaygin; tam temas cakisma sayilirsa…
+### Community 65 - "kok_sematik"
+Cohesion: 0.21
+Nodes (7): Proje metninden kok sematik. Metin ARGUMANDIR, Tk degiskeni degil. tkinter is…, kok_sematik(), KomutError, RuntimeError, Su anki modelimiz" = hedefteki TEK proje. Birden fazla aday varsa secim…, Komut calistirilamadi (hedef sematik bulunamadi gibi)., KokSematikTests
 
 ### Community 66 - "komut.py"
-Cohesion: 0.06
-Nodes (41): Pattern, Baglama, _baglama_ayir(), _baglantilari_dagit(), build_parser(), _dagarcik(), Eylem, _fiil_bul() (+33 more)
+Cohesion: 0.08
+Nodes (31): Pattern, Baglama, _baglama_ayir(), _baglantilari_dagit(), build_parser(), _dagarcik(), _hedef_olabilir(), _hedef_temizle() (+23 more)
 
-### Community 67 - "compare_additive"
-Cohesion: 0.22
-Nodes (7): compare_additive(), EKLEME icin kalkan: mevcut devre aynen dursun, yalnizca yenisi eklensin.…, AdditiveShieldTests, Yeni sembol var olan bir tele degerse kalkan yakalamali., ExpectedJoinShieldTests, Tel cizilip baglanmadiysa sessizce gecmemeli., PinKey
+### Community 67 - "Connectivity"
+Cohesion: 0.18
+Nodes (9): compare_additive(), Connectivity, EKLEME icin kalkan: mevcut devre aynen dursun, yalnizca yenisi eklensin.…, Bir sematigin kanonik baglanti yapisi., AdditiveShieldTests, Yeni sembol var olan bir tele degerse kalkan yakalamali., ExpectedJoinShieldTests, Tel cizilip baglanmadiysa sessizce gecmemeli. (+1 more)
 
 ### Community 68 - "auto: uretim yerlestiricisi"
 Cohesion: 0.12
@@ -539,24 +539,20 @@ Cohesion: 0.16
 Nodes (17): evals_to_first_gain(), evaluate(), mae(), pairwise_accuracy(), Any, r2(), _ranks(), Metrikler: regresyon dogrulugu VE - asil onemlisi - siralama kalitesi. Bir… (+9 more)
 
 ### Community 70 - "schematic.py"
-Cohesion: 0.19
-Nodes (19): _atom(), _flag(), _lib_extent(), _lib_pins(), _num(), _properties(), Path, Sematik okuyucu (Asama 4a) - .kicad_sch dosyalarini veri modeline cevirir.… (+11 more)
-
-### Community 71 - "WorkerTests"
-Cohesion: 0.10
-Nodes (4): FrontTests, Canli sematikte yanlis hedef, eski plan ve yari yazma korumalari., Schematic, WorkerTests
+Cohesion: 0.21
+Nodes (19): _atom(), _flag(), _lib_extent(), _lib_pins(), _num(), _properties(), Sematik okuyucu (Asama 4a) - .kicad_sch dosyalarini veri modeline cevirir.…, Junction / no_connect gibi tek noktali ogeler. (+11 more)
 
 ### Community 72 - "RidgeModel"
-Cohesion: 0.10
-Nodes (13): _cholesky_solve(), Any, Model, Ridge (L2 cezali) dogrusal regresyon - saf Python. Neden saf Python: proje…, En buyuk mutlak katsayili oznitelikler. Standartlastirilmis uzayda oldugu icin…, Sutun ortalamalari ve standart sapmalari (sifir sapma -> 1)., A simetrik pozitif tanimli iken A x = b cozumu., Standartlastirilmis ridge regresyon. (+5 more)
+Cohesion: 0.15
+Nodes (10): _cholesky_solve(), Any, Model, Ridge (L2 cezali) dogrusal regresyon - saf Python. Neden saf Python: proje…, En buyuk mutlak katsayili oznitelikler. Standartlastirilmis uzayda oldugu icin…, Sutun ortalamalari ve standart sapmalari (sifir sapma -> 1)., A simetrik pozitif tanimli iken A x = b cozumu., Standartlastirilmis ridge regresyon. (+2 more)
 
 ### Community 73 - "generate.py"
-Cohesion: 0.05
-Nodes (51): allocate_refs(), build_parser(), build_schematic_tree(), choose_paper(), create_skeleton(), draw_outline(), empty_board_text(), empty_schematic_text() (+43 more)
+Cohesion: 0.08
+Nodes (39): allocate_refs(), build_parser(), build_schematic_tree(), choose_paper(), create_skeleton(), draw_outline(), empty_board_text(), empty_schematic_text() (+31 more)
 
-### Community 74 - "canli.py"
-Cohesion: 0.35
-Nodes (16): apply_plan(), board_identity(), check_target(), connection(), describe_connection(), fingerprint(), LivePlan, main() (+8 more)
+### Community 74 - "arayuz.py"
+Cohesion: 0.16
+Nodes (28): ayar_oku(), build_parser(), main(), ArgumentParser, MASAUSTU ARAYUZU (tkinter) - islerin pencereden yurutulmesi. pcbqa arayuz Alti…, Bu (ya da verilen) Python tkinter'i getiriyor mu?, tkinter'i olan bir yorumlayici ara. Bulamazsa None. KiCad'inki elenir - onda…, Fonksiyonu calistirir ve stdout'una yazdigini da toplar. Alt komutlarin cogu… (+20 more)
 
 ### Community 75 - "Yuksek hizli ve hassas sinyal arayuzleri (Bolum 3)"
 Cohesion: 0.15
@@ -579,12 +575,12 @@ Cohesion: 0.14
 Nodes (15): Cok birimli parca kartta tek fiziksel paket, fp_rect courtyard'larin dusmesi, Gercek poligon kesisimi (disbukey kabuk + SAT), Icbukey courtyard: zincirleme + kenar kesisimi, KiCad DRC'si her seyi yakalamaz, KiCad'in kendi araclari son hakemdir, Mikron seviyesi degme: esik uydurulmadi, Pad acisinin cift sayilmasi (+7 more)
 
 ### Community 80 - "test_collect_design.py"
-Cohesion: 0.15
-Nodes (16): ExploreResult, features_of(), Bir tasarimin yerlestirmeden ONCE bilinen ozellikleri., FEATURE_NAMES ile AYNI sirada oznitelik vektoru. Tohum bilerek yok (bkz. modul…, Bir kesif kosumunu egitim orneklerine cevirir., samples_from_run(), Topology, FeatureTests (+8 more)
+Cohesion: 0.23
+Nodes (14): features_of(), Bir tasarimin yerlestirmeden ONCE bilinen ozellikleri., FEATURE_NAMES ile AYNI sirada oznitelik vektoru. Tohum bilerek yok (bkz. modul…, Bir kesif kosumunu egitim orneklerine cevirir., samples_from_run(), Topology, FeatureTests, Evre 3c: tasarim seviyesi veri toplama (varyant siralayici icin). Korunan… (+6 more)
 
-### Community 81 - "crystal_load_capacitor_f"
-Cohesion: 0.24
-Nodes (7): crystal_load_capacitor_f(), crystal_load_capacitor_range_f(), Kristalin CL'sini karsilamak icin gereken TEK kondansator degeri., Stray belirsizliginden (2-5 pF) dogan kabul edilebilir aralik. Stray BUYUDUKCE…, CrystalLoadTests, Microchip AN826: CL = C/2 + Cstray, stray 2-5 pF., Stray buyudukce gereken kondansator KUCULUR - aralik yonu bundan.
+### Community 81 - "verify_against_plan"
+Cohesion: 0.26
+Nodes (6): KiCad'in netlist'i plani birebir kuruyor mu? (dogrulanan ag, engeller). Ug ayri…, verify_against_plan(), _conn(), Etiket tutmamis: ayni ad iki ayri aga bolunmus., Planda olmayan bir pin aga girmis - sessiz kisa devre., ShieldTests
 
 ### Community 82 - "Sessiz hata sinifi: yazilmis ama baglanmamis kod"
 Cohesion: 0.16
@@ -594,49 +590,45 @@ Nodes (14): Buck-boost buck saniliyordu, Niyet semasi ve sablon kutuphanesi (int
 Cohesion: 0.22
 Nodes (5): KutuphaneTests, skipUnless, Tablodaki her kimlik GERCEK olmali - uydurma sembol adi yazilmaz., `uclar` uydurulmaz: baglanti tam bu numaralarla kurulur., Kutupluluk NOTU kullanicinin karti nasil baglayacagini belirler. KiCad diyot…
 
-### Community 84 - "optimize_and_apply"
-Cohesion: 0.20
-Nodes (6): optimize_and_apply(), Path, `improve` + `apply_placement` kisayolu. `(placement, once, sonra, sonuc)`…, BatchApplyTests, skipUnless, Netleri birlestiren yerlestirme: kalkan yakalamali, dosya el degmemeli.
+### Community 84 - "Yorum"
+Cohesion: 0.17
+Nodes (9): _aglari_coz(), _fiil_bul(), mevcut_aglar(), Schematic, Cumlenin anlasilan hali. Dosyaya DOKUNMAZ; once gosterilir., Cumlenin fiili. Bilinmeyen fiil sessizce "ekle" sayilmaz., Sematikte BUGUN duran ag adlari (etiketler + guc sembolleri). Netlist'ten degil…, Hedef ag adlarini sematikteki GERCEK yazimla esler. Neden gerekli: baglanti bir… (+1 more)
 
-### Community 85 - "arayuz.py"
-Cohesion: 0.16
-Nodes (13): ayar_yaz(), build_parser(), main(), ArgumentParser, MASAUSTU ARAYUZU (tkinter) - islerin pencereden yurutulmesi. pcbqa arayuz Alti…, Zamanlayiciyi iptal eder. Pencereyi YOK ETMEZ., Bu (ya da verilen) Python tkinter'i getiriyor mu?, tkinter'i olan bir yorumlayici ara. Bulamazsa None. KiCad'inki elenir - onda… (+5 more)
+### Community 86 - "test_canli_pcb.py"
+Cohesion: 0.06
+Nodes (12): LiveBoard, LiveTests, footprint(), LivePcbTests, Canli PCB okuma/yazma: komut dili, kilit, eski plan ve commit sonrasi dogrulama., Canli onizlemenin baska/eski bir karta uygulanmasini engelleyen sinirlar., FakeAngle, FakeBoard (+4 more)
 
-### Community 86 - "test_ipc_apply.py"
-Cohesion: 0.07
-Nodes (12): LiveBoard, LiveTests, Canli onizlemenin baska/eski bir karta uygulanmasini engelleyen sinirlar., FakeAngle, FakeBoard, FakeField, FakeFootprint, FakeText (+4 more)
+### Community 87 - "SchAddError"
+Cohesion: 0.27
+Nodes (7): allocate_units(), RuntimeError, (referans yuvasi, birim) ciftleri. Cok birimli sembollerde (74LS125 -> 4 kapi +…, SchAddError, FakeSymbol, 74LS125 -> 4 kapi + guc birimi; 6 istek iki referansa dagilir., UnitAllocationTests
 
-### Community 87 - "ray_gerilimi"
-Cohesion: 0.26
-Nodes (5): Net ADINDAN gerilim. Doner: (volt ya da None, nereden bilindigi). Ad bir…, ray_gerilimi(), +3V3" adli bir agi 3.3 V saymak tahmin degil, adi okumaktir., En onemli test: "VCC 5V'tur" varsayimi 3.3 V'luk kartta yanlis akim…, RayTests
-
-### Community 88 - "ConnectivityDiff"
-Cohesion: 0.16
-Nodes (10): compare(), ConnectivityDiff, Iki baglanti yapisini karsilastirir. Net adlari ve kodlari yok sayilir;…, Iki baglanti yapisi arasindaki fark., Reddeden kalkan NEDENINI soylemeli. Olculdu: guc sembolu reddi sirasinda mesaj…, conn(), Test icin elle baglanti yapisi kurar., Kalkanin dogru degismezi kullandigini dogrular. (+2 more)
-
-### Community 89 - "test_courtyard.py"
+### Community 88 - "RegressionGuardTests"
 Cohesion: 0.29
-Nodes (5): _courtyard(), CourtyardReadTests, Courtyard okuma ve cakisma geometrisi. Bu dosyadaki testlerin tamami Evre 3a'da…, Iki kosegen kose dort koseye acilmali - yoksa sekil dusuyordu., L bicimli courtyard dısbukey kabuga cevrilmemeli.
+Nodes (5): best_result(), Sozlesme ihlali olmayan ve karti KOTULESTIRMEYEN en iyi sonucu secer. Gerileme…, Result, RegressionGuardTests, Result
+
+### Community 89 - "EndToEndTests"
+Cohesion: 0.25
+Nodes (5): EndToEndTests, skipUnless, Dongunun varlik sebebi: kucuk kart. Kazanan en buyuk aday olmamali., Skorun neyi yargilamadigi SESSIZ kalmamali., Sinir yinelenebilir cizilmeli - iki dikdortgen karti belirsiz kilardi.
 
 ### Community 90 - "uygula"
-Cohesion: 0.08
-Nodes (21): Proje metninden kok sematik. Metin ARGUMANDIR, Tk degiskeni degil. tkinter is…, _aglari_coz(), kok_sematik(), KomutError, mevcut_aglar(), Path, RuntimeError, Schematic (+13 more)
+Cohesion: 0.15
+Nodes (10): Path, Eylemleri sirayla `sch_add.add_symbols`a verir. Kalkan, yedek, kilit kontrolu…, uygula(), AddResult, Ikinci eylem, birincisinin YAZILMIS halini okumali - yoksa iki plan da ayni…, Isin olcusu sematikteki etiket degil, KiCad'in cikardigi NETLIST'tir: yeni…, Baglama, mevcut aglara pin EKLER; onlardan pin ALMAZ., vcc" diye yazan kullanici "VCC" agina baglanmis olmaz; yazim sematige bakilarak… (+2 more)
 
 ### Community 91 - "Model"
-Cohesion: 0.11
-Nodes (14): Asama 5 - makine ogrenimi altyapisi. Katmanlar bilerek ayri tutuldu; ust katman…, build(), _ensure_registry(), load(), MeanModel, Model, Any, Path (+6 more)
+Cohesion: 0.13
+Nodes (7): MeanModel, Model, Any, Path, Taban cizgisi: her zaman egitim ortalamasini soyler.…, Tum modellerin ortak yuzeyi. Alt siniflar `kind`, `_params()`, `_load_params()`…, Modelin egitildigi sema ile cagiranin semasini karsilastirir.
 
 ### Community 92 - "test_eseri.py"
 Cohesion: 0.15
 Nodes (6): HataTests, KaynakDegerleriTests, KontrolBasinaSeriTests, IEC 60063 E-serisi ve IPC-6012 performans siniflari., KiCad PCB Calculator E-Series sekmesindeki belgelenmis ornekler., Her hesap kendi tolerans sinifini beyan etmeli.
 
 ### Community 93 - "read_board"
-Cohesion: 0.06
-Nodes (26): BoardParseError, Path, RuntimeError, Kart dosyasi okunamadi. Sessizce bos kart dondurmekten YEGDIR: bos kart butun…, Bir .kicad_pcb dosyasini okur., read_board(), CopperReadTests, Bakir okuma: yonlendirilmis iz ve via'lar. Akim tasima kurallari (iz genisligi,… (+18 more)
+Cohesion: 0.05
+Nodes (27): BoardParseError, Path, RuntimeError, Kart dosyasi okunamadi. Sessizce bos kart dondurmekten YEGDIR: bos kart butun…, Bir .kicad_pcb dosyasini okur., read_board(), CopperReadTests, Bakir okuma: yonlendirilmis iz ve via'lar. Akim tasima kurallari (iz genisligi,… (+19 more)
 
 ### Community 94 - "SymLibTests"
-Cohesion: 0.17
-Nodes (4): Dosya icine yazilan tanim `Kutuphane:Ad` adini tasir., Tablo eski surum adini tasiyorsa ayni turden degiskene duser., `extends` cozulurken birim dugumleri TUREVIN adini almali. KiCad birim…, SymLibTests
+Cohesion: 0.06
+Nodes (11): PricingTests, Istenen degismez: buyuk deger daha pahali. Olculdu: ilk iki surumde "gercekci…, Deger bilinmiyorsa fiyat UYDURULMAZ., Ayni girdi ayni katalog - iki kosuda fiyat degisirse guven biter., +10V, R1, C1 - hicbiri bagli degil., R1.1-R1.2 onerilirse direnc kisa devre olur. Bu gercekten olmustu: ilk surumde…, ThreePartTests, Dosya icine yazilan tanim `Kutuphane:Ad` adini tasir. (+3 more)
 
 ### Community 95 - "InProcessBridgeTests"
 Cohesion: 0.24
@@ -658,9 +650,9 @@ Nodes (10): KiCad'in Python'u PYTHONPATH'i yok sayar (olculmus, 2026-08-30), pcb
 Cohesion: 0.29
 Nodes (9): r"""Onyukleyici - KiCad'in Python'u `PYTHONPATH`'i YOK SAYAR, bu yuzden var.…, diagnose(), _dispatch(), _line(), main(), BAGIMSIZ UYGULAMA - tek giris noktasi. pcbqa tani ortami denetle pcbqa analiz…, Ortami denetler. Doner: (satirlar, engel_sayisi)., run_diagnose() (+1 more)
 
-### Community 100 - "ValueRange"
-Cohesion: 0.31
-Nodes (5): crystal_load_range(), Bir bilesen degerinin kabul araligi ve nereden geldigi., `cl_pf` beyanindan yuk kondansatoru araligi., ValueRange, ValueRangeTests
+### Community 100 - "RedTests"
+Cohesion: 0.18
+Nodes (4): Reddedilmesi gerekenler. Bir cozumleyicinin degeri buradadir., Anlamadim" ile "henuz yapmiyorum" ayri seylerdir., Kaynagi olmayan varsayilan (or. "kondansator = 100nF") yazilmaz., RedTests
 
 ### Community 101 - "Netlist degismezligi kalkani (sch_verify)"
 Cohesion: 0.20
@@ -678,37 +670,37 @@ Nodes (11): base.Compound: birlesik hamle, Finding.rule_type ve Finding.pins, Ev
 Cohesion: 0.13
 Nodes (6): Pad, Bir footprint pad'i. x/y kart uzerindeki MUTLAK konum (mm)., Pad bakirinin alani (mm2). Sekle gore tam hesaplanir., Pad'i cevreleyen dairenin yaricapi (kaba olcum icin)., Pad bakiri: (noktalar, sisme_yaricapi). Sonuc, noktalarin `r` kadar sisirilmis…, PadAreaTests
 
-### Community 105 - "find_buck_converters"
-Cohesion: 0.10
-Nodes (20): BuckConverter, _components_on(), find_buck_converters(), _first_net(), normalize_pin_name(), _pad_xy(), _pins_by_ref(), Alt-devre tanima: karttaki bilinen devre bloklarini topolojiden bulur. Neden… (+12 more)
+### Community 105 - "test_subcircuit.py"
+Cohesion: 0.04
+Nodes (49): Board, Bilesenlerin kapladigi alan, kart yuzune gore ayri ayri. Cift tarafli kartlarda…, Bir netin toplam bakir alani (mm2). UYARI - bu bir FAZLA TAHMINDIR: ustuste…, BuckConverter, _components_on(), find_buck_converters(), _first_net(), hot_loop_area_mm2() (+41 more)
 
 ### Community 106 - "LauncherTests"
 Cohesion: 0.18
 Nodes (6): CompletedProcess, LauncherTests, Baslatici son kullanicinin gordugu sey - sanal ortam olmadan kosar., Regresyon: kullanici paket klasorunde DEGILDIR. Baslatici once `python -m…, KiCad'in Python'u PYTHONPATH'i YOK SAYIYOR - buna guvenilmemeli. Olcum (KiCad…, `baslat.py` paketin YANINDA olmali - sys.path[0]'i o konum veriyor.
 
-### Community 107 - "fb_divider_max_bottom_ohms"
-Cohesion: 0.28
-Nodes (6): fb_divider_max_bottom_ohms(), fb_divider_range(), Alt bolucu direncinin ust siniri. I_bolucu = Vfb / R2 >= ratio * I_bias -> R2…, `vfb` ve `bias_current_na` beyanlarindan alt direnc ust siniri., FeedbackDividerTests, Richtek AN033: bolucu akimi >= 100 x FB bias akimi.
+### Community 107 - ".evaluate"
+Cohesion: 0.20
+Nodes (7): Placer, Placement, Bir yerlestirmeyi hakemin kendi olcutuyle puanlar. Vekil maliyetle ugrasmak…, Kartin su anki yerlesimi - iyilestirmeye buradan baslamak gercek kartlarda…, Bir yerlestirme stratejisi., Yeni konumlari dondurur. Kurallar: * `ctx.locked` icindeki referanslari SONUCA…, Protocol
 
 ### Community 109 - "Agirliklar kanit gucune gore bantlanir"
 Cohesion: 0.15
 Nodes (16): Agirliklar kanit gucune gore bantlanir, Kaynaklar arasi celiskiler ve alinan kararlar, IPC-2221B / IPC-7351B, Olcekleme yalnizca kaynak bir formulse, Cogu tavsiyenin sayisi yok, TI AN-2155 (SNVA638A), TI SLVA959B, esd-tvs-konnektore-yakin (proximity, 5 mm, weight 14) (+8 more)
 
 ### Community 110 - "GBTModel"
-Cohesion: 0.13
-Nodes (11): _bin_edges(), _Builder, GBTModel, _predict_tree(), Any, Model, Gradyan artirmali regresyon agaclari (GBT) - saf Python, histogram tabanli.…, Gradyan artirmali regresyon agaclari (kare hata). (+3 more)
+Cohesion: 0.17
+Nodes (7): GBTModel, Any, Model, Gradyan artirmali regresyon agaclari (kare hata)., Hangi oznitelik kac kez bolme icin kullanildi (kaba onem olcusu)., ModelTests, Sessizce yanlis sayilari okumaktansa hata vermeli.
 
 ### Community 111 - "graphify-bilgilendir.py"
 Cohesion: 0.54
 Nodes (7): graphify_tazele(), hafiza_anahtarlari(), kabuk(), main(), GRAPHIFY'I BILGILENDIR - her karar, her hata duzeltmesi, her plan sonrasi.…, yaz_hafizalar(), yaz_kayitlar()
 
-### Community 112 - "collect_design.py"
-Cohesion: 0.17
-Nodes (15): build_parser(), collect(), collect_intent(), CollectError, _design_of(), intent_files(), main(), ArgumentParser (+7 more)
+### Community 112 - "intent_files"
+Cohesion: 0.33
+Nodes (5): CollectError, intent_files(), RuntimeError, IntentLibraryTests, Kutuphanedeki her niyet plana acilabilmeli - veri toplama onlara dayaniyor.
 
-### Community 113 - "Zone"
-Cohesion: 0.22
-Nodes (5): Bakir dokum alani (poligon). Iki poligon vardir ve karistirilmamalidir: *…, Bakir alani (mm2). Doldurulmus poligonlarda delikler, poligonun kendisine giren…, Tek bir katmandaki bakir alani., Zone, Doldurulmamis kartta sinirdan olcmek FAZLA tahmindir - `filled` bunu soyler.
+### Community 113 - "TermTableTests"
+Cohesion: 0.20
+Nodes (5): Ad ezberden degil olcumden geldi; `ornek` o olcumun izidir., Arama kucuk harfle yapiliyor; buyuk harfli anahtar hic tutmaz., Paket ve uretici adlari CEVRILMEZ; TERMS'e girerlerse cevrilirler., Kod ve veri ASCII (proje kurali); 'kondansator', 'kondansatör' degil., TermTableTests
 
 ### Community 114 - "SchSymbol"
 Cohesion: 0.09
@@ -722,21 +714,21 @@ Nodes (15): Skorun siniri: skor bir ihlal sayacidir, kalite olcegi degil, Vekil 
 Cohesion: 0.38
 Nodes (7): USB 2.0 diferansiyel empedans 90 ohm +-%15, pcbqa komut seti (tani, kurulum, analiz, uret, kesfet, yerlestir), swd-header sablonu, usb-micro-b sablonu, f103-asgari niyeti, f103-usb-kristal niyeti, f103-usb-swd niyeti
 
-### Community 117 - "DiscreteBuckTests"
-Cohesion: 0.23
-Nodes (5): DiscreteBuckTests, AYRIK (harici FET'li) tasarim: olcmek yerine SUSMAK. Entegre regulatorde giris…, Ayni karta SW dugumunde bir FET ekler ve tasarimi yeniden kurar., Susmak YETMEZ - gorunmez bir bosluk yine sessiz hatadir., `info` cezasi sifirdir; kapsam disiligi kartin skorunu dusurmemeli.
+### Community 117 - "ExploreResult"
+Cohesion: 0.22
+Nodes (3): ExploreResult, GenerateResult, Uretimin sonucu - her adim ayri ayri gorunur.
 
 ### Community 118 - "IpcApplyError"
-Cohesion: 0.29
-Nodes (17): apply(), check_target(), connect(), decode(), digest(), dispatch(), encode(), items() (+9 more)
+Cohesion: 0.18
+Nodes (25): configuration(), environment(), main(), open_copy(), Canli sematik icin ayri, surumu eslesen KiCad/Python ortami., Deneysel dosya bicimini kullanicinin asil projesinden ayirir., request(), apply() (+17 more)
 
 ### Community 119 - "default_rules.yaml - pcbqa varsayilan kurallari"
 Cohesion: 0.14
 Nodes (15): Beads - AI-native issue tracking, Skorlama yol haritasi - evre durumu (2026-08-28), Sessiz hata sinifi - uretmek olcen katmani denetler, uretim-courtyard-cakisma warning/6'ya cekildi, Korpus kalibrasyonu (19 KiCad demo karti, 2026-08-28), Pad katmanlari okunmuyordu (kalibrasyonun yakaladigi kusur), courtyard-cakisma (courtyard_overlap, warning), default_rules.yaml - pcbqa varsayilan kurallari (+7 more)
 
 ### Community 120 - "ZoneReadTests"
-Cohesion: 0.15
-Nodes (5): Bir zone'un TEK KATMANDAKI doldurulmus bakiri., ZoneFill, KiCad'de nete BAGLI OLMAYAN dokum olabilir; ad bos string gelir., Sinir poligonu kullanicinin cizdigi; GERCEK bakir doldurulmus olandir. Ikisi…, ZoneReadTests
+Cohesion: 0.09
+Nodes (10): Bir zone'un TEK KATMANDAKI doldurulmus bakiri., Bakir dokum alani (poligon). Iki poligon vardir ve karistirilmamalidir: *…, Bakir alani (mm2). Doldurulmus poligonlarda delikler, poligonun kendisine giren…, Tek bir katmandaki bakir alani., Zone, ZoneFill, KiCad'de nete BAGLI OLMAYAN dokum olabilir; ad bos string gelir., Sinir poligonu kullanicinin cizdigi; GERCEK bakir doldurulmus olandir. Ikisi… (+2 more)
 
 ### Community 121 - "bundle.py"
 Cohesion: 0.26
@@ -755,12 +747,12 @@ Cohesion: 0.27
 Nodes (5): deger_coz(), 100nf" -> "100nF", "4u7" -> "4u7", "10" -> None (o bir SAYI). Onek ya da birim…, DegerTests, 10 kapasitor" 10 ADET demektir, 10 farad degil., 10M" mega, "10m" milidir - sadelestirilmis kelimeden okunsaydi ikisi ayni…
 
 ### Community 125 - "test_lexicon.py"
-Cohesion: 0.05
-Nodes (19): BuiltLexiconTests, GlossTests, LookupTests, NormalizeTests, skipUnless, Iki dilli bilesen sozlugu. Bu sozluk ilerideki makine ogreniminin GIRDISI…, Olculdu: alt dizi aramasi 'C' icin 41 onek donduruyordu - gurultu., Uretilmis sozluk - KiCad kurulu makinede. (+11 more)
+Cohesion: 0.14
+Nodes (6): LookupTests, NormalizeTests, Iki dilli bilesen sozlugu. Bu sozluk ilerideki makine ogreniminin GIRDISI…, Olculdu: alt dizi aramasi 'C' icin 41 onek donduruyordu - gurultu., `U6`, `RL2`, `MES?` ayri onek DEGIL - kutuphane yazim tutarsizligi., Kirpma sonucu tanimli bir onege dusmuyorsa dokunulmaz. Yoksa gercekten yeni bir…
 
-### Community 126 - "features.py"
-Cohesion: 0.20
-Nodes (8): _bbox_of(), _CompStatic, _kind_index(), _log1p(), DONMUS OZNITELIK SEMASI - bir aday hamleyi sayilara cevirir. Bu dosya…, Bilesenin hamleden bagimsiz, bir kez hesaplanan bilgileri., Yaricap icindeki bilesenler - izgara sorgusu., (cakisan komsu sayisi, en kucuk aciklik, yaricaptaki komsu sayisi). Cakisma…
+### Community 126 - "BuiltLexiconTests"
+Cohesion: 0.22
+Nodes (4): BuiltLexiconTests, skipUnless, Uretilmis sozluk - KiCad kurulu makinede., Kullanicinin ornegi: C = kapasitor/kondansator, iki dilde.
 
 ### Community 127 - "graphify-etiketle.py"
 Cohesion: 0.50
@@ -786,29 +778,25 @@ Nodes (7): keep_apart - kaynaklarin 'uzaklastir' dedigi bosluk, ROHM 66AN015E, T
 Cohesion: 0.29
 Nodes (7): Canli duzenleme: sematikte yok, PCB'de var, Canli mod ve API'siz mod, ipc_apply: calisan KiCad'e yazma hatti, Bilinen IPC bug'lari, pcbqa kurulum: izinle alinan API, Duzeltilen yanilgi: sematik komutlari belge turunden bagimsiz, Canli calisirken tek KiCad ornegi
 
-### Community 133 - ".test_no_false_clearance_error_on_interf_u"
-Cohesion: 0.18
-Nodes (8): PadLayerTests, PinFunctionTests, skipUnless, Asil kazanc: `function:` seciciSi sematik olmadan da eslesmeli. Aranacak adi…, Pad'in bakir katmanlari - kalibrasyonun yakaladigi hata., interf_u'daki BUS1: ayni x/y, farkli net, farkli YUZ. BUS1.29 (VCC) ve BUS1.60…, Gercek, calisan bir kartta 0.000 mm aciklik = kisa devre demek olurdu., Pin ADI pad'den okunmali - `function:` seciciSinin tamami buna bagli. Uzun sure…
+### Community 133 - "GlossTests"
+Cohesion: 0.25
+Nodes (4): GlossTests, Hicbir terim tutmazsa BOS doner - yarim ceviriyi Turkce diye sunmayiz., Kelime kelime cevirmek bunlari bozuyordu: 'Through hole' -> 'Through delik'., Parca numarasi ve paket adi cevrilmemeli.
 
-### Community 134 - "explore"
-Cohesion: 0.09
-Nodes (19): build_parser(), candidate_sizes(), explore(), explore_from_intent(), main(), plan_variants(), ArgumentParser, Path (+11 more)
+### Community 134 - "explore.py"
+Cohesion: 0.06
+Nodes (48): build_parser(), candidate_sizes(), explore(), explore_from_intent(), main(), plan_variants(), ArgumentParser, Path (+40 more)
 
-### Community 136 - "read_schematic"
-Cohesion: 0.04
-Nodes (24): Bir .kicad_sch dosyasini (ve tum alt sayfalarini) okur. Klasor verilirse…, read_schematic(), WriteTests, AssignmentTests, Sentetik MPN ve fiyat alanlari. Bu modul sematige TEDARIK VERISI yaziyor ve o…, Ornekte C1'in degeri 'C' - okunamaz, fiyat almamali., Ikinci kez atamak alani COGALTMAMALI., Uydurma veri UYDURMA GORUNMELI. (+16 more)
+### Community 136 - "ReaderTests"
+Cohesion: 0.15
+Nodes (3): R1 90 derece donuk; pinleri govdenin iki yaninda, ayni Y'de olmali., Donusum dogruysa her pin bir capaya oturur. Capa yalnizca tel ucu degildir: bir…, ReaderTests
 
-### Community 137 - "ValueClassificationTests"
-Cohesion: 0.22
-Nodes (5): skipUnless, Cozulemeyen deger HER IKI kovaya sayilir - yanlilik yon degistirmesin.…, Kaynagin GERCEKTEN konustugu olcek: 29 guc pinli bir ray., RealBoardTests, ValueClassificationTests
+### Community 137 - "next_references"
+Cohesion: 0.38
+Nodes (4): next_references(), Kullanilmayan `prefix1..N` referanslari. Numaralandirma TUM sematik uzerinden…, R1 ve R3 kullanimdaysa sirada R2 vardir - KiCad de boyle yapar., ReferenceNumberingTests
 
 ### Community 138 - "ArayuzLauncherTests"
 Cohesion: 0.21
 Nodes (7): ArayuzLauncherTests, skipUnless, Arayuzun kendi baslaticisi (kisayolun hedefi). Ayri bir dosya olmasinin sebebi…, `--nerede` tanilamasini calistirir; etiket -> deger., Varsayilmaz, sinanir: secilen yorumlayici tkinter'i ICE AKTARABILMELI., Ilk surumdeki gercek hata buydu. `pythonw` PATH'ten aliniyordu ve bu makinede…, KiCad'in Python'u tkinter getirmiyor; secilirse arayuz acilmaz. Denetim YOL…
-
-### Community 139 - "RealBoardDetectionTests"
-Cohesion: 0.23
-Nodes (6): jetson / U69: VIN pini "V_{IN}" yaziyor. Normalizasyon olmadan vin_net None…, One-Air-Max / U5 (BQ25672): induktor IKI anahtar arasinda. Orada "diger uc"…, Tanınan her devrede SW neti ve o nette bir induktor olmali., CM5_MINIMA_3 / U702: rollerin tamami cikmalı., One-Air-Max / U2: FB neti "Net-(U2-FB{slash}VSET)". Hicbir net ADI deseni bunu…, RealBoardDetectionTests
 
 ### Community 140 - "runtime_twin"
 Cohesion: 0.27
@@ -818,21 +806,17 @@ Nodes (6): Bir YAML dosyasinin calisma zamani JSON esi., runtime_twin(), yaml_av
 Cohesion: 0.33
 Nodes (6): Ayrik sicak dongu: altigen akim yolu, Ayrik regulator: yanlis olcmektense olcmemek, Bakir kurallari yonlendirilmemis kartta sessizce atlanir, Pad bakir sekli tam modelleme (copper_shape), geom.segment_distance, Zone okuma - tahmin fazla iyimserdi
 
-### Community 142 - "atomic_write_text"
-Cohesion: 0.32
-Nodes (3): atomic_write_text(), Metni atomik olarak yazar. Yazilan bayt sayisini dondurur. Gecici dosya HEDEFLE…, AtomicWriteTests
+### Community 142 - "SilenceTests"
+Cohesion: 0.29
+Nodes (4): Kanit yoksa oneri de yok - ve bu SESSIZCE olmamali., Onerilmeyen pin, kullaniciya ADIYLA soylenmeli., Telli halde ayni pinler artik 'bos' sayilmamali., SilenceTests
 
-### Community 143 - "RunningKicadTests"
-Cohesion: 0.25
-Nodes (3): KiCad acikken yazmak degisikligi kaybettirir - reddedilmeli., Bilerek devam etmek mumkun olmali ama VARSAYILAN olmamali., RunningKicadTests
+### Community 144 - "BuckLayoutRuleTests"
+Cohesion: 0.11
+Nodes (13): BuckLayoutRuleTests, skipUnless, jetson / U69: VIN pini "V_{IN}" yaziyor. Normalizasyon olmadan vin_net None…, One-Air-Max / U5 (BQ25672): induktor IKI anahtar arasinda. Orada "diger uc"…, Tanınan her devrede SW neti ve o nette bir induktor olmali., `buck_layout` - ROHM kontrol listesi, tespit edilen rollere karsi., LDO kartinda hicbir sey tanınmaz - bulgu da olmamali., Bulgu "bir yerde bir direnc" degil, GERCEK parcayi soylemeli. (+5 more)
 
-### Community 144 - "find_demo"
-Cohesion: 0.19
-Nodes (10): BuckLayoutRuleTests, demos_available(), find_demo(), Path, skipUnless, `buck_layout` - ROHM kontrol listesi, tespit edilen rollere karsi., LDO kartinda hicbir sey tanınmaz - bulgu da olmamali., Bulgu "bir yerde bir direnc" degil, GERCEK parcayi soylemeli. (+2 more)
-
-### Community 146 - "rules_with"
-Cohesion: 0.22
-Nodes (7): gap(), KeepApartPlacementTests, Path, Catisan bir kisit pesinde kartin geri kalani bozulmamali. Kristali USB…, bench kurallari + ek bir kural iceren gecici kural dosyasi., Ucuz bir kisit skora girince auto onu saglar. Bu, keep_apart'in ucu uca…, rules_with()
+### Community 147 - "Variant"
+Cohesion: 0.33
+Nodes (3): Sozluksel siralama anahtari; BUYUK olan daha iyidir.…, Tek bir deneme: hangi kosullarla, ne cikti., Variant
 
 ### Community 148 - "post-commit"
 Cohesion: 0.40
@@ -850,9 +834,9 @@ Nodes (5): Creepage - IEC 60664-1 / IEC 62368-1, Delik-bakir ve via-via mesafele
 Cohesion: 0.40
 Nodes (5): component_value - ilk devre dogrulugu kurali, NXP UM10204 (I2C spesifikasyonu), Richtek AN044, thermal kurali - esik yerine hesap, regulator-jonksiyon-sicakligi (thermal, KAPALI ornek)
 
-### Community 152 - "_satir"
-Cohesion: 0.29
-Nodes (3): AkimTests, Test icin elle bir satir; gerilimler ag ADINDAN turetilir., _satir()
+### Community 152 - "label_of"
+Cohesion: 0.53
+Nodes (3): label_of(), Iki degerlendirme arasindaki farki tek sayiya indirir (bkz. modul basi).…, LabelTests
 
 ### Community 153 - "pcbqa/__init__.py"
 Cohesion: 0.10
@@ -862,25 +846,25 @@ Nodes (31): pcbqa - KiCad tasarimlari icin salt-okunur kalite/uygunluk analizi (
 Cohesion: 0.50
 Nodes (3): post-checkout script, GRAPHIFY_REBUILD_LOG, PYTHONHASHSEED
 
-### Community 156 - "Variant"
-Cohesion: 0.16
-Nodes (8): Sozluksel siralama anahtari; BUYUK olan daha iyidir.…, Tek bir deneme: hangi kosullarla, ne cikti., Variant, _clamp(), label_of(), Parti medyanina gore kalite. Buyuk olan daha iyi. Skor farki baskindir…, LabelTests, Kaliteden odun verilmez: dusuk skorlu ama kisa telli kart yenilmeli.
+### Community 156 - "label_of"
+Cohesion: 0.31
+Nodes (5): _clamp(), label_of(), Parti medyanina gore kalite. Buyuk olan daha iyi. Skor farki baskindir…, LabelTests, Kaliteden odun verilmez: dusuk skorlu ama kisa telli kart yenilmeli.
 
 ### Community 158 - "decoupling_count kurali - mesafe degil adet"
 Cohesion: 0.67
 Nodes (3): decoupling_count kurali - mesafe degil adet, Cozulemeyen deger her iki kovaya sayilir, TI SPRABV2
 
-### Community 174 - "_variant"
-Cohesion: 0.39
-Nodes (3): Kaliteden odun verilmez: buyuk ama temiz kart, kucuk ama kusurluyu yener., SelectionTests, _variant()
+### Community 174 - "test_explore.py"
+Cohesion: 0.31
+Nodes (4): Evre 3b: uretim-degerlendirme dongusu (N varyant, en iyisini sec). Korunan iki…, Kaliteden odun verilmez: buyuk ama temiz kart, kucuk ama kusurluyu yener., SelectionTests, _variant()
 
 ### Community 175 - "place_point"
 Cohesion: 0.31
 Nodes (5): place_point(), Kutuphane noktasini sayfa ofsetine cevirir. Modul basligindaki deneysel olarak…, Kutuphane -> sayfa donusumu (deneysel olarak secildi, bkz. schematic.py)., Ters sirada uygulanirsa 90 derecede farkli sonuc cikar., TransformTests
 
-### Community 176 - "HotLoopTests"
-Cohesion: 0.29
-Nodes (5): HotLoopTests, Giris sicak dongusu - projedeki EN GUCLU sayisal kanit. TI AN-2155 bunu…, Olculdu: 0.73 / 0.85 / 1.13 mm2 - TI'in "iyi" degeri 6 mm2. Kalibrasyon ilkesi:…, Buck-boost'ta CIN tanınmiyor - iddia etmek yerine None donmeli., Esik gercek degerin altina cekilince kural ateslemeli.
+### Community 176 - "FakeSymbol"
+Cohesion: 0.40
+Nodes (3): FakeSymbol, Kutuphane gerektirmeden referans on eki tasiyan en kucuk sembol., RefTests
 
 ### Community 177 - "DagarcikTests"
 Cohesion: 0.15
@@ -894,25 +878,21 @@ Nodes (3): E48/E96/E192 formulden turetiliyor - turetmenin dogrulanmasi., 2 hane
 Cohesion: 0.29
 Nodes (7): placer-force agent tanimi, Cok-agentli yerlestirici sinavi kurallari, Kuvvet tabanli yerlestirme yontemi, Decoupling max mesafe < 6.35 mm, Decoupling icin lambda/40 kurali, Genel IC bypass -> besleme pini <= 5 mm, 'Yakin olmali' tavsiyelerinin sayisallastirilmasi (27 madde)
 
-### Community 180 - "._geometry_findings"
-Cohesion: 0.25
-Nodes (6): _key(), Kural motorunun gormedigi, tasimaya ozgu riskler., Bir sembol ORNEGININ tasimaya hazir on-hesaplanmis hali. Anahtar UUID'dir,…, _same(), _SymbolInfo, _WireInfo
-
 ### Community 181 - "_Convergence"
 Cohesion: 0.29
 Nodes (3): _Convergence, Bir asamanin ne zaman devredecegini soyler. ## Neden basit bir "iyilesme yok"…, Her asama kendi sayacini tutar.
 
 ### Community 182 - "Connection"
-Cohesion: 0.33
-Nodes (3): Connection, Tek bir baglama istegi: hangi pin, neye., Hedef bir pin mi (`R1.2`), yoksa ag adi mi (`VCC`)?
+Cohesion: 0.20
+Nodes (7): _expected_joins(), Kalkana "bu pin SU pinle ayni aga girmeli" listesi. Ag adiyla baglanirken…, Connection, pins_on_net(), Tek bir baglama istegi: hangi pin, neye., Hedef bir pin mi (`R1.2`), yoksa ag adi mi (`VCC`)?, Bir ag adina bugun bagli olan pinler. Ad karsilastirmasi hosgorulu: KiCad kok…
+
+### Community 184 - "test_ml.py"
+Cohesion: 0.18
+Nodes (6): ModelRanker, Aday BIRLESIK hamleleri modelin tahminine gore buyukten kucuge dizer. `top_k`…, MetricTests, RankerTests, Asama 5 garantileri: oznitelik dogrulugu, model cekirdegi, guvenli baglanti. En…, Taban cizgisi 0.5 vermeli; vermiyorsa metrik sisiyordur.
 
 ### Community 185 - "BoardWriteTests"
 Cohesion: 0.43
 Nodes (3): BoardWriteTests, `harness.write_board` bir HARNESS islevi ama hatasi burada bulundu. Uretilen 18…, Metinler VE pad'ler donmeli - KiCad kendi dondurdugunde oyle yazar. Pad acisi…
-
-### Community 190 - "test_circuit.py"
-Cohesion: 0.21
-Nodes (7): decoupling_counts(), (gereken 0.1 uF sayisi, gereken bulk sayisi) - TI SPRABV2 6. TI: her 2 guc topu…, DecouplingCountTests, Devre dogrulugu hesaplari (`pcbqa/circuit.py`). Kural motoru simdiye kadar…, TI SPRABV2 6: her 2 guc topu icin 0.1 uF, her ~10 icin bulk., Oranlar TI SPRABV2'nin kendi sayilari olmali., SourceRatioTests
 
 ### Community 193 - "GercekKartTests"
 Cohesion: 0.22
@@ -923,20 +903,20 @@ Cohesion: 0.29
 Nodes (3): Bunlar Tk penceresi ACMADAN kosar., KiCad'in Python'unda tkinter yok; ayirt edebilmeliyiz., YorumlayiciTests
 
 ### Community 197 - "Dataset"
-Cohesion: 0.11
-Nodes (17): Dataset, Path, Veri kumesi: JSONL depolama + KART BAZLI bolme. Alan bagimsizdir - burada ne…, Gruplari (kartlari) butun halinde egitim/test olarak ayirir., Gruplu k-kat capraz dogrulama. Az grup varsa kat sayisi kisilir., JSONL: ilk satir baslik, sonraki her satir bir ornek., Ornek kumesi + hangi semayla uretildigi., cross_validate() (+9 more)
+Cohesion: 0.09
+Nodes (14): Dataset, Any, Path, Gruplari (kartlari) butun halinde egitim/test olarak ayirir., Gruplu k-kat capraz dogrulama. Az grup varsa kat sayisi kisilir., Ornekleri aday listesine gore gruplar (siralama metrikleri icin)., JSONL: ilk satir baslik, sonraki her satir bir ornek., Tek bir egitim ornegi. (+6 more)
 
 ### Community 198 - "noise_floor"
 Cohesion: 0.53
 Nodes (3): noise_floor(), Ayni oznitelik vektorunun etiket yayilimi: modelin ASAMAYACAGI taban. Tohum…, NoiseFloorTests
 
-### Community 199 - "ModelRanker"
-Cohesion: 0.28
-Nodes (5): ModelRanker, Compound, Placement, Aday BIRLESIK hamleleri modelin tahminine gore buyukten kucuge dizer. `top_k`…, RankerTests
+### Community 199 - "Evaluation"
+Cohesion: 0.12
+Nodes (13): Evaluation, Hakemin bir yerlestirme icin verdigi gercek olcum. Yerlestiriciler vekil…, Siralamada kullanilan anahtar; buyuk olan daha iyidir., Sozluksel siralamayi TEK SAYIYA indirir: pozitif = bu daha iyi. `key` sozluksel…, Compound, Placement, Metropolis, TAVLAMA BENZERI KABUL - yerel en iyiden kacmak icin. `polish` bugun yalnizca… (+5 more)
 
-### Community 209 - "parse_with_stats"
-Cohesion: 0.10
-Nodes (24): Placement, Yerlestirmeyi kaynak dosyaya uygulayip yeni bir .kicad_pcb yazar. KiCad'de…, write_board(), backup_file(), lock_files(), Path, Sematige guvenli yazma (Asama 4c). KiCad 10'da IPC sematikte calismaz, yani PCB…, Ayristirilmis s-expression agacini bir .kicad_sch dosyasina yazar. Varsayilan… (+16 more)
+### Community 209 - "write_tree"
+Cohesion: 0.11
+Nodes (16): atomic_write_text(), backup_file(), lock_files(), Path, RuntimeError, Sematige guvenli yazma (Asama 4c). KiCad 10'da IPC sematikte calismaz, yani PCB…, Ayristirilmis s-expression agacini bir .kicad_sch dosyasina yazar. Varsayilan…, Yazma reddedildi veya basarisiz oldu. (+8 more)
 
 ## Ambiguous Edges - Review These
 - `Vekil maliyet uydurma - gercek olcumu optimize et` → `Benzetimli tavlama yontemi (anneal)`  [AMBIGUOUS]
@@ -946,8 +926,8 @@ Nodes (24): Placement, Yerlestirmeyi kaynak dosyaya uygulayip yeni bir .kicad_pc
 
 ## Knowledge Gaps
 - **60 isolated node(s):** `AllCadOtomation`, `Calisma anlasmasi graphify entegre`, `Canli pcb arayuzu ve dogrulama`, `Canli sematik nightly dogrulandi`, `Graphify kurulumu ve hafiza akisi` (+55 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1533 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **34 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1550 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **39 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -956,12 +936,12 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `f103-usb-kristal niyeti` and `Kristal -> MCU pini mesafesi: sayisal deger BULUNAMADI`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `load_design()` connect `load_design` to `rules.py`, `.test_no_false_clearance_error_on_interf_u`, `.routed`, `ValueClassificationTests`, `Repertoire`, `RealBoardDetectionTests`, `find_demo`, `test_zones.py`, `__main__.py`, `test_decoupling_count.py`, `refine.py`, `run`, `swig_apply.py`, `ComponentValueRuleTests`, `HotLoopTests`, `CopperAreaRuleTests`, `penalty_of`, `test_circuit.py`, `explore.py`, `generate.py`, `canli.py`, `bench_context`, `test_collect_design.py`, `read_board`, `find_buck_converters`, `DiscreteBuckTests`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
-- **Why does `PlacementContext` connect `PlacementContext` to `explore.py`, `refine.py`, `generate.py`, `Repertoire`, `swig_apply.py`, `anneal.py`, `bench_context`, `_Model`, `load_design`, `_Engine`?**
-  _High betweenness centrality (0.083) - this node is a cross-community bridge._
-- **Why does `load_rules()` connect `rules.py` to `explore.py`, `.test_no_false_clearance_error_on_interf_u`, `explore`, `refine.py`, `generate.py`, `canli.py`, `swig_apply.py`, `bench_context`, `IncludeTests`, `Repertoire`, `rules_with`, `__main__.py`, `penalty_of`, `load_config`, `load_design`?**
-  _High betweenness centrality (0.039) - this node is a cross-community bridge._
+- **Why does `PlacementContext` connect `PlacementContext` to `refine.py`, `explore.py`, `Evaluation`, `generate.py`, `Repertoire`, `.evaluate`, `anneal.py`, `sch_place.py`, `ipc_apply.py`, `_Model`, `swig_apply.py`, `bench_context`, `codex.py`, `polish`, `test_repertoire.py`, `test_ml.py`, `load_design`, `cluster.py`?**
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
+- **Why does `load_rules()` connect `load_rules` to `rules.py`, `.probe`, `explore.py`, `Evaluation`, `generate.py`, `arayuz.py`, `swig_apply.py`, `bench_context`, `test_subcircuit.py`, `ipc_apply.py`, `penalty_of`, `polish`, `test_repertoire.py`, `__main__.py`, `test_ml.py`, `load_config`, `load_design`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
+- **Why does `load_design()` connect `load_design` to `rules.py`, `explore.py`, `.routed`, `load_rules`, `ipc_apply.py`, `BuckLayoutRuleTests`, `test_decoupling_count.py`, `run`, `swig_apply.py`, `ComponentValueRuleTests`, `penalty_of`, `CopperAreaRuleTests`, `polish`, `test_repertoire.py`, `test_ml.py`, `.probe`, `test_circuit.py`, `Evaluation`, `generate.py`, `arayuz.py`, `bench_context`, `test_collect_design.py`, `read_board`, `test_subcircuit.py`?**
+  _High betweenness centrality (0.058) - this node is a cross-community bridge._
 - **Are the 45 inferred relationships involving `PlacementContext` (e.g. with `SimulatedAnnealing` and `Auto`) actually correct?**
   _`PlacementContext` has 45 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 42 inferred relationships involving `Schematic` (e.g. with `junctions_for()` and `_net_check()`) actually correct?**

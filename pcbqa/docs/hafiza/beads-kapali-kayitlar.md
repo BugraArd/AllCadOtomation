@@ -177,6 +177,13 @@ ayakta oldugunu dogrula.
 
 IPC API sunucusu KiCad'de VARSAYILAN KAPALI (kicad_common.json api.enable_server=false) - dagitimda her kullanicidan Tercihler'i acmasini istemek kabul edilemez. Cozum: swig_apply.py (pcbnew SWIG, surec-ici, kurulum adimi yok) + confload.py/bundle.py (pyyaml artik istege bagli; YAML kaynak, JSON calisma zamani kopyasi). Sozlesme ipc.py ile ayni. 14 test, 5'i KiCad'in yorumlayicisinda alt surec olarak kosuyor.
 
+## Kicad-7d2 - Canli PCB okuma ve komutla yazma (arayuz)
+
+- oncelik: P1  |  durum: closed  |  tur: feature
+- kapanis: 2026-09-25T18:31:24Z
+
+2026-09-25: Kullanici uygulama icinde PCB okuma ve yazma istedi. KARAR: yeni pcbqa/canli_pcb.py + arayuz Canli sekmesinde 'Canli PCB okuma ve yazma' cercevesi + 'pcbqa canli-pcb' alt komutu. OKUMA: IPC ile kaydedilmemis hal; ref/deger/X/Y/aci/yuz/kilit/footprint tablosu + iz/via/dokum/ag sayilari. YAZMA: sinirli komut dili (';' ile coklu): 'R1 konumunu 50 30 yap', 'C2 5 -2.5 kaydir', 'U1 90 dondur', 'U1 acisini 180 yap', 'J1 kilitle', 'J1 kilidini ac', 'R1 degerini 10k yap'. Anlasilmayan tek parca butun komutu reddeder. NEDEN SINIRLI: aglar/padler hic yazilmaz (netlist degismezligi); yalniz konum/aci/kilit/deger. Kilitli parca acik 'kilidini ac' olmadan tasinmaz. Deger yazmasi F8 uyarisi verir (sematik eski degeri geri yazar). Guvenlik sematikle ayni: check_target tam yol, SaveCopy SHA256 eski plani reddeder, tekrar eden ref yazmayi durdurur, tek begin/push_commit (tek Ctrl+Z), hata -> drop_commit, dogrulama push_commit SONRASI (10.0.4 olcumu) ve DEGISMEYEN parcalar da karsilastirilir, otomatik kayit yok. DOGRULAMA: tests/test_canli_pcb.py 13 test; tam paket 917 test OK (416 s). Gercek KiCad 10.0.4 pcbnew, scratchpad pic_programmer kopyasi: 63 bilesen/370 iz/6 via/1 dokum/112 ag okundu; C4 tasi, C5 kaydir, D11 dondur, C9 deger+kilit tek committe yazildi ve geri okundu; kilitli C9 reddedildi; eski plan gercek kartta reddedildi; diskteki dosya SHA ayni kaldi. OLCULMEDI: bu komutla Ctrl+Z tekligi GUI'de yeniden olculmedi (ayni commit deseni ipc_apply'da tek islem olarak olculmustu). SINIR: yuz degistirme (flip), iz/via/dokum yazma, yeni footprint ekleme yok. Geri alma kosulu: KiCad API'si flip/ag yazmayi guvenli verirse genisletilebilir. Commit/push yok.
+
 ## Kicad-805 - Evre 3b onunde karar: uretilen kart yonlendirilecek mi
 
 - oncelik: P1  |  durum: closed  |  tur: task

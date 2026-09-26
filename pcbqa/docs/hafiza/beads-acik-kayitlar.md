@@ -575,6 +575,12 @@ ml/features.py bilesen turunu lib_id'den cikariyor; sozluk oradaki _kind_index
 yerine gecebilir ve iki dilli sorgu/etiketlemeyi acar. Once olculmeli:
 sozluge dayali tur bilgisi skorda ya da yerlestirmede fark yaratiyor mu?
 
+## Kicad-ik9 - Canli PCB komutunun tek Ctrl+Z oldugunu GUI'de olc; flip/iz yazma degerlendir
+
+- oncelik: P3  |  durum: open  |  tur: task
+
+Kicad-7d2 takibi: canli_pcb yazmasinin KiCad undo yiginina tek islem girdigi bu komutla GUI'de yeniden olculmedi. Ayrica yuz degistirme (flip) ve iz/via yazma API guvenligi arastirilmali.
+
 ## Kicad-xpi - Ayrik sicak dongu tanimasini GERCEK bir kartta dogrula
 
 - oncelik: P3  |  durum: open  |  tur: task

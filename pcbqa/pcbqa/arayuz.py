@@ -8,7 +8,8 @@ Alti sekme, hepsi ayni projeyi hedefler:
     Parcalar  ag / gerilim / akim / MPN / fiyat tablosu (`elektrik.py`)
     Analiz    kalite raporu ve skor                     (`__main__.py`)
     Uret      niyet dosyasindan kart uret / kesfet      (`generate`, `explore`)
-    Canli     acik PCB ve sematik -> onizle -> uygula (`canli`, `canli_sematik`)
+    Canli     acik PCB oku/yaz, yerlestir; sematik komut (`canli`, `canli_pcb`,
+              `canli_sematik`)
     Ortam     ortam denetimi + arayuzun dagarcigi       (`app`, `komut`)
 
 ## Olculmus kisit: KiCad'in Python'unda tkinter YOK
@@ -129,6 +130,8 @@ class Arayuz:
         self.canli_proje = None
         self.sematik_plan = None
         self.sematik_imza = None
+        self.pcb_plan = None
+        self.pcb_imza = None
         self.satirlar: list = []
 
         ayar = ayar_oku()
@@ -142,6 +145,7 @@ class Arayuz:
         self.varyant = tk.StringVar(value=str(ayar.get("varyant", 4)))
         self.komut = tk.StringVar(value="")
         self.sematik_komut = tk.StringVar(value="2 adet 100nF kondansator ekle")
+        self.pcb_komut = tk.StringVar(value="R1 konumunu 50 30 yap")
         self.durum = tk.StringVar(value="hazir")
 
         self._proje_satiri()
@@ -154,6 +158,8 @@ class Arayuz:
         self._sekme_canli()
         self.sematik_komut.trace_add("write", lambda *_: self._sematik_sifirla())
         self.proje.trace_add("write", lambda *_: self._sematik_sifirla())
+        self.pcb_komut.trace_add("write", lambda *_: self._pcb_sifirla())
+        self.proje.trace_add("write", lambda *_: self._pcb_sifirla())
         self._sekme_ortam()
         self._durum_cubugu()
 
@@ -594,7 +600,8 @@ class Arayuz:
         ttk = self.ttk
         sayfa = ttk.Frame(self.defter)
         self.defter.add(sayfa, text="Canli")
-        ttk.Label(sayfa, text="PCB: acik kart uzerinde tek Ctrl+Z ile geri alinabilir yerlestirme.\n"
+        ttk.Label(sayfa, text="PCB: acik karti okuyun, komutla yazin veya otomatik yerlestirin; "
+                  "her yazma tek Ctrl+Z ile geri alinir.\n"
                   "Sematik: asagidan ayri KiCad nightly ile canli proje kopyasi acin. "
                   "Degisiklikler kopyada kalir; kaydetmek icin KiCad'de Ctrl+S kullanin.", wraplength=1000).pack(
                       fill="x", padx=8, pady=8)
@@ -613,6 +620,23 @@ class Arayuz:
         self.b_canli_uygula = ttk.Button(sayfa, text="Canli PCB'ye uygula",
                                         command=self._canli_uygula, state="disabled")
         self.b_canli_uygula.pack(anchor="w", padx=8, pady=8)
+        pcb = ttk.LabelFrame(sayfa, text="Canli PCB okuma ve yazma")
+        pcb.pack(fill="x", padx=8, pady=4)
+        row = ttk.Frame(pcb)
+        row.pack(fill="x", padx=6, pady=4)
+        read = ttk.Button(row, text="PCB'yi oku", command=self._pcb_oku)
+        read.pack(side="left", padx=(0, 4))
+        self.dugmeler.append(read)
+        ttk.Entry(row, textvariable=self.pcb_komut).pack(side="left", fill="x", expand=True)
+        preview = ttk.Button(row, text="PCB komutunu onizle", command=self._pcb_onizle)
+        preview.pack(side="left", padx=4)
+        self.dugmeler.append(preview)
+        self.b_pcb_uygula = ttk.Button(row, text="Canli PCB'ye yaz", state="disabled",
+                                       command=self._pcb_uygula)
+        self.b_pcb_uygula.pack(side="left")
+        ttk.Label(pcb, text="Ornek: R1 konumunu 50 30 yap; C2 5 -2.5 kaydir; U1 90 dondur; "
+                  "U1 acisini 180 yap; J1 kilitle; J1 kilidini ac; R1 degerini 10k yap",
+                  wraplength=1050).pack(anchor="w", padx=6, pady=4)
         sch = ttk.LabelFrame(sayfa, text="Canli sematik (gelistirme surumu)")
         sch.pack(fill="x", padx=8, pady=4)
         row = ttk.Frame(sch)
@@ -634,6 +658,53 @@ class Arayuz:
         ttk.Label(sch, text="Ornek: R1 degerini 10k yap | 2 adet 100nF kondansator ekle ve hepsini VCC ile GND arasina bagla",
                   wraplength=1050).pack(anchor="w", padx=6, pady=4)
         self.canli_cikti = self._metin_alani(sayfa)
+
+    def _pcb_sifirla(self):
+        self.pcb_plan = self.pcb_imza = None
+        if hasattr(self, "b_pcb_uygula"):
+            self.b_pcb_uygula.config(state="disabled")
+
+    def _pcb_oku(self):
+        from .canli_pcb import read_live
+        project = self.proje.get().strip()
+        self._calistir("PCB okuma", lambda: read_live(project),
+                       lambda s: self._basit_bitti(s, self.canli_cikti, "PCB okuma"))
+
+    def _pcb_onizle(self):
+        from .canli_pcb import prepare_edit
+        if self.mesgul:
+            return
+        self._pcb_sifirla()
+        signature = (self.proje.get().strip(), self.pcb_komut.get().strip())
+
+        def finished(s):
+            if s.hata:
+                self._basit_bitti(s, self.canli_cikti, "PCB onizleme")
+            elif signature != (self.proje.get().strip(), self.pcb_komut.get().strip()):
+                self._yaz(self.canli_cikti, "Proje veya komut degisti; yeni onizleme alin.")
+            else:
+                self.pcb_plan, self.pcb_imza = s.deger, signature
+                self.b_pcb_uygula.config(state="normal")
+                self._yaz(self.canli_cikti, s.deger.description)
+                self.durum.set("Canli PCB onizlemesi hazir")
+
+        self._calistir("PCB onizleme", lambda: prepare_edit(*signature), finished)
+
+    def _pcb_uygula(self):
+        from tkinter import messagebox
+        from .canli_pcb import apply_edit
+        if self.mesgul:
+            return
+        signature = (self.proje.get().strip(), self.pcb_komut.get().strip())
+        if self.pcb_plan is None or self.pcb_imza != signature:
+            messagebox.showwarning(BASLIK, "Once bu proje ve komut icin PCB onizlemesi alin.")
+            return
+        plan = self.pcb_plan
+        if not messagebox.askokcancel(BASLIK, plan.description + "\n\nAcik PCB'ye yazilsin mi?"):
+            return
+        self._pcb_sifirla()
+        self._calistir("canli PCB yazma", lambda: apply_edit(plan),
+                       lambda s: self._basit_bitti(s, self.canli_cikti, "canli PCB yazma"))
 
     def _sematik_sifirla(self):
         self.sematik_plan = self.sematik_imza = None
@@ -868,6 +939,7 @@ class Arayuz:
         self.b_canli_uygula.config(state="disabled")
         self.durum.set(f"{ad} calisiyor...")
         self.b_sematik_uygula.config(state="disabled")
+        self.b_pcb_uygula.config(state="disabled")
         self._bitince = bitince
 
         def sarmal():
@@ -898,6 +970,8 @@ class Arayuz:
                     and self.canli_proje == self.proje.get().strip() else "disabled")
                 self.b_sematik_uygula.config(state="normal" if self.sematik_plan is not None
                     and self.sematik_imza == (self.proje.get().strip(), self.sematik_komut.get().strip()) else "disabled")
+                self.b_pcb_uygula.config(state="normal" if self.pcb_plan is not None
+                    and self.pcb_imza == (self.proje.get().strip(), self.pcb_komut.get().strip()) else "disabled")
                 geri = getattr(self, "_bitince", None)
                 if geri:
                     try:
