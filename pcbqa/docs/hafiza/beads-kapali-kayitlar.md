@@ -258,6 +258,49 @@ Not: zone poligonlari Track/Via'dan daha karmasik - dolgu (filled_polygon)
 alt dugumleri, thermal relief, keepout bolgeleri var. Ilk adim yalnizca
 sinir + katman + net okumak olabilir.
 
+## Kicad-d3b - Onizleme adimi kaldirildi: dort yazma yolu tek adimli
+
+- oncelik: P1  |  durum: closed  |  tur: task
+- kapanis: 2026-09-27T01:00:49Z
+
+KARAR (kullanici talimati, 2026-09-27): pcbqa'da onizleme/kuru kosum kapisi KALDIRILDI.
+
+KALDIRILAN DORT KATMAN:
+  A duzelt.py CLI --uygula bayragi ve dry-run varsayilani
+  B arayuz 'Anla (kuru kosum)' dugmesi + kuru_imza/kuru_yorum silahlanma kapisi
+  C Duzelt sekmesi 'Oneriyi onizle' adimi (duzelt_imza/duzelt_hazir)
+  D canli PCB/sematik prepare onizlemeleri (pcb_plan/pcb_imza, sematik_plan/sematik_imza)
+Ayrica messagebox.askokcancel onay diyaloglari kaldirildi.
+
+GEREKCE: onizleme kapisinin korudugu sey plan bayatlamasiydi (ekrandaki plan !=
+yazilan plan). Plan ile yazma artik ayni is parcaciginda zincirlendigi icin bu
+fark yapisal olarak olusamaz; imza karsilastirmasi korumadigi bir seyi
+koruyordu.
+
+KORUNANLAR (kullanici acik karari - 'hepsi korunsun'): otomatik yedek, KiCad
+acikken yazma reddi (lock_files), kalkan/diff kontrolu (sch_add icinde),
+netlist paritesi (_net_signature), basarisiz dogrulamada yedekten geri alma,
+bakir/via/zone olan kartta otomatik yerlesim yazmasi reddi.
+
+ISTISNA: canli YERLESTIRME plani (b_canli_uygula) hala iki adimli - yuzlerce
+bileseni tek tikla oynatmak geri alinabilir olsa da okunamaz.
+
+DOSYALAR: pcbqa/pcbqa/duzelt.py, pcbqa/pcbqa/arayuz.py, tests/test_arayuz.py,
+README.md, KURULUM.md, HANDOFF.md s35.2, docs/paketler/paket-01-*.md s11
+
+CAKISAN ONCEKI KARAR: Paket 01 s3.2 'duzeltme dogrudan dosyaya yazilmayacak,
+once onizleme uretilecek' ve s7 'kullanici onayi olmadan mevcut tasarim
+degistirilmez'. Kullaniciya cakisma bildirildi, onay alindi, paket dokumanina
+s11 olarak kaydedildi - sessizce degistirilmedi.
+
+DOGRULAMA: 930 test OK (unittest discover -s tests). test_arayuz.py kilit
+testlerinden yazma kapisi testlerine cevrildi: anlasilmayan cumle dosyaya
+dokunmaz, eksik girdi is baslatmaz, prepare/apply tek kosumda zincirlenir.
+
+GERI ALMA KOSULU: gercek kullanici kartinda tek tikla yazma veri kaybina yol
+acarsa, once kalkan/dogrulama kapilarinin neden tutmadigi arastirilmali;
+onizlemeyi geri getirmek ilk cozum degil.
+
 ## Kicad-ec5 - auto skoruna keep_apart cezasi ekle (uzaklastirma kisitlari)
 
 - oncelik: P1  |  durum: closed  |  tur: task

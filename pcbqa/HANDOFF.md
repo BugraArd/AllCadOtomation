@@ -3497,13 +3497,27 @@ açılamaz. Karşılık, sessiz olmayan bir geri çekilme:
 Kullanıcıya üç seçenek sunuldu (tarayıcı arayüzü / tkinter / yalnız API);
 tkinter **bilinerek** seçildi, bu kısıt bilinerek kabul edildi.
 
-### 35.2 İki adımlı güvenlik, düğmeye çevrildi
+### 35.2 İki adımlı güvenlik kaldırıldı (2026-09-27)
 
-CLI'de yazmak için `--uygula` yazmak zorundasınız. Arayüzde bunun karşılığı:
-**"Uygula" kapalı başlar**, yalnızca *aynı cümle* + *aynı proje* için bir kuru
-koşum geçtikten sonra açılır, cümle/proje değişince ve yazdıktan sonra tekrar
-kapanır. `_uygula()` düğmenin görünümüne **güvenmez**, imzayı kendisi de
-doğrular — testlerden biri tam olarak bunu, düğmeyi hiç kullanmadan sınar.
+Önceki sürümde arayüzdeki **"Uygula" kapalı başlıyordu** ve yalnızca *aynı
+cümle* + *aynı proje* için bir kuru koşum geçtikten sonra açılıyordu. Kullanıcı
+talimatıyla bu silahlanma kapısı **kaldırıldı**: dört yazma yolu da (doğal dil,
+`Duzelt` sekmesi, canlı PCB, canlı şematik) tek tıkla yazar, `duzelt` CLI'sinde
+de `--uygula` bayrağı kalktı.
+
+Gerekçe, plan bayatlaması riskinin ortadan kalkması: plan ile yazma artık **aynı
+iş parçacığında zincirlenir**, bu yüzden "ekranda görülen plan" ile "yazılan
+plan" yapısal olarak aynıdır ve korumak için imza karşılaştırmasına gerek
+kalmaz.
+
+Güvenlik önizlemeden **değil** yazma kapılarından gelir; hepsi korunur: otomatik
+yedek, KiCad açıkken yazma reddi, kalkan (mevcut devre değişmedi mi), netlist
+paritesi ve başarısız doğrulamada yedekten geri alma. Testler de buna çevrildi —
+artık sınanan şey kilit değil, "anlaşılmayan cümle dosyaya dokunmaz" ve "plan ile
+yazma tek koşumda zincirlenir".
+
+Tek istisna: canlı **yerleştirme** planı (`b_canli_uygula`) hâlâ iki adımlıdır;
+yüzlerce bileşeni tek tıkla oynatmak geri alınabilir olsa da okunamaz.
 
 ### 35.3 `elektrik.py` — asıl soru "neyi bilmiyoruz"
 

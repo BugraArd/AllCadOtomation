@@ -66,9 +66,9 @@
     "semantic_hash": "d8c111dad476ea738d8c75c36d6ae5a1"
   },
   "pcbqa/pcbqa/app.py": {
-    "mtime": 1790360166.0276663,
-    "seen": 1790361120.9327414,
-    "ast_hash": "160c4826bf56005f6a6911c93030d5c9",
+    "mtime": 1790466996.4100728,
+    "seen": 1790467025.0319178,
+    "ast_hash": "892f992c650905fe9d5b30eb3ed222c5",
     "semantic_hash": ""
   },
   "pcbqa/pcbqa/bundle.py": {
@@ -312,10 +312,10 @@
     "semantic_hash": "d2950336897eec066b3e98259ff70ac3"
   },
   "pcbqa/pcbqa/placement/refine.py": {
-    "mtime": 1787778541.4822302,
-    "seen": 1788103869.7205696,
-    "ast_hash": "9eb491d7dc4117fab122e47e5d5c5759",
-    "semantic_hash": "9eb491d7dc4117fab122e47e5d5c5759"
+    "mtime": 1790466996.4128087,
+    "seen": 1790467025.032002,
+    "ast_hash": "f3d30ec402269e21bb8ccd17c163a5ad",
+    "semantic_hash": ""
   },
   "pcbqa/pcbqa/placement/repertoire.py": {
     "mtime": 1787738294.9697094,
@@ -360,9 +360,9 @@
     "semantic_hash": "4c601cf4459acd187426f9dbda12691c"
   },
   "pcbqa/pcbqa/rules.py": {
-    "mtime": 1790113947.7265787,
-    "seen": 1790114261.0909717,
-    "ast_hash": "272ba0771274219f5cf00e6872e6bff0",
+    "mtime": 1790466996.4139347,
+    "seen": 1790467025.032015,
+    "ast_hash": "4da4ee7e6d69814db7985c1deeb80dec",
     "semantic_hash": ""
   },
   "pcbqa/pcbqa/sch_add.py": {
@@ -756,22 +756,22 @@
     "semantic_hash": ""
   },
   "pcbqa/HANDOFF.md": {
-    "mtime": 1788518745.170777,
-    "seen": 1788518864.6957667,
-    "ast_hash": "89d1654acf6c64169c930af2e41a2c76",
+    "mtime": 1790470758.2722046,
+    "seen": 1790470868.938111,
+    "ast_hash": "7a611342a4104360f2d66d445af5cd85",
     "semantic_hash": ""
   },
   "pcbqa/KURULUM.md": {
-    "mtime": 1788855370.2508688,
-    "seen": 1788855390.704016,
-    "ast_hash": "72a7ecbbf3857848b09051d0714d7c5d",
+    "mtime": 1790470743.5089214,
+    "seen": 1790470868.9381123,
+    "ast_hash": "35338bdc7c8cc7df8b10775f834c7796",
     "semantic_hash": ""
   },
   "pcbqa/README.md": {
-    "mtime": 1788102802.5287516,
-    "seen": 1788171527.7872448,
-    "ast_hash": "e02b3c2e55d46c1ab7b83b3e92b77959",
-    "semantic_hash": "e02b3c2e55d46c1ab7b83b3e92b77959"
+    "mtime": 1790470736.2502859,
+    "seen": 1790470868.9381132,
+    "ast_hash": "747a58f54306a857efcc285bb93ef18b",
+    "semantic_hash": ""
   },
   "pcbqa/docs/hafiza/beads-acik-kayitlar.md": {
     "mtime": 1790361092.9770794,
@@ -780,9 +780,9 @@
     "semantic_hash": ""
   },
   "pcbqa/docs/hafiza/beads-kapali-kayitlar.md": {
-    "mtime": 1790361092.9972203,
-    "seen": 1790361120.9329875,
-    "ast_hash": "b67cf8b6dfd127f33d68af6f6a4b776c",
+    "mtime": 1790470856.4437528,
+    "seen": 1790470868.9381158,
+    "ast_hash": "32d81757e8e4c6ac505c89ee7f4433d7",
     "semantic_hash": ""
   },
   "pcbqa/docs/hafiza/canli-mod-ve-sematik-api.md": {
@@ -1086,9 +1086,9 @@
     "semantic_hash": ""
   },
   "pcbqa/pcbqa/arayuz.py": {
-    "mtime": 1790360165.988097,
-    "seen": 1790361120.9327445,
-    "ast_hash": "e33516fd96ac4ef862b2bb853a481c22",
+    "mtime": 1790470521.036492,
+    "seen": 1790470868.9379,
+    "ast_hash": "16bf2263d7236c94e697397d4a26b24d",
     "semantic_hash": ""
   },
   "pcbqa/pcbqa/elektrik.py": {
@@ -1098,9 +1098,9 @@
     "semantic_hash": ""
   },
   "pcbqa/tests/test_arayuz.py": {
-    "mtime": 1788855203.2445426,
-    "seen": 1788855390.7039363,
-    "ast_hash": "88b59b636c047b2764f93f6209fe7f61",
+    "mtime": 1790470655.016788,
+    "seen": 1790470868.9380252,
+    "ast_hash": "4c3b10e0b6a4c9c6b9cd05bd7437aca7",
     "semantic_hash": ""
   },
   "pcbqa/tests/test_elektrik.py": {
@@ -1191,6 +1191,84 @@
     "mtime": 1790360190.2065573,
     "seen": 1790361120.9328957,
     "ast_hash": "38b1917036c5b991d7cc942bd7f1195c",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/bom.py": {
+    "mtime": 1790466996.4116733,
+    "seen": 1790467025.0319226,
+    "ast_hash": "d7cb19b759666da8441ec6c329e7fddf",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/duzelt.py": {
+    "mtime": 1790470310.9403617,
+    "seen": 1790470868.9379208,
+    "ast_hash": "33f2274e429d04ce8261523d45d1e851",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/templates/mcu-stm32g031k8.json": {
+    "mtime": 1790466996.4144733,
+    "seen": 1790467025.0320425,
+    "ast_hash": "74119b515f90e411bdb7b99d41b89f25",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_bom.py": {
+    "mtime": 1790466996.417755,
+    "seen": 1790467025.032051,
+    "ast_hash": "cc0e976e4fe13ba610054e2b81661624",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_duzelt.py": {
+    "mtime": 1790466996.417755,
+    "seen": 1790467025.032069,
+    "ast_hash": "9b40a06358fb3af9d481041aa518be12",
+    "semantic_hash": ""
+  },
+  "pcbqa/tests/test_stm32g0_template.py": {
+    "mtime": 1790466996.4182997,
+    "seen": 1790467025.032106,
+    "ast_hash": "8b8dec3cf08cff2cf57f26abeebde803",
+    "semantic_hash": ""
+  },
+  "docs/paketler/ACIK-IS-RAPORU.md": {
+    "mtime": 1790466996.4024978,
+    "seen": 1790467025.0321293,
+    "ast_hash": "8c8f0af0ead96e8db44003343c632ba2",
+    "semantic_hash": ""
+  },
+  "docs/paketler/DEVIR-RAPORU-2026-09-27.md": {
+    "mtime": 1790466996.4024978,
+    "seen": 1790467025.0321305,
+    "ast_hash": "1729ad936a1b1c40f0bb54a2741f2de5",
+    "semantic_hash": ""
+  },
+  "docs/paketler/paket-01-bulgu-duzeltme-cekirdegi.md": {
+    "mtime": 1790470820.7306006,
+    "seen": 1790470868.9381084,
+    "ast_hash": "84e372ab5f3c669d37605e5158731881",
+    "semantic_hash": ""
+  },
+  "docs/paketler/paket-02-stm32g0-profili.md": {
+    "mtime": 1790466996.4045012,
+    "seen": 1790467025.0321329,
+    "ast_hash": "374b7872dab4c073027561e3de41e690",
+    "semantic_hash": ""
+  },
+  "pcbqa/pcbqa/templates/mcu-stm32g031k8.yaml": {
+    "mtime": 1790466996.4150226,
+    "seen": 1790467025.0321872,
+    "ast_hash": "7e13946efc52c09b56d96cfacf781ff6",
+    "semantic_hash": ""
+  },
+  "pcbqa/samples/bom/g031-asgari.yaml": {
+    "mtime": 1790466996.4155746,
+    "seen": 1790467025.0321944,
+    "ast_hash": "e8ca5aeb8480ec698d9dd3e428f3f0c2",
+    "semantic_hash": ""
+  },
+  "pcbqa/samples/niyetler/g031-asgari.yaml": {
+    "mtime": 1790466996.416121,
+    "seen": 1790467025.0322037,
+    "ast_hash": "1a4bb5d51a3079f767ba94f88156e76f",
     "semantic_hash": ""
   }
 }

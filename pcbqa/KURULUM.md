@@ -135,15 +135,17 @@ Yazmadan önce ayrıca onay sorulur.
 pcbqa duzelt C:\projeler\kart --liste
 ```
 
-Sonra seçili bulgu için dry-run öneri alın:
+Sonra seçili bulguyu doğrudan düzeltin:
 
 ```
 pcbqa duzelt C:\projeler\kart --finding F-123456789abc
 ```
 
-`--uygula` verilirse dosyaya yazmadan önce mevcut dosyanın yanına
-`.pcbqa-bak` yedeği alınır. Uygulama sonrası hedef bulgu ve netlist tekrar
-doğrulanır. Kartta mevcut track/via/zone varsa otomatik dosya uygulaması
+Bu komut planı yazar ve **aynı koşumda uygular**; ayrı bir onay adımı yoktur.
+Dosyaya yazmadan önce mevcut dosyanın yanına `.pcbqa-bak` yedeği alınır ve
+KiCad açıksa yazma reddedilir. Uygulama sonrası hedef bulgu ve netlist tekrar
+doğrulanır; doğrulama geçmezse dosya yedekten geri alınır. Kartta mevcut
+track/via/zone varsa otomatik dosya uygulaması
 bilinçli olarak reddedilir; yönlendirilmiş kartın bakırını koruyan akış henüz
 Paket 01 kapsamı değildir.
 

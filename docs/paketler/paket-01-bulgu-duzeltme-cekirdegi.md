@@ -1,6 +1,7 @@
 # Paket 01 — Bulgu / Düzeltme / Doğrulama Çekirdeği
 
 **Durum:** UYGULANDI — KABUL TESTİ BEKLİYOR
+**Kapsam değişikliği:** 2026-09-27 — onay/önizleme adımı kaldırıldı, bkz. §11
 **Tarih:** 2026-09-26
 **Hedef:** Mevcut `pcbqa` analiz motorunu, bulduğu tasarım sorunlarını güvenli biçimde düzeltebilen ilk ürün akışına dönüştürmek.
 
@@ -173,3 +174,41 @@ uygulama akışı henüz açık iştir. Bu nedenle paket kod olarak uygulanmış
 - **ONAY:** Kapsam aynen uygulanır.
 - **ONAY + DEĞİŞİKLİK:** Kapsama yazılacak değişiklikler belirtilir.
 - **RED / YENİ PAKET:** Gerekçe yazılır; kodlama başlamaz.
+
+## 11. Kapsam değişikliği — 2026-09-27: önizleme adımı kaldırıldı
+
+Kullanıcı talimatıyla, paketin **iki adımlı onay akışı kaldırıldı**. Yazma
+yolları artık tek adımlıdır: plan üretilir, ekrana yazılır ve aynı koşumda
+uygulanır.
+
+Kaldırılan dört katman:
+
+1. `duzelt.py` CLI'sindeki `--uygula` bayrağı ve dry-run varsayılanı
+2. Arayüzdeki "Anla (kuru koşum)" düğmesi ve `kuru_imza` silahlanma kapısı
+3. `Duzelt` sekmesindeki "Öneriyi önizle" adımı
+4. Canlı PCB ve canlı şematik `prepare` önizlemeleri
+
+**Gerekçe:** önizleme kapısının koruduğu şey plan bayatlamasıydı — ekranda
+görülen planın yazılandan farklı olması. Plan ile yazma artık aynı iş
+parçacığında zincirlendiği için bu fark yapısal olarak oluşamaz; imza
+karşılaştırması korumadığı bir şeyi korumaya çalışıyordu.
+
+**Korunanlar (kullanıcı kararı):** güvenlik önizlemeden değil yazma
+kapılarından gelir ve hepsi yerinde durur — otomatik yedek, KiCad açıkken
+yazma reddi, kalkan (mevcut devre değişmedi mi), netlist paritesi ve başarısız
+doğrulamada yedekten geri alma. Bakır/via/zone bulunan yönlendirilmiş kartta
+otomatik yerleşim yazması hâlâ reddedilir.
+
+**İstisna:** canlı *yerleştirme* planı hâlâ iki adımlıdır; yüzlerce bileşeni
+tek tıkla oynatmak geri alınabilir olsa da okunamaz.
+
+**Bu değişiklikle geçersizleşen maddeler:** §3.2'deki "önce önizleme
+üretilecek", §3.4'teki `--uygula` ayrımı ve "Uygula onayı", §5'teki "dry-run
+dosyaya yazmaz" kriteri, §7'deki "kullanıcı onayı olmadan mevcut tasarım
+değiştirilmez", §8'deki 3. ve 4. demo adımları. §5'in geri kalanı — yedek,
+netlist değişmezliği, uygulama sonrası doğrulama, başarısızsa geri alma —
+yürürlüktedir.
+
+**Doğrulama:** 930 test, 0 hata (`unittest discover -s tests`). `test_arayuz.py`
+artık kilidi değil yazma kapılarını sınar: anlaşılmayan cümle dosyaya dokunmaz,
+eksik girdi iş başlatmaz, `prepare`/`apply` tek koşumda zincirlenir.

@@ -1,9 +1,12 @@
 """Masaustu arayuzu.
 
-Arayuzun goruntusu sinanmaz - sinanan sey GUVENLIK KILIDIDIR: "Uygula"
-dugmesi yalnizca EKRANDA GORULEN planla AYNI cumle ve AYNI proje icin acik
-olabilir. CLI'de bu is `--uygula` bayragini yazmak zorunda kalmakla
-saglaniyor; arayuzde bir dugme oldugu icin kilidin kendisi sinanmali.
+Arayuzun goruntusu sinanmaz. Onizleme/silahlanma kapisi 2026-09-27'de kullanici
+talimatiyla KALDIRILDI; "Uygula" dugmeleri surekli acik ve tek tikla yazar. Bu
+yuzden sinanan sey artik kilit degil, YAZMA KAPILARI: anlasilmayan cumle dosyaya
+dokunmaz, eksik girdi is baslatmaz ve plan ile yazma tek kosumda zincirlenir.
+
+Canli YERLESTIRME plani (`b_canli_uygula`) bu degisiklikten muaftir - hala iki
+adimlidir ve kilidi burada sinanmaya devam eder.
 
 Tk baslatilamayan bir ortamda (uzak oturum, ekransiz makine) butun sinif
 atlanir.
@@ -149,19 +152,17 @@ class PencereTests(unittest.TestCase):
         adlar = [self.a.defter.tab(t, "text") for t in self.a.defter.tabs()]
         self.assertEqual(adlar, ["Yap", "Parcalar", "Analiz", "Duzelt", "Uret", "Canli", "Ortam"])
 
-    def test_fix_apply_needs_preview(self):
-        self.a.duzelt_finding.set("F-123456789abc")
-        self.a._duzelt_uygula()
-        self.assertEqual(str(self.a.b_duzelt_uygula["state"]), "disabled")
-        self.assertTrue(any(ad == "showwarning" for ad, _ in self.diyaloglar))
+    def test_fix_apply_is_always_available(self):
+        """Onizleme kapisi kalkti: dugme bir kuru kosum beklemez."""
+        self.assertEqual(str(self.a.b_duzelt_uygula["state"]), "normal")
 
-    def test_fix_project_or_finding_change_disarms_preview(self):
-        self.a.duzelt_imza = (str(self.proje), "F-123456789abc")
-        self.a.duzelt_hazir = True
-        self.a.b_duzelt_uygula.config(state="normal")
-        self.a.duzelt_finding.set("F-other")
-        self.a._sil_silah()
-        self.assertEqual(str(self.a.b_duzelt_uygula["state"]), "disabled")
+    def test_fix_apply_without_a_finding_id_does_not_start(self):
+        """Finding ID yoksa is baslatilmaz - sessizce degil, ekrana yazarak."""
+        self.a.duzelt_finding.set("")
+        with patch("pcbqa.duzelt.main") as main:
+            self.a._duzelt_uygula()
+        main.assert_not_called()
+        self.assertIn("gerekli", self.a.duzelt_cikti.get("1.0", "end"))
 
     def test_live_apply_needs_preview(self):
         self.assertEqual(str(self.a.b_canli_uygula["state"]), "disabled")
@@ -177,78 +178,53 @@ class PencereTests(unittest.TestCase):
         self.assertIsNone(self.a.canli_plan)
         self.assertEqual(str(self.a.b_canli_uygula["state"]), "disabled")
 
-    def test_apply_starts_locked(self):
-        self.assertEqual(str(self.a.b_uygula["state"]), "disabled")
+    def test_apply_starts_unlocked(self):
+        """Yazma dugmeleri artik baslangicta aciktir."""
+        self.assertEqual(str(self.a.b_uygula["state"]), "normal")
+        self.assertEqual(str(self.a.b_sematik_uygula["state"]), "normal")
+        self.assertEqual(str(self.a.b_pcb_uygula["state"]), "normal")
 
-    def test_live_schematic_requires_matching_preview(self):
-        with patch('pcbqa.canli_sematik.request') as request:
+    def test_live_schematic_chains_prepare_and_apply(self):
+        """Plan ile yazma AYNI kosumda zincirlenir; arada bayatlama olamaz."""
+        with patch("pcbqa.canli_sematik.request") as request:
+            request.return_value = {"description": "plan"}
             self.a._sematik_uygula()
-        request.assert_not_called()
-        self.assertEqual(str(self.a.b_sematik_uygula['state']), 'disabled')
+            self._bekle(30)
+        eylemler = [cagri.args[0] for cagri in request.call_args_list]
+        self.assertEqual(eylemler, ["prepare", "apply"])
 
-    def test_live_schematic_command_edit_disarms_preview(self):
-        self.a.sematik_plan = {'description': 'old plan'}
-        self.a.b_sematik_uygula.config(state='normal')
-        self.a.sematik_komut.set('R1 degerini 10k yap')
-        self.assertIsNone(self.a.sematik_plan)
-        self.assertEqual(str(self.a.b_sematik_uygula['state']), 'disabled')
+    # -- yazma kapilari ----------------------------------------------------
 
-    # -- guvenlik kilidi ---------------------------------------------------
-
-    def test_a_refused_sentence_never_arms_apply(self):
+    def test_a_refused_sentence_writes_nothing(self):
+        """Anlasilmayan cumle tek tikla bile dosyaya dokunamaz."""
+        sch = self.proje / "pic_programmer.kicad_sch"
+        onceki = sch.read_text(encoding="utf-8")
         self.a.komut.set("bir transistor ekle")   # belirsiz -> ENGEL
-        self.a._anla()
-        self._bekle(30)
-        self.assertIsNone(self.a.kuru_imza)
-        self.assertEqual(str(self.a.b_uygula["state"]), "disabled")
-
-    def test_applying_without_a_dry_run_is_refused(self):
-        """Kilit sadece dugmenin gorunumu degil: `_uygula` kendisi de bakar."""
-        self.a.komut.set("10 adet kapasitor ekle")
-        self.a.kuru_imza = None
-        onceki = (self.proje / "pic_programmer.kicad_sch").read_text(encoding="utf-8")
         self.a._uygula()
         self._bekle(30)
-        self.assertEqual(
-            (self.proje / "pic_programmer.kicad_sch").read_text(encoding="utf-8"),
-            onceki)
+        self.assertEqual(sch.read_text(encoding="utf-8"), onceki)
         # Sessizce vazgecmek yetmez - kullaniciya NEDEN yazilmali.
-        self.assertTrue(any(ad == "showwarning" for ad, _ in self.diyaloglar),
-                        f"uyari verilmedi: {self.diyaloglar}")
+        self.assertIn("komut uygulanmadi", self.a.durum.get())
+
+    def test_an_empty_sentence_does_not_start_a_job(self):
+        self.a.komut.set("")
+        with patch("pcbqa.komut.anla") as anla:
+            self.a._uygula()
+        anla.assert_not_called()
+        self.assertIn("komut cumlesi", self.a.yap_cikti.get("1.0", "end"))
 
     @unittest.skipUnless(kicad_available(), "KiCad kurulu degil")
-    def test_a_good_sentence_arms_apply_and_editing_disarms_it(self):
-        self.a.komut.set("10 adet kapasitor ekle")
-        self.a._anla()
-        self._bekle()
-        self.assertEqual(str(self.a.b_uygula["state"]), "normal",
-                         self.a.yap_cikti.get("1.0", "end")[:400])
-        self.assertIsNotNone(self.a.kuru_imza)
-
-        # Cumle degisti - ekrandaki plan artik bu cumleye ait degil.
-        self.a.komut.set("10 adet direnc ekle")
-        self.a._sil_silah()
-        self.assertIsNone(self.a.kuru_imza)
-        self.assertEqual(str(self.a.b_uygula["state"]), "disabled")
-
-    @unittest.skipUnless(kicad_available(), "KiCad kurulu degil")
-    def test_changing_the_project_also_disarms(self):
-        self.a.komut.set("10 adet kapasitor ekle")
-        self.a._anla()
-        self._bekle()
-        self.assertEqual(str(self.a.b_uygula["state"]), "normal")
-        self.a.proje.set(str(self.tmp))
-        self.a._sil_silah()
-        self.assertEqual(str(self.a.b_uygula["state"]), "disabled")
-
-    @unittest.skipUnless(kicad_available(), "KiCad kurulu degil")
-    def test_a_dry_run_writes_nothing(self):
+    def test_a_good_sentence_writes_in_one_step(self):
+        """Onizleme yok: tek tik hem cozumler hem yazar, yedegi birakir."""
         sch = self.proje / "pic_programmer.kicad_sch"
         onceki = sch.read_text(encoding="utf-8")
         self.a.komut.set("10 adet kapasitor ekle")
-        self.a._anla()
+        self.a._uygula()
         self._bekle()
-        self.assertEqual(sch.read_text(encoding="utf-8"), onceki)
+        cikti = self.a.yap_cikti.get("1.0", "end")
+        self.assertIn("yazildi:", cikti, cikti[:400])
+        self.assertNotEqual(sch.read_text(encoding="utf-8"), onceki)
+        self.assertIn("eylem yazildi", self.a.durum.get())
 
     # -- parcalar ----------------------------------------------------------
 
@@ -276,20 +252,14 @@ class PencereTests(unittest.TestCase):
         self.assertEqual(arayuz.ayar_oku().get("proje"), str(self.proje))
 
     @unittest.skipUnless(kicad_available(), "KiCad kurulu degil")
-    def test_apply_asks_before_writing_and_a_cancel_writes_nothing(self):
-        """Onay diyalogu iptal edilirse hicbir sey yazilmamali."""
-        sch = self.proje / "pic_programmer.kicad_sch"
-        onceki = sch.read_text(encoding="utf-8")
+    def test_writing_does_not_ask_for_confirmation(self):
+        """Onay diyalogu da kaldirildi: tek tik = yazma, arada soru yok."""
         self.a.komut.set("10 adet kapasitor ekle")
-        self.a._anla()
-        self._bekle()
-        self.assertEqual(str(self.a.b_uygula["state"]), "normal")
         self.diyaloglar.clear()
-        self.a._uygula()          # askokcancel yamasi False doner = iptal
-        self._bekle(30)
-        self.assertTrue(any(ad == "askokcancel" for ad, _ in self.diyaloglar),
-                        f"onay sorulmadi: {self.diyaloglar}")
-        self.assertEqual(sch.read_text(encoding="utf-8"), onceki)
+        self.a._uygula()
+        self._bekle()
+        self.assertFalse([ad for ad, _ in self.diyaloglar if ad == "askokcancel"],
+                         f"beklenmeyen onay sorusu: {self.diyaloglar}")
 
 
 if __name__ == "__main__":

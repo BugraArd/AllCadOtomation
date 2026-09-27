@@ -29,13 +29,19 @@ baslaticinin varsayilan yorumlayicisiyla ACILAMAZ. Iki karsilik:
     CLI'nin yerine gecmez, ustune biner: her sekme ayni modulun ayni
     fonksiyonunu cagirir, ikinci bir mantik yazilmaz.
 
-## Iki adimli guvenlik korunur
+## Tek adimli yazma - guvenlik yazma kapilarinda
 
-CLI'de varsayilan dry-run'dir ve yazmak icin `--uygula` gerekir. Arayuzde
-bunun karsiligi: "Uygula" dugmesi BASLANGICTA KAPALIDIR ve yalnizca AYNI
-cumle + AYNI proje icin bir kuru kosum gectikten sonra acilir. Cumle ya da
-proje degisirse tekrar kapanir - ekranda gordugunuz planla yazilan planin
-ayni olmasi bu sekilde garanti edilir.
+Kullanici talimati (2026-09-27): onizleme/kuru kosum adimi KALDIRILDI. "Uygula"
+dugmeleri surekli aciktir; plan ile yazma ayni is parcaciginda zincirlenir, bu
+yuzden "ekranda gordugun plan" ile "yazilan plan" zaten ayni olur ve imza
+silahlanmasina gerek kalmaz.
+
+Guvenlik onizlemeden DEGIL, yazma kapilarindan gelir ve hepsi korunur:
+otomatik yedek, KiCad acikken yazma reddi, kalkan (mevcut devre degismedi mi),
+netlist paritesi ve basarisiz dogrulamada yedekten geri alma.
+
+Tek istisna: canli YERLESTIRME plani (`b_canli_uygula`) hala iki adimlidir -
+yuzlerce bileseni tek tikla oynatmak geri alinabilir olsa da okunamaz.
 
 Uzun suren isler (netlist, ERC, yerlestirme) ayri bir is parcaciginda kosar;
 pencere donmaz, ama ayni anda tek is calisir (dugmeler kilitlenir).
@@ -124,17 +130,8 @@ class Arayuz:
         self.kuyruk: queue.Queue[Sonuc] = queue.Queue()
         self.mesgul = False
         self.dugmeler: list = []
-        # (cumle, proje) - "Uygula"nin acik olabilecegi tek durum
-        self.kuru_imza: tuple[str, str] | None = None
-        self.kuru_yorum = None
         self.canli_plan = None
         self.canli_proje = None
-        self.duzelt_imza: tuple[str, str] | None = None
-        self.duzelt_hazir = False
-        self.sematik_plan = None
-        self.sematik_imza = None
-        self.pcb_plan = None
-        self.pcb_imza = None
         self.satirlar: list = []
 
         ayar = ayar_oku()
@@ -160,10 +157,6 @@ class Arayuz:
         self._sekme_duzelt()
         self._sekme_uret()
         self._sekme_canli()
-        self.sematik_komut.trace_add("write", lambda *_: self._sematik_sifirla())
-        self.proje.trace_add("write", lambda *_: self._sematik_sifirla())
-        self.pcb_komut.trace_add("write", lambda *_: self._pcb_sifirla())
-        self.proje.trace_add("write", lambda *_: self._pcb_sifirla())
         self.proje.trace_add("write", lambda *_: self._sil_silah())
         self._sekme_ortam()
         self._durum_cubugu()
@@ -217,14 +210,11 @@ class Arayuz:
         ttk.Label(ust, text="Komut:").pack(side="left")
         giris = ttk.Entry(ust, textvariable=self.komut, font=("Segoe UI", 11))
         giris.pack(side="left", fill="x", expand=True, padx=6)
-        giris.bind("<Return>", lambda _e: self._anla())
+        giris.bind("<Return>", lambda _e: self._uygula())
         giris.bind("<KeyRelease>", lambda _e: self._sil_silah())
-        self.b_anla = ttk.Button(ust, text="Anla (kuru kosum)", command=self._anla)
-        self.b_anla.pack(side="left")
-        self.b_uygula = ttk.Button(ust, text="Uygula", command=self._uygula,
-                                   state="disabled")
-        self.b_uygula.pack(side="left", padx=(4, 0))
-        self.dugmeler += [self.b_anla, self.b_uygula]
+        self.b_uygula = ttk.Button(ust, text="Uygula", command=self._uygula)
+        self.b_uygula.pack(side="left")
+        self.dugmeler += [self.b_uygula]
 
         ornek = ttk.Frame(sayfa)
         ornek.pack(fill="x", padx=8)
@@ -242,18 +232,11 @@ class Arayuz:
         self._sil_silah()
 
     def _sil_silah(self):
-        """Cumle ya da proje degisti - gosterilen plan artik gecerli degil."""
+        """Proje degisti - saklanan canli plan artik bu projeye ait degil."""
         if self.canli_proje != self.proje.get().strip():
             self.canli_plan = None
             if hasattr(self, "b_canli_uygula"):
                 self.b_canli_uygula.config(state="disabled")
-        if self.kuru_imza != (self.komut.get().strip(), self.proje.get().strip()):
-            self.kuru_imza = None
-            self.kuru_yorum = None
-            if not self.mesgul:
-                self.b_uygula.config(state="disabled")
-        if self.duzelt_imza != (self.proje.get().strip(), self.duzelt_finding.get().strip()):
-            self._duzelt_sifirla()
 
     def _hedef_sematik(self, proje_metni: str):
         """Proje metninden kok sematik. Metin ARGUMANDIR, Tk degiskeni degil.
@@ -271,7 +254,15 @@ class Arayuz:
             metin = str(Path(metin).with_suffix(".kicad_sch"))
         return kok_sematik(Path(metin) if metin else None)
 
-    def _anla(self):
+    def _uygula(self):
+        """Cumleyi anla ve AYNI kosumda sematige yaz.
+
+        Ayri bir kuru kosum adimi yoktur (kullanici talimati, 2026-09-27).
+        Guvenlik onizlemeden degil `sch_add`in kapilarindan gelir: kalkan
+        (mevcut devre degismedi mi), yedek, KiCad kilit kontrolu ve netlist
+        dogrulamasi orada korunur. Ilk engelde sonraki eylemler CALISMAZ -
+        yarim uygulanmis bir cumle, hic uygulanmamis olandan zor toparlanir.
+        """
         from .komut import anla, uygula
 
         metin = self.komut.get().strip()
@@ -285,103 +276,46 @@ class Arayuz:
 
             yorum = anla(metin)
             if not yorum.ok:
-                return yorum, None, None
+                return yorum, None
             hedef = self._hedef_sematik(proje)
             try:
-                sonuclar = uygula(yorum, hedef, apply=False)
+                sonuclar = uygula(yorum, hedef, apply=True)
             except KomutError as exc:
                 yorum.engeller.append(str(exc))
-                return yorum, hedef, None
-            return yorum, hedef, sonuclar
-
-        self._calistir("anla", is_, self._anla_bitti)
-
-    def _anla_bitti(self, s: Sonuc):
-        if s.hata:
-            self._yaz(self.yap_cikti, f"hata: {s.hata}")
-            return
-        yorum, hedef, sonuclar = s.deger
-        satirlar = [yorum.describe()]
-        if hedef is not None:
-            satirlar.append(f"  hedef: {hedef}")
-        gecti = bool(sonuclar)
-        for sonuc in sonuclar or []:
-            satirlar += ["", sonuc.plan.describe()]
-            if sonuc.diff is not None:
-                if sonuc.diff.ok:
-                    satirlar.append("  kalkan: mevcut devre degismedi, "
-                                    "yalnizca yeni bilesenler eklendi")
-                else:
-                    satirlar.append(f"  KALKAN REDDETTI: {sonuc.diff.describe()}")
-                    satirlar += ["  " + r for r in sonuc.diff.details()]
-                    gecti = False
-            if not sonuc.plan.ok:
-                gecti = False
-        if sonuclar and len(sonuclar) < len(yorum.eylemler):
-            satirlar.append(f"  DURDURULDU: {len(yorum.eylemler) - len(sonuclar)} "
-                            "eylem calistirilmadi")
-            gecti = False
-
-        if gecti:
-            self.kuru_imza = (self.komut.get().strip(), self.proje.get().strip())
-            self.kuru_yorum = yorum
-            self.b_uygula.config(state="normal")
-            satirlar += ["", "  kuru kosum gecti - yazmak icin 'Uygula'."]
-            self.durum.set("kuru kosum gecti - 'Uygula' acildi")
-        else:
-            self.kuru_imza = None
-            self.b_uygula.config(state="disabled")
-            self.durum.set("kuru kosum gecmedi - yazma kapali")
-        self._yaz(self.yap_cikti, "\n".join(satirlar))
-
-    def _uygula(self):
-        from tkinter import messagebox
-
-        from .komut import uygula
-
-        imza = (self.komut.get().strip(), self.proje.get().strip())
-        if self.kuru_imza != imza or self.kuru_yorum is None:
-            messagebox.showwarning(
-                BASLIK,
-                "Gosterilen plan bu cumleye ait degil. Once 'Anla' calistirin.")
-            self.b_uygula.config(state="disabled")
-            return
-        eylemler = "\n".join("  " + e.describe() for e in self.kuru_yorum.eylemler)
-        if not messagebox.askokcancel(
-                BASLIK, f"Sematige YAZILACAK:\n\n{eylemler}\n\n"
-                        f"Hedef: {imza[1] or 'bulundugun klasor'}\n\n"
-                        "Yedek alinir; KiCad acikken yazma reddedilir."):
-            return
-
-        yorum = self.kuru_yorum
-        proje = self.proje.get()
-
-        def is_():
-            return uygula(yorum, self._hedef_sematik(proje), apply=True)
+                return yorum, None
+            return yorum, sonuclar
 
         self._calistir("uygula", is_, self._uygula_bitti)
 
     def _uygula_bitti(self, s: Sonuc):
+        """Yazma sonucunu dokur: ne anlasildi, ne yazildi, neresi durdu."""
         if s.hata:
             self._yaz(self.yap_cikti, f"hata: {s.hata}")
             self.durum.set("yazilamadi")
             return
-        satirlar = []
+        yorum, sonuclar = s.deger
+        satirlar = [yorum.describe()]
+        if not sonuclar:
+            self._yaz(self.yap_cikti, "\n".join(satirlar))
+            self.durum.set("komut uygulanmadi")
+            return
+
         yazilan = 0
-        for sonuc in s.deger:
-            satirlar += [sonuc.plan.describe()]
+        for sonuc in sonuclar:
+            satirlar += ["", sonuc.plan.describe()]
+            if sonuc.diff is not None and not sonuc.diff.ok:
+                satirlar.append(f"  KALKAN REDDETTI: {sonuc.diff.describe()}")
+                satirlar += ["  " + r for r in sonuc.diff.details()]
             if sonuc.applied and sonuc.write is not None:
                 yazilan += 1
                 yedek = (f" (yedek: {sonuc.write.backup.name})"
                          if sonuc.write.backup else "")
                 satirlar.append(f"  yazildi: {sonuc.write.path}{yedek}")
-            satirlar.append("")
+        if len(sonuclar) < len(yorum.eylemler):
+            satirlar.append(f"  DURDURULDU: {len(yorum.eylemler) - len(sonuclar)} "
+                            "eylem calistirilmadi")
         self._yaz(self.yap_cikti, "\n".join(satirlar))
         self.durum.set(f"{yazilan} eylem yazildi")
-        # Yazildi: ayni cumleyi yanlislikla ikinci kez uygulamayi engelle.
-        self.kuru_imza = None
-        self.kuru_yorum = None
-        self.b_uygula.config(state="disabled")
 
     # -- sekme: Parcalar ---------------------------------------------------
 
@@ -534,34 +468,28 @@ class Arayuz:
         ttk.Label(ust, text="Finding ID:").pack(side="left")
         giris = ttk.Entry(ust, textvariable=self.duzelt_finding, width=20)
         giris.pack(side="left", padx=6)
-        giris.bind("<KeyRelease>", lambda _e: self._duzelt_sifirla())
+        giris.bind("<Return>", lambda _e: self._duzelt_uygula())
         tara = ttk.Button(ust, text="Bulgulari tara", command=self._duzelt_liste)
         tara.pack(side="left")
-        onizle = ttk.Button(ust, text="Oneriyi onizle", command=self._duzelt_onizle)
-        onizle.pack(side="left", padx=4)
         self.b_duzelt_uygula = ttk.Button(
-            ust, text="Uygula", command=self._duzelt_uygula, state="disabled"
+            ust, text="Uygula", command=self._duzelt_uygula
         )
-        self.b_duzelt_uygula.pack(side="left")
-        self.dugmeler += [tara, onizle]
+        self.b_duzelt_uygula.pack(side="left", padx=4)
+        self.dugmeler += [tara, self.b_duzelt_uygula]
         ttk.Label(
             sayfa,
-            text="Once Bulgulari tara ile kimlikleri alin; sonra secili bulgu icin oneri alin.",
+            text="Once Bulgulari tara ile kimlikleri alin; sonra Finding ID girip Uygula "
+                 "ile dogrudan yazin. Yedek alinir, yazma sonrasi dogrulama basarisizsa "
+                 "geri alinir.",
             foreground="#666",
+            wraplength=1050,
         ).pack(anchor="w", padx=8)
         self.duzelt_cikti = self._metin_alani(sayfa)
-
-    def _duzelt_sifirla(self):
-        self.duzelt_imza = None
-        self.duzelt_hazir = False
-        if hasattr(self, "b_duzelt_uygula"):
-            self.b_duzelt_uygula.config(state="disabled")
 
     def _duzelt_liste(self):
         from . import duzelt
 
         proje = self.proje.get().strip()
-        self._duzelt_sifirla()
 
         def is_():
             if not proje:
@@ -574,7 +502,13 @@ class Arayuz:
             lambda s: self._duzelt_bitti(s, "bulgu taramasi"),
         )
 
-    def _duzelt_onizle(self):
+    def _duzelt_uygula(self):
+        """Secili bulgunun duzeltmesini dogrudan uygula.
+
+        Onizleme adimi yoktur (kullanici talimati, 2026-09-27). `duzelt` plani
+        ciktiya yazar ve ayni kosumda uygular; bakirli kart, acik KiCad ve
+        bozulan netlist paritesi orada reddedilir.
+        """
         from . import duzelt
 
         proje = self.proje.get().strip()
@@ -582,51 +516,9 @@ class Arayuz:
         if not proje or not finding:
             self._yaz(self.duzelt_cikti, "proje ve Finding ID gerekli.")
             return
-        self._duzelt_sifirla()
-        imza = (proje, finding)
 
         def is_():
             return _yakala(duzelt.main, [proje, "--finding", finding])
-
-        def finished(s: Sonuc):
-            if s.hata:
-                self._duzelt_bitti(s, "duzeltme onizlemesi")
-                return
-            code, output = s.deger
-            self._yaz(self.duzelt_cikti, output)
-            if code == 0 and imza == (self.proje.get().strip(), self.duzelt_finding.get().strip()):
-                self.duzelt_imza = imza
-                self.duzelt_hazir = True
-                self.b_duzelt_uygula.config(state="normal")
-                self.durum.set("duzeltme onizlemesi hazir - 'Uygula' acildi")
-            else:
-                self._duzelt_sifirla()
-                self.durum.set("duzeltme onizlemesi gecmedi")
-
-        self._calistir("duzeltme onizlemesi", is_, finished)
-
-    def _duzelt_uygula(self):
-        from tkinter import messagebox
-        from . import duzelt
-
-        imza = (self.proje.get().strip(), self.duzelt_finding.get().strip())
-        if not self.duzelt_hazir or self.duzelt_imza != imza:
-            messagebox.showwarning(
-                BASLIK, "Bu bulgu icin once ayni projede yeni bir onizleme alin."
-            )
-            self._duzelt_sifirla()
-            return
-        if not messagebox.askokcancel(
-            BASLIK,
-            f"{imza[1]} icin guvenli duzeltme dosyaya uygulanacak.\n\n"
-            "Yedek alinacak ve analiz tekrar calistirilacak. Devam edilsin mi?",
-        ):
-            return
-
-        self._duzelt_sifirla()
-
-        def is_():
-            return _yakala(duzelt.main, [imza[0], "--finding", imza[1], "--uygula"])
 
         self._calistir(
             "duzeltme uygulamasi",
@@ -645,8 +537,6 @@ class Arayuz:
         else:
             cikti = str(deger)
         self._yaz(self.duzelt_cikti, cikti)
-        if "UYGULANDI:" in cikti:
-            self._duzelt_sifirla()
         self.durum.set(f"{ad} bitti")
 
     # -- sekme: Uret -------------------------------------------------------
@@ -763,12 +653,10 @@ class Arayuz:
         read.pack(side="left", padx=(0, 4))
         self.dugmeler.append(read)
         ttk.Entry(row, textvariable=self.pcb_komut).pack(side="left", fill="x", expand=True)
-        preview = ttk.Button(row, text="PCB komutunu onizle", command=self._pcb_onizle)
-        preview.pack(side="left", padx=4)
-        self.dugmeler.append(preview)
-        self.b_pcb_uygula = ttk.Button(row, text="Canli PCB'ye yaz", state="disabled",
+        self.b_pcb_uygula = ttk.Button(row, text="Canli PCB'ye yaz",
                                        command=self._pcb_uygula)
-        self.b_pcb_uygula.pack(side="left")
+        self.b_pcb_uygula.pack(side="left", padx=4)
+        self.dugmeler.append(self.b_pcb_uygula)
         ttk.Label(pcb, text="Ornek: R1 konumunu 50 30 yap; C2 5 -2.5 kaydir; U1 90 dondur; "
                   "U1 acisini 180 yap; J1 kilitle; J1 kilidini ac; R1 degerini 10k yap",
                   wraplength=1050).pack(anchor="w", padx=6, pady=4)
@@ -784,20 +672,13 @@ class Arayuz:
         row = ttk.Frame(sch)
         row.pack(fill="x", padx=6, pady=4)
         ttk.Entry(row, textvariable=self.sematik_komut).pack(side="left", fill="x", expand=True)
-        preview = ttk.Button(row, text="Sematik komutunu onizle", command=self._sematik_onizle)
-        preview.pack(side="left", padx=4)
-        self.dugmeler.append(preview)
-        self.b_sematik_uygula = ttk.Button(row, text="Canli sematige uygula", state="disabled",
+        self.b_sematik_uygula = ttk.Button(row, text="Canli sematige uygula",
                                           command=self._sematik_uygula)
-        self.b_sematik_uygula.pack(side="left")
+        self.b_sematik_uygula.pack(side="left", padx=4)
+        self.dugmeler.append(self.b_sematik_uygula)
         ttk.Label(sch, text="Ornek: R1 degerini 10k yap | 2 adet 100nF kondansator ekle ve hepsini VCC ile GND arasina bagla",
                   wraplength=1050).pack(anchor="w", padx=6, pady=4)
         self.canli_cikti = self._metin_alani(sayfa)
-
-    def _pcb_sifirla(self):
-        self.pcb_plan = self.pcb_imza = None
-        if hasattr(self, "b_pcb_uygula"):
-            self.b_pcb_uygula.config(state="disabled")
 
     def _pcb_oku(self):
         from .canli_pcb import read_live
@@ -805,45 +686,24 @@ class Arayuz:
         self._calistir("PCB okuma", lambda: read_live(project),
                        lambda s: self._basit_bitti(s, self.canli_cikti, "PCB okuma"))
 
-    def _pcb_onizle(self):
-        from .canli_pcb import prepare_edit
-        if self.mesgul:
-            return
-        self._pcb_sifirla()
-        signature = (self.proje.get().strip(), self.pcb_komut.get().strip())
-
-        def finished(s):
-            if s.hata:
-                self._basit_bitti(s, self.canli_cikti, "PCB onizleme")
-            elif signature != (self.proje.get().strip(), self.pcb_komut.get().strip()):
-                self._yaz(self.canli_cikti, "Proje veya komut degisti; yeni onizleme alin.")
-            else:
-                self.pcb_plan, self.pcb_imza = s.deger, signature
-                self.b_pcb_uygula.config(state="normal")
-                self._yaz(self.canli_cikti, s.deger.description)
-                self.durum.set("Canli PCB onizlemesi hazir")
-
-        self._calistir("PCB onizleme", lambda: prepare_edit(*signature), finished)
-
     def _pcb_uygula(self):
-        from tkinter import messagebox
-        from .canli_pcb import apply_edit
+        """Komutu cozumle ve acik PCB'ye AYNI kosumda yaz.
+
+        Ayri onizleme adimi yoktur (kullanici talimati, 2026-09-27). Plan ve
+        yazma ayni is parcaciginda zincirlendigi icin "ekranda gordugun plan"
+        ile "yazilan plan" zaten ayni olur; imza karsilastirmasina gerek kalmaz.
+        """
+        from .canli_pcb import apply_edit, prepare_edit
         if self.mesgul:
             return
         signature = (self.proje.get().strip(), self.pcb_komut.get().strip())
-        if self.pcb_plan is None or self.pcb_imza != signature:
-            messagebox.showwarning(BASLIK, "Once bu proje ve komut icin PCB onizlemesi alin.")
-            return
-        plan = self.pcb_plan
-        if not messagebox.askokcancel(BASLIK, plan.description + "\n\nAcik PCB'ye yazilsin mi?"):
-            return
-        self._pcb_sifirla()
-        self._calistir("canli PCB yazma", lambda: apply_edit(plan),
-                       lambda s: self._basit_bitti(s, self.canli_cikti, "canli PCB yazma"))
 
-    def _sematik_sifirla(self):
-        self.sematik_plan = self.sematik_imza = None
-        self.b_sematik_uygula.config(state="disabled")
+        def is_():
+            plan = prepare_edit(*signature)
+            return f"{plan.description}\n\n{apply_edit(plan)}"
+
+        self._calistir("canli PCB yazma", is_,
+                       lambda s: self._basit_bitti(s, self.canli_cikti, "canli PCB yazma"))
 
     def _sematik_ac(self):
         from .canli_sematik import open_copy
@@ -866,40 +726,23 @@ class Arayuz:
         self._calistir("sematik baglantisi", lambda: request("check", project)["description"],
                        lambda s: self._basit_bitti(s, self.canli_cikti, "sematik baglantisi"))
 
-    def _sematik_onizle(self):
-        from .canli_sematik import request
-        if self.mesgul:
-            return
-        self._sematik_sifirla()
-        signature = (self.proje.get().strip(), self.sematik_komut.get().strip())
-
-        def finished(s):
-            if s.hata:
-                self._basit_bitti(s, self.canli_cikti, "sematik onizleme")
-            elif signature != (self.proje.get().strip(), self.sematik_komut.get().strip()):
-                self._yaz(self.canli_cikti, "Proje veya komut degisti; yeni onizleme alin.")
-            else:
-                self.sematik_plan, self.sematik_imza = s.deger, signature
-                self.b_sematik_uygula.config(state="normal")
-                self._yaz(self.canli_cikti, s.deger["description"])
-                self.durum.set("Canli sematik onizlemesi hazir")
-
-        self._calistir("sematik onizleme", lambda: request("prepare", signature[0], command=signature[1]), finished)
-
     def _sematik_uygula(self):
-        from tkinter import messagebox
+        """Komutu cozumle ve acik sematige AYNI kosumda uygula.
+
+        Ayri onizleme adimi yoktur (kullanici talimati, 2026-09-27); plan ile
+        yazma zincirlendigi icin arada plan bayatlamasi olamaz.
+        """
         from .canli_sematik import request
         if self.mesgul:
             return
-        signature = (self.proje.get().strip(), self.sematik_komut.get().strip())
-        if self.sematik_plan is None or self.sematik_imza != signature:
-            messagebox.showwarning(BASLIK, "Once bu proje ve komut icin sematik onizlemesi alin.")
-            return
-        plan = self.sematik_plan
-        if not messagebox.askokcancel(BASLIK, plan["description"] + "\n\nAcik sematige uygulansin mi?"):
-            return
-        self._sematik_sifirla()
-        self._calistir("canli sematik", lambda: request("apply", signature[0], plan=plan)["description"],
+        project, command = self.proje.get().strip(), self.sematik_komut.get().strip()
+
+        def is_():
+            plan = request("prepare", project, command=command)
+            applied = request("apply", project, plan=plan)
+            return f"{plan['description']}\n\n{applied['description']}"
+
+        self._calistir("canli sematik", is_,
                        lambda s: self._basit_bitti(s, self.canli_cikti, "canli sematik"))
 
     def _editor_ac(self, kind):
@@ -1101,15 +944,10 @@ class Arayuz:
                 self.mesgul = False
                 for d in self.dugmeler:
                     d.config(state="normal")
-                self.b_uygula.config(state="disabled")
+                # Yazma dugmeleri artik surekli aciktir; silahlanma kapisi yok.
+                # Yalnizca canli YERLESTIRME plani hala iki adimlidir.
                 self.b_canli_uygula.config(state="normal" if self.canli_plan is not None
                     and self.canli_proje == self.proje.get().strip() else "disabled")
-                self.b_sematik_uygula.config(state="normal" if self.sematik_plan is not None
-                    and self.sematik_imza == (self.proje.get().strip(), self.sematik_komut.get().strip()) else "disabled")
-                self.b_pcb_uygula.config(state="normal" if self.pcb_plan is not None
-                    and self.pcb_imza == (self.proje.get().strip(), self.pcb_komut.get().strip()) else "disabled")
-                self.b_duzelt_uygula.config(state="normal" if self.duzelt_hazir
-                    and self.duzelt_imza == (self.proje.get().strip(), self.duzelt_finding.get().strip()) else "disabled")
                 geri = getattr(self, "_bitince", None)
                 if geri:
                     try:

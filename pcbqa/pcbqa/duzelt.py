@@ -1,9 +1,17 @@
-"""Bulgu kanıtı, güvenli düzeltme önerisi ve tekrar doğrulama akışı.
+"""Bulgu kanıtı, güvenli düzeltme ve tekrar doğrulama akışı.
 
-Paket 01'in ürün kapısıdır. Kural motoru bulguyu üretir; bu modül bulguyu
-doğrudan dosyaya yazmaz. Önce mevcut tasarım üzerinde adayları dener, hedef
-bulgunun kapandığını ve hakem puanının kötüleşmediğini ölçer. Kullanıcı
-`--uygula` demedikçe yalnızca plan ve dry-run çıktısı üretir.
+Paket 01'in ürün kapısıdır. Kural motoru bulguyu üretir; bu modül hedef bulgu
+için aday konumları mevcut tasarım üzerinde dener, bulgunun kapandığını ve
+hakem puanının kötüleşmediğini ölçer, sonra DOĞRUDAN uygular.
+
+Ayrı bir onay adımı YOKTUR (kullanıcı talimatı, 2026-09-27): `--finding` verilen
+komut planı yazdırır ve aynı koşuda dosyaya yazar. Güvenlik önizlemeden değil,
+yazma sonrası kapılardan gelir - hepsi korunur:
+  * bakır/via/zone olan kartta otomatik yerleşim yazması reddedilir,
+  * KiCad açıkken yazma reddedilir (kilit dosyası kontrolü),
+  * yazma atomiktir ve önce yedek alınır,
+  * yazma sonrası tekrar taranır; hedef bulgu kapanmadıysa veya netlist
+    paritesi bozulduysa dosya yedekten geri alınır.
 """
 
 from __future__ import annotations
@@ -31,7 +39,7 @@ class FixError(RuntimeError):
 
 @dataclass
 class FixProposal:
-    """Kullanıcı onayından önce gösterilen, uygulanabilir düzeltme planı."""
+    """Hakemden geçmiş, uygulanan düzeltme planı (kayıt ve rapor için)."""
 
     proposal_id: str
     finding: Finding
@@ -250,8 +258,8 @@ def _render_findings(findings: list[Finding]) -> str:
 
 def _render_proposal(proposal: FixProposal) -> str:
     lines = [
-        "DUZELTME ONIZLEMESI",
-        "-------------------",
+        "DUZELTME PLANI (uygulaniyor)",
+        "----------------------------",
         f"proposal : {proposal.proposal_id}",
         f"bulgu    : {proposal.finding_id}",
         f"risk     : {proposal.risk}",
@@ -319,7 +327,7 @@ def _find_by_id(findings: list[Finding], finding_id: str) -> Finding:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pcbqa.duzelt",
-        description="Bulgu için kanıtlı düzeltme öner, onayla ve tekrar doğrula",
+        description="Bulgu için kanıtlı düzeltmeyi uygula ve tekrar doğrula",
     )
     parser.add_argument("project", type=Path, help="Proje klasörü veya .kicad_pcb/.kicad_pro")
     parser.add_argument("--finding", help="Finding ID; örn. F-123456789abc")
@@ -328,8 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--kicad-cli", default=None)
     parser.add_argument("--out", type=Path, default=None,
                         help="Uygulama hedefi; verilmezse kaynak PCB güvenli yedekle değiştirilir")
-    parser.add_argument("--uygula", action="store_true", help="Dry-run yerine yaz ve tekrar doğrula")
-    parser.add_argument("--json", type=Path, default=None, help="Rapor/öneri JSON yolu")
+    parser.add_argument("--json", type=Path, default=None, help="Rapor/plan JSON yolu")
     parser.add_argument("--no-kicad-checks", action="store_true")
     return parser
 
@@ -359,10 +366,6 @@ def main(argv: list[str] | None = None) -> int:
         proposal = propose(report, finding, rules)
         print(_render_proposal(proposal))
         _write_json(args.json, proposal.as_dict())
-
-        if not args.uygula:
-            print("\nDRY-RUN: dosyaya dokunulmadı. Gerçek yazma için --uygula verin.")
-            return 0
 
         source = report.design.board.path.resolve()
         target = (args.out or source).resolve()

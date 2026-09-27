@@ -54,7 +54,7 @@ $env:PCBQA_KICAD_CLI = "C:\Program Files\KiCad\10.0\bin\kicad-cli.exe"
 # Bulguları kimlikleri ve kanıtlarıyla listele
 pcbqa duzelt C:\yol\projem --liste
 
-# Bir bulgu için dry-run düzeltme önerisi üret
+# Bir bulguyu doğrudan düzelt (planı yazar ve aynı koşumda uygular)
 pcbqa duzelt C:\yol\projem --finding F-123456789abc
 
 # İlk STM32G0 profilinden geçici KiCad projesi üret
@@ -92,10 +92,15 @@ ağa girmediyse komut hata döner ve yedeğin yolunu söyler.
 
 `duzelt` komutu analiz bulgularına kararlı `Finding ID`, ölçüm ve kanıt özeti
 verir. Paket 01'de yalnızca ölçülmüş decoupling mesafesi ihlalleri otomatik
-düzeltme adayıdır. Varsayılan davranış dry-run'dır; gerçek yazma için ayrıca
-`--uygula` gerekir. Her uygulama öncesi yedek alınır ve sonrasında hedef
-bulgu ile netlist tekrar kontrol edilir. Mevcut track/via/zone bulunan
-yönlendirilmiş kartlar otomatik dosya uygulamasına alınmaz.
+düzeltme adayıdır.
+
+`--finding` verilen komut **ayrı bir onay adımı beklemez** (kullanıcı talimatı,
+2026-09-27): planı ekrana yazar ve aynı koşumda uygular. Güvenlik önizlemeden
+değil yazma kapılarından gelir ve hepsi korunur — uygulama öncesi yedek alınır,
+KiCad açıkken yazma reddedilir, sonrasında hedef bulgu ile netlist paritesi
+tekrar kontrol edilir ve doğrulama başarısızsa dosya yedekten geri alınır.
+Mevcut track/via/zone bulunan yönlendirilmiş kartlar otomatik dosya
+uygulamasına hâlâ alınmaz.
 
 ### STM32G0 ilk profil
 
