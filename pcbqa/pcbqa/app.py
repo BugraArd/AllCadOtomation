@@ -8,6 +8,7 @@
     pcbqa sozluk                     bilesen adlari sozlugu (EN/TR)
     pcbqa mpn     <sematik>          parca numarasi + fiyat alanlari (sentetik)
     pcbqa bom     <manifest.yaml>   kaynakli BOM raporu ve acik kalem kapisi
+    pcbqa gereksinim <manifest.yaml> donanim kararlarini ve acik karar kapisini raporla
     pcbqa sablonlar                  sablon kutuphanesini listele
     pcbqa uygula  <kart.kicad_pcb>   acik KiCad'e yerlesim uygula (API'siz)
 
@@ -56,6 +57,7 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("sozluk", "pcbqa.lexicon", "Iki dilli bilesen sozlugu (kisaltma, ad, EN/TR)"),
     ("mpn", "pcbqa.mpn", "Bilesenlere SENTETIK parca numarasi ve fiyat alani yaz"),
     ("bom", "pcbqa.bom", "Kaynakli BOM raporu ve uretim oncesi acik kalem kapisi"),
+    ("gereksinim", "pcbqa.requirements", "Donanim gereksinim sozlesmesi ve acik karar kapisi"),
     ("yerlestir", "pcbqa.harness", "Var olan bir karti yerlestir ve puanla"),
     ("uygula", "pcbqa.swig_apply", "Karti yerlestirip pcbnew ile uygula (API GEREKMEZ)"),
     ("uygula-ipc", "pcbqa.ipc_apply", "Calisan KiCad'e IPC ile uygula (API sunucusu acik olmali)"),

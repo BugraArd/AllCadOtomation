@@ -103,6 +103,7 @@ pcbqa bagla   <şematik>          var olan sembolleri telle birleştir
 pcbqa sozluk                     bileşen adları sözlüğü (kısaltma, EN/TR)
 pcbqa mpn     <şematik>          parça numarası + fiyat alanları (sentetik)
 pcbqa bom     <manifest.yaml>   kaynaklı BOM raporu + açık kalem kapısı
+pcbqa gereksinim <manifest.yaml> donanım kararları + açık karar kapısı
 pcbqa sablonlar                  şablon kütüphanesini listele
 pcbqa yerlestir <kart>           var olan bir kartı yerleştir ve puanla
 pcbqa uygula  <kart>             yerleştirip pcbnew ile uygula (API gerekmez)

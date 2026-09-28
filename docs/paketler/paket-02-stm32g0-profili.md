@@ -45,6 +45,9 @@ kontrol edilecektir; bu dosya gerçek BOM/sourcing garantisi değildir.
 - KiCad netlist doğrulaması geçen geçici bir proje üretilebilmeli.
 - Gerçek kartta güç, reset, SWD ve seçilen çevre birimleri kullanıcı
   gereksinimiyle onaylanmadan profil “üretime hazır” sayılmamalı.
+- `samples/gereksinimler/g031-urun-sozlesmesi.yaml` içindeki altı P0 karar
+  `decided` veya gerekçeli `not_applicable` olmadan elektriksel kabul tamamlanmış
+  sayılmamalı.
 
 ## Kaynaklar
 

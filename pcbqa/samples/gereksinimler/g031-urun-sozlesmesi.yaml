@@ -1,0 +1,32 @@
+# Bu dosya bilincli olarak draft ve acik bir sozlesmedir.
+# Degerler kullanicidan gelmeden STM32G031 karti uretime kabul edilmez.
+version: 1
+profile: mcu-stm32g031k8
+status: draft
+notes: "P0 kararları kullanıcı/ürün gereksinimiyle doldurulmadan üretim kabulü yok."
+
+decisions:
+  - id: input_supply
+    status: open
+    value: null
+    notes: "Giriş 5 V header mı, USB mi, başka bir gerilim aralığı mı?"
+  - id: current_budget
+    status: open
+    value: null
+    notes: "Maksimum giriş/çıkış akımı ve LDO ısıl sınırı belirtilmeli."
+  - id: interfaces
+    status: open
+    value: null
+    notes: "SWD zorunlu; I2C1, USART2 ve LSE gerçekten gerekli mi?"
+  - id: gpio_and_peripherals
+    status: open
+    value: null
+    notes: "GPIO, ADC, PWM, timer ve pin çakışma öncelikleri belirtilmeli."
+  - id: mechanical_and_manufacturing
+    status: open
+    value: null
+    notes: "Kart ölçüsü, katman sayısı, üretici minimumları ve hedef adet belirtilmeli."
+  - id: temperature_and_package
+    status: open
+    value: null
+    notes: "Çalışma sıcaklığı/sınıfı ve MCU paket alternatifi kesinleşmeli."

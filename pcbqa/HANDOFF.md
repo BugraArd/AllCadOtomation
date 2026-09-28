@@ -1,6 +1,6 @@
 # Devir Promptu — KiCad Otomasyon Projesi
 
-> **Güncel kısa devir:** `../docs/paketler/DEVIR-RAPORU-2026-09-27.md`
+> **Güncel kısa devir:** `../docs/paketler/DEVIR-RAPORU-2026-09-28.md`
 > Bu dosya tarihsel geniş bağlamdır; devam etmeden önce güncel raporu okuyun.
 
 > Bu dosya, projeyi yeni bir oturumda (veya başka bir asistanla) kaldığı yerden

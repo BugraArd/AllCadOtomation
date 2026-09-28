@@ -62,6 +62,9 @@ pcbqa uret --intent samples\niyetler\g031-asgari.yaml --out C:\yol\g031-kart
 
 # BOM'da yalnızca kaynağı doğrulanmış kalemleri üretime kabul et
 pcbqa bom samples\bom\g031-asgari.yaml --fail-on-open
+
+# Kullanıcıdan beklenen donanım kararlarını açık/kapalı olarak denetle
+pcbqa gereksinim samples\gereksinimler\g031-urun-sozlesmesi.yaml --fail-on-open
 ```
 
 Ya da kısayol: `run.cmd samples\pic_programmer`
@@ -116,6 +119,15 @@ sonra kilitlenecektir.
 `pcbqa bom` fiyat veya stok uydurmaz. Her kalem `verified`, `needs_selection`,
 `blocked` veya `synthetic` olarak görünür. `verified` kalemlerde MPN, üretici
 ve kaynak zorunludur; `--fail-on-open` açık kalem varsa çıkış kodu `1` döndürür.
+
+### Donanım gereksinim sözleşmesi
+
+`pcbqa gereksinim`, besleme, akım bütçesi, arayüzler, GPIO/çevre birimleri,
+mekanik/üretim ve sıcaklık/MCU paketi kararlarını tek manifestte toplar.
+Örnek sözleşme bilerek `draft` ve altı karar da `open` durumundadır; bu alanlar
+kullanıcı gereksinimi gelmeden doldurulmaz. `accepted` durumunda açık veya
+`blocked` karar bırakılamaz. Böylece profil, elektriksel kabul yapılmış gibi
+yanlış işaretlenmez.
 
 ## Aşama 5: makine öğrenimi altyapısı
 
