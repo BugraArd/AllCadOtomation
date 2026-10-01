@@ -1,0 +1,52 @@
+{
+  "components": [
+    {
+      "connect": {
+        "#1": "${vin}",
+        "#2": "${vout}"
+      },
+      "footprint": "${fp_ust}",
+      "lib_id": "Device:R",
+      "name": "ust-direnc",
+      "value": "${r_ust}"
+    },
+    {
+      "connect": {
+        "#1": "${vout}",
+        "#2": "${gnd}"
+      },
+      "footprint": "${fp_alt}",
+      "lib_id": "Device:R",
+      "name": "alt-direnc",
+      "value": "${r_alt}"
+    },
+    {
+      "connect": {
+        "#1": "${vout}",
+        "#2": "${gnd}"
+      },
+      "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "lib_id": "Connector_Generic:Conn_01x02",
+      "name": "olcum-header",
+      "value": "OLCUM"
+    }
+  ],
+  "description": "Rezistif gerilim bolucu (VIN -> OUT) + olcum header'i",
+  "id": "gerilim-bolucu",
+  "params": {
+    "fp_alt": "Resistor_SMD:R_0603_1608Metric",
+    "fp_ust": "Resistor_SMD:R_0603_1608Metric",
+    "gnd": "GND",
+    "r_alt": "10k 1%",
+    "r_ust": "30.1k 1%",
+    "vin": "VBUS",
+    "vout": "OUT"
+  },
+  "provides": [
+    "bolucu-cikisi"
+  ],
+  "requires": [
+    "guc-vbus"
+  ],
+  "version": 1
+}

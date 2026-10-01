@@ -1,0 +1,36 @@
+{
+ "aile": "rezistif-bolucu",
+ "parametre": {
+  "kimlik": "bolucu-gercek-hatali",
+  "vin_nom": 12.0,
+  "vin_tol": 0.02,
+  "vout_hedef": 3.0,
+  "pencere": 0.12,
+  "yuk_nom_a": 1e-05,
+  "yuk_tepe_a": 2e-05,
+  "ortam_c": 25.0,
+  "sicakliklar": [
+   -40.0,
+   85.0
+  ],
+  "r_ust": 47000.0,
+  "r_alt": 10000.0,
+  "tolerans": 0.01,
+  "paket_ust": "0603",
+  "paket_alt": "0603",
+  "aralik_mm": 3.2
+ },
+ "roller": {
+  "giris_header": "J1",
+  "ust": "R1",
+  "alt": "R2",
+  "cikis_header": "J2",
+  "giris": "VIN",
+  "cikis": "OUT",
+  "toprak": "GND"
+ },
+ "iz_mm": 0.25,
+ "iz_sayisi": 7,
+ "uretim": "2026-10-01",
+ "not": "pcbqa.duzeltme.proje referans ile uretildi; yerlesim/yonlendirme bolucu.yerlesim"
+}

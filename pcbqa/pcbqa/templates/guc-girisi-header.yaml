@@ -14,11 +14,14 @@ requires: []
 params:
   vin: "VBUS"
   gnd: "GND"
+  # Deger alani (kartta/BOM'da gorunen etiket). 5 V disi girislerde
+  # yaniltici olmasin diye parametre (Kicad-ecd: 12 V bolucu referansi).
+  etiket: GUC-5V
 
 components:
   - name: header
     lib_id: Connector_Generic:Conn_01x02
-    value: GUC-5V
+    value: "${etiket}"
     footprint: Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
     connect:
       "#1": "${vin}"

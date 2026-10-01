@@ -1,0 +1,38 @@
+{
+ "version": 1,
+ "ortam_c": 25.0,
+ "raylar": {
+  "VIN": {
+   "nom": 12.0,
+   "min": 11.76,
+   "max": 12.24
+  }
+ },
+ "kaynaklar": [
+  "VIN"
+ ],
+ "yukler": [
+  {
+   "ag": "OUT",
+   "akim_a": 1e-05,
+   "tepe_a": 2e-05
+  }
+ ],
+ "gereksinimler": [
+  {
+   "ag": "OUT",
+   "min_v": 2.64,
+   "max_v": 3.36
+  }
+ ],
+ "analiz": {
+  "monte_carlo": 0,
+  "sicakliklar": [
+   -40.0,
+   85.0
+  ]
+ },
+ "pcb": {
+  "izin_dV_yuzde": 0.1
+ }
+}

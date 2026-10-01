@@ -63,7 +63,7 @@ def main() -> int:
           "| graphify path \"<A>\" \"<B>\" | graphify query \"<soru>\" --budget N")
     # Kullanicinin kalici talimati (2026-08-31). Kuralin kendisi de her oturumda
     # gorunmeli; yalnizca CLAUDE.md'ye yazmak yetmiyor - orada bir bolum arasinda
-    # kayboluyor. Ayrinti: CLAUDE.md '## Calisma Anlasmasi'.
+    # kayboluyor. Ayrinti: AGENTS.md bolum 1.1 (CLAUDE.md onu ice aktarir).
     print("  ANLASMA: her KARAR, her HATA DUZELTMESI, her GELECEK PLANI once "
           "bd'ye yazilir,")
     print("           sonra: python .claude/graphify-bilgilendir.py")

@@ -1,0 +1,12 @@
+# devre-duzelt ornegi (Kicad-u4k): 12 V'tan ~3 V ADC girisi ureten bolucu,
+# ama ust direnc YANLIS (47k; dogrusu ~29k). Gereksinim ve yuk kosullar.yaml'da.
+#   pcbqa uret --intent samples/bolucu/bolucu-hatali.yaml --out .work/bolucu-proje
+#   pcbqa devre-duzelt .work/bolucu-proje --kosullar samples/bolucu/kosullar.yaml
+version: 1
+name: bolucu-hatali
+blocks:
+  - template: guc-girisi-header
+  - template: gerilim-bolucu
+    params:
+      r_ust: "47k 1%"
+      r_alt: "10k 1%"

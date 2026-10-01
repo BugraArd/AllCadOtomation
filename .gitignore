@@ -1,49 +1,96 @@
+# ---------------------------------------------------------------------------
 # Python
+# ---------------------------------------------------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# Sanal ortamlar: gelistirme (.venv) ve canli sematik icin nightly (.venv-nightly)
 .venv/
 .venv-nightly/
+# Yerel calisma zamani: KiCad nightly acilimi, derlenmis kipy wheel'i, profiller
 pcbqa/.runtime/
-scratchpad/canli-sematik/
 
-# pcbqa ara dosyalari
+# ---------------------------------------------------------------------------
+# pcbqa ara ciktilari
+# ---------------------------------------------------------------------------
 pcbqa/.work/
+*.pcbqa-bak*
+.pcbqa-canli.json
+scratchpad/
+scratchpad/canli-sematik/
 
 # Windows kisayollari MAKINEYE OZELDIR: icinde mutlak yollar ve o makinedeki
 # yorumlayicinin ikon yolu gomulu. Izlenirse baska makinede bozuk cikar.
 # Yeniden uretmek icin: pcbqa/pcbqa-arayuz.cmd hedefli bir kisayol olusturun
-# (bkz. pcbqa/KURULUM.md, "Kisayol").
+# (bkz. docs/KURULUM.md, "Kisayol").
 *.lnk
 
-# KiCad yerel ayar/yedek dosyalari
+# ---------------------------------------------------------------------------
+# KiCad yerel dosyalari
+# ---------------------------------------------------------------------------
+# Pencere/gorunum durumu - kullaniciya ozel
 *.kicad_prl
+# Yedekler ve otomatik kayit
 *-backups/
+_autosave-*
+*.kicad_sch-bak
+*.kicad_pcb-bak
 fp-info-cache
+# Acik-proje KILIDI: "~proje.kicad_pro.lck". Icinde makine ve kullanici adi
+# var; izlenirse klonlanan kopyada proje "KiCad'de acik" gorunur ve pcbqa'nin
+# acik-proje korumasi yazmayi reddeder.
+~*.lck
+*.lck
 
-# Agent calisma kopyalari (git worktree)
-.claude/worktrees/
-
-# Beads / Dolt files (added by bd init)
+# ---------------------------------------------------------------------------
+# Beads / Dolt (bd init ekledi)
+# ---------------------------------------------------------------------------
 .dolt/
 *.db
 .beads-credential-key
 .beads/proxieddb/
 
+# ---------------------------------------------------------------------------
 # graphify - yeniden uretilebilen ciktilar izlenmez.
 # graph.json BILINCLI olarak disarida birakilmadi: `graphify hook install`
-# onun icin bir birlestirme surucusu kaydediyor, yani izlenmesi bekleniyor.
+# onun icin bir birlestirme surucusu kaydediyor (.gitattributes), yani
+# izlenmesi bekleniyor.
+# ---------------------------------------------------------------------------
 graphify-out/graph.html
 graphify-out/cache/
 graphify-out/cost.json
 graphify-out/.graphify_*
 graphify-out/.parcalar.json
+graphify-out/20??-??-??/
 .claude/settings.json.graphify-bak
 
-# Yerel ajan ayarlari ve yeniden uretilebilir gecici dosyalar
+# ---------------------------------------------------------------------------
+# Ajan ve editor yerel dosyalari
+# ---------------------------------------------------------------------------
 .claude/settings.local.json
-.serena/
+# Agent calisma kopyalari (git worktree)
+.claude/worktrees/
 .history/
-*.pcbqa-bak*
-.pcbqa-canli.json
-scratchpad/
-graphify-out/20??-??-??/
+.idea/
+# Serena bu projede KULLANILMAZ (2026-08-31). Kullanici genelindeki bir MCP
+# ayari klasoru yeniden olusturursa yanlislikla izlenmesin diye koruma.
+.serena/
+
+# ---------------------------------------------------------------------------
+# Isletim sistemi / OneDrive artiklari
+# ---------------------------------------------------------------------------
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Ogrenim calisma alani (pcbqa/pcbqa/ogrenim): kullanicinin projelerinin
+# kopyalari, deneyler ve surumlu modeller - depoya girmez, iskelet kalir.
+# ---------------------------------------------------------------------------
+pcbqa/calisma/**
+!pcbqa/calisma/projeler/
+!pcbqa/calisma/modeller/
+!pcbqa/calisma/**/.gitkeep

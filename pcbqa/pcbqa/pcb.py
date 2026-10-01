@@ -52,6 +52,12 @@ class Pad:
     # BUS1.60 /PC-A2). Katman ayrimi olmadan aralarinda 0.000 mm aciklik
     # olculuyordu - gercek bir kartta kisa devre demek olurdu.
     copper_layers: tuple[str, ...] = ()
+    # smd | thru_hole | np_thru_hole | connect. Uretilebilirlik (delik, halka)
+    # ve montaj deligi tespiti icin gerekir.
+    kind: str = "smd"
+    # Delik capi (mm); SMD pad'de 0. Oval delikte KUCUK eksen - uretici
+    # sinirini belirleyen odur.
+    drill: float = 0.0
 
     @property
     def on_all_layers(self) -> bool:
@@ -522,6 +528,21 @@ def _read_courtyard_local(node) -> list[tuple[float, float]]:
     return _chain(edges) or geom.convex_hull(pts)
 
 
+def _pad_drill(pad_node) -> float:
+    """`(drill 1.0)` ya da `(drill oval 1.0 1.6)` -> en kucuk cap (mm)."""
+    node = child(pad_node, "drill")
+    if node is None:
+        return 0.0
+    sizes = []
+    for item in node[1:]:
+        if isinstance(item, str):
+            try:
+                sizes.append(float(item))
+            except ValueError:
+                continue  # "oval" anahtar kelimesi
+    return min(sizes) if sizes else 0.0
+
+
 def _read_footprint(node) -> Component | None:
     at = child(node, "at")
     if at is None:
@@ -596,6 +617,8 @@ def _read_footprint(node) -> Component | None:
                 angle=as_float(pat[3]) if pat and len(pat) > 3 else frot,
                 shape=str(pnode[3]) if len(pnode) > 3 and isinstance(pnode[3], str) else "rect",
                 copper_layers=_pad_copper_layers(pnode),
+                kind=str(pnode[2]) if len(pnode) > 2 and isinstance(pnode[2], str) else "smd",
+                drill=_pad_drill(pnode),
             )
         )
 

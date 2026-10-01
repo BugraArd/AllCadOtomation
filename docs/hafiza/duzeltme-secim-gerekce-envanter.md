@@ -1,0 +1,6 @@
+# Duzeltme secim gerekce envanter
+
+> Beads kalici hafizasi (`bd recall duzeltme-secim-gerekce-envanter`). Kaynak Dolt veritabani;
+> bu dosya graphify gorebilsin diye disa aktarilmis kopyasidir.
+
+DUZELTME GERCEK DENEY - SECIM + GEREKCE + ENVANTER + ARAYUZ (2026-10-02, Kicad-d8k). Kod: pcbqa/pcbqa/duzeltme/{secim,aciklama,gorunum}.py, proje.py, envanter.py, arayuz.py Deney sekmesi. Belge: docs/duzeltme-siralama.md 'Kicad-d8k'. SECIM en-dusuk-maliyet-v1: yalniz gecti; eksik/gecersiz maliyet sifir SAYILMAZ; en dusuk maliyet; esitlikte az yeni ihlal, sonra kararli ureteci kimligi (aday.kimlik; aday-NN on eki degil); esitler raporlanir, daha kotu denmez; kismi degerlendirmede kuresel iddia yok; ilk_gecen ayri; durum/egitim degismez, tercih ve aciklamalar ayri alan. ENVANTER pcbqa duzeltme-envanter: gercek (deney.jsonl) ve bellek (kayitlar.jsonl) AYRI; temel tasarim = dosya ozetleri, aday = kosul+ureteci kimligi+degisiklikler; tekrar bir kez, bozuk/eksik ayri. SONUC bolucu-hatali: secim aday-02 -> aday-03 alt-yeniden-E96 (esit maliyet 1, uc aday); kontroller 18/18 ayni; iki onbelleksiz kosu ayni. KAPSAM_DISI direnc-gerilimi metni duzeltildi. Tam takim 1114 OK. Cozmedigi: veri dengesizligi (4zv, 515), aile genellemesi (s0p).

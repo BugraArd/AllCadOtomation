@@ -1,0 +1,15 @@
+# Bolucu ornegi icin calisma kosullari ve gereksinim.
+# VBUS 12 V +-%2 (regule edilmis harici besleme), OUT bir ADC girisi:
+# 3.0 V +-%10 pencere, ADC giris akimi 10 uA (tepe 20 uA).
+version: 1
+ortam_c: 25
+raylar:
+  VBUS: {nom: 12, min: 11.76, max: 12.24}
+kaynaklar: [VBUS]
+yukler:
+  - {ag: OUT, akim_a: 0.00001, tepe_a: 0.00002}
+gereksinimler:
+  - {ag: OUT, min_v: 2.7, max_v: 3.3}
+analiz:
+  monte_carlo: 0
+  sicakliklar: [-40, 85]

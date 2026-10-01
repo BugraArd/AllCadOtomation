@@ -1,1 +1,60 @@
+# ---------------------------------------------------------------------------
+# Satir sonlari: depoda LF (olculdu: izlenen tum metin dosyalari i/lf).
+# Calisma kopyasinda Windows'ta CRLF olabilir; depo icerigi degismez.
+# ---------------------------------------------------------------------------
+* text=auto
+
+*.py      text eol=lf
+*.md      text
+*.yaml    text
+*.yml     text
+*.json    text
+*.jsonl   text
+*.toml    text
+*.txt     text
+# cmd.exe etiket/goto LF satir sonuyla bozulabilir
+*.cmd     text eol=crlf
+*.bat     text eol=crlf
+*.ps1     text eol=crlf
+*.sh      text eol=lf
+
+# KiCad dosyalari metindir (s-expression); KiCad kendisi LF yazar.
+*.kicad_pcb  text eol=lf
+*.kicad_sch  text eol=lf
+*.kicad_sym  text eol=lf
+*.kicad_pro  text eol=lf
+*.kicad_mod  text eol=lf
+*-lib-table  text eol=lf
+
+# ---------------------------------------------------------------------------
+# Ikili dosyalar
+# ---------------------------------------------------------------------------
+*.gz   binary
+*.zip  binary
+*.whl  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.pdf  binary
+*.lnk  binary
+*.dll  binary
+*.exe  binary
+
+# ---------------------------------------------------------------------------
+# Birlestirme suruculeri
+# ---------------------------------------------------------------------------
+# graphify: `graphify hook install` kaydetti (git config merge.graphify.*)
 graphify-out/graph.json merge=graphify
+
+# ---------------------------------------------------------------------------
+# Uretilmis dosyalar (diff/istatistikte gizlenir; elle duzenlenmez)
+# ---------------------------------------------------------------------------
+graphify-out/**                         linguist-generated=true
+docs/hafiza/**                          linguist-generated=true
+# YAML kaynaklarinin calisma zamani JSON ikizleri (python -m pcbqa.bundle)
+pcbqa/pcbqa/presets/*.json              linguist-generated=true
+pcbqa/pcbqa/templates/*.json            linguist-generated=true
+pcbqa/pcbqa/data/parcalar/*.json        linguist-generated=true
+pcbqa/pcbqa/default_rules.json          linguist-generated=true
+.beads/issues.jsonl                     linguist-generated=true

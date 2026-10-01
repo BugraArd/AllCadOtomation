@@ -41,6 +41,28 @@ class SchComponent:
     value: str = ""
     footprint: str = ""
     libpart: str = ""
+    # Kutuphane adi ("Device", "Regulator_Linear"). `libpart` ile birlikte
+    # `Netlist.libparts` anahtaridir.
+    lib: str = ""
+    datasheet: str = ""
+    description: str = ""
+    # Sembolun TUM alanlari (MPN, Manufacturer, Tolerance, Voltage...).
+    # Devre grafi parca bilgisini once buradan okur; sematik okunmadan da
+    # netlist'te tasinirlar.
+    fields: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class LibPin:
+    """Kutuphane sembolunun bir pini: numara, GERCEK ad, elektriksel tip.
+
+    Netlist dugumundeki `pinfunction` KiCad 10'da "VO_2" gibi numara ekli
+    gelir (olculdu, guc-modulu); asil ad buradadir.
+    """
+
+    number: str
+    name: str = ""
+    type: str = ""
 
 
 @dataclass
@@ -48,6 +70,14 @@ class Netlist:
     path: Path
     components: dict[str, SchComponent] = field(default_factory=dict)
     nets: list[Net] = field(default_factory=list)
+    # (lib, part) -> pinler. Sembol-footprint pin eslesmesinin sematik tarafi.
+    libparts: dict[tuple[str, str], list[LibPin]] = field(default_factory=dict)
+
+    def lib_pins_of(self, ref: str) -> list[LibPin]:
+        comp = self.components.get(ref)
+        if comp is None:
+            return []
+        return self.libparts.get((comp.lib, comp.libpart), [])
 
     def net_of(self, ref: str, pin: str) -> Net | None:
         for net in self.nets:
@@ -121,12 +151,33 @@ def read_netlist(path: str | Path) -> Netlist:
             if not ref:
                 continue
             libsource = comp.find("libsource")
+            fields: dict[str, str] = {}
+            fields_el = comp.find("fields")
+            if fields_el is not None:
+                for fel in fields_el.findall("field"):
+                    name = fel.get("name", "")
+                    if name:
+                        fields[name] = (fel.text or "").strip()
             netlist.components[ref] = SchComponent(
                 ref=ref,
                 value=_text(comp, "value"),
                 footprint=_text(comp, "footprint"),
                 libpart=libsource.get("part", "") if libsource is not None else "",
+                lib=libsource.get("lib", "") if libsource is not None else "",
+                datasheet=_text(comp, "datasheet"),
+                description=_text(comp, "description"),
+                fields=fields,
             )
+
+    libparts_el = root.find("libparts")
+    if libparts_el is not None:
+        for lp in libparts_el.findall("libpart"):
+            pins_el = lp.find("pins")
+            pins = [
+                LibPin(number=p.get("num", ""), name=p.get("name", ""), type=p.get("type", ""))
+                for p in (pins_el.findall("pin") if pins_el is not None else [])
+            ]
+            netlist.libparts[(lp.get("lib", ""), lp.get("part", ""))] = pins
 
     nets_el = root.find("nets")
     if nets_el is not None:

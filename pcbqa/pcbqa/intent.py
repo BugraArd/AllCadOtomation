@@ -476,7 +476,10 @@ def expand_intent(intent: Intent, templates: dict[str, Template]) -> BuildPlan:
                     template_id=tpl.id,
                     lib_id=comp.lib_id,
                     value=value,
-                    footprint=comp.footprint,
+                    # Footprint de parametre olabilir (or. bolucu paketi,
+                    # Kicad-ecd); `resolve_plan` kutuphanede var mi diye bakar.
+                    footprint=_substitute(comp.footprint, params, used, plan.problems,
+                                          f"{where}.footprint"),
                     connect=list(resolved_conns),
                 ))
 

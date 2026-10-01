@@ -102,19 +102,19 @@
       "Netlist kalkani"
     ],
     [
-      "pcbqa_handoff_sessiz_hata_sinifi",
+      "docs_handoff_sessiz_hata_sinifi",
       "Sessiz hata sinifi ve surum korlugu"
     ],
     [
-      "pcbqa_docs_tasarim_kurallari_03_yuksek_hiz_sinyal_20h_kurali_curutuldu",
+      "docs_tasarim_kurallari_03_yuksek_hiz_sinyal_20h_kurali_curutuldu",
       "Yuksek hizli sinyal kurallari"
     ],
     [
-      "pcbqa_docs_tasarim_kurallari_01_anahtarlamali_guc_sicak_dongu_alani",
+      "docs_tasarim_kurallari_01_anahtarlamali_guc_sicak_dongu_alani",
       "Anahtarlamali guc kurallari"
     ],
     [
-      "pcbqa_docs_hafiza_beads_kapali_kayitlar_kicad_i6z_baslatici_pythonpath",
+      "docs_hafiza_beads_kapali_kayitlar_kicad_i6z_baslatici_pythonpath",
       "Calisma zamani, dagitim ve baslatici"
     ]
   ]

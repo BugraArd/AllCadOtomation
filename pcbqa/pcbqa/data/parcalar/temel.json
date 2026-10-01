@@ -1,0 +1,843 @@
+{
+  "parcalar": [
+    {
+      "anahtar": "yageo-rc-l-kalin-film",
+      "eslesme": {
+        "mpn_desen": "^RC(0201|0402|0603|0805|1206|1210|2010|2512)([BDFJ])([RK])-(07|10|13)([0-9]+[RKM]?[0-9]*)L$",
+        "tur": "resistor"
+      },
+      "guven": "parcaya-ozel",
+      "guven_genel": "paket-tipik",
+      "kategori": "direnc",
+      "kaynak": "Yageo RC_L series datasheet V.10 (2018-12-12): Tablo 2, Tablo 8, Sekil 10",
+      "notlar": [
+        "guc anma degeri 70 C ortamda; ustunde Sekil 10 egrisiyle dogrusal azaltma",
+        "surekli calisma gerilimi sqrt(P x R) ile azami calisma geriliminden kucuk olani (veri sayfasi RATED VOLTAGE)"
+      ],
+      "paket_tablosu": {
+        "0201": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              10000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 50
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 25
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.05
+          },
+          "tcr": [
+            [
+              10,
+              350
+            ],
+            [
+              10000000,
+              200
+            ]
+          ],
+          "termal": {
+            "sifir_guc_ortam_c": 125,
+            "tam_guc_ortam_c": 70
+          }
+        },
+        "0402": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              22000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 100
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 50
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.0625
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ]
+          ]
+        },
+        "0603": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              22000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 150
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 75
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.1
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ]
+          ]
+        },
+        "0805": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              100000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 300
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 150
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.125
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ],
+            [
+              100000000,
+              300
+            ]
+          ]
+        },
+        "1206": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              100000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 400
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 200
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.25
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ],
+            [
+              100000000,
+              300
+            ]
+          ]
+        },
+        "1210": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              22000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 500
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 200
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.5
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ]
+          ]
+        },
+        "2010": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              22000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 500
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 200
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 0.75
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ]
+          ]
+        },
+        "2512": {
+          "araliklar": {
+            "0.001": [
+              10,
+              1000000
+            ],
+            "0.005": [
+              10,
+              1000000
+            ],
+            "0.01": [
+              1,
+              10000000
+            ],
+            "0.05": [
+              1,
+              22000000
+            ]
+          },
+          "asiri_yuk_gerilimi": {
+            "birim": "V",
+            "onerilen_max": 500
+          },
+          "gerilim": {
+            "birim": "V",
+            "onerilen_max": 200
+          },
+          "guc": {
+            "birim": "W",
+            "onerilen_max": 1.0
+          },
+          "tcr": [
+            [
+              10,
+              200
+            ],
+            [
+              10000000,
+              100
+            ],
+            [
+              22000000,
+              200
+            ]
+          ]
+        }
+      },
+      "termal": {
+        "sifir_guc_ortam_c": 155,
+        "tam_guc_ortam_c": 70
+      },
+      "tolerans_siniflari": [
+        {
+          "kod": "B",
+          "tolerans": 0.001,
+          "yaslanma": {
+            "ek_ohm": 0.05,
+            "sapma_yuzde": 1.0,
+            "test_ortam_c": 70,
+            "test_saat": 1000
+          }
+        },
+        {
+          "kod": "D",
+          "tolerans": 0.005,
+          "yaslanma": {
+            "ek_ohm": 0.05,
+            "sapma_yuzde": 1.0,
+            "test_ortam_c": 70,
+            "test_saat": 1000
+          }
+        },
+        {
+          "kod": "F",
+          "tolerans": 0.01,
+          "yaslanma": {
+            "ek_ohm": 0.05,
+            "sapma_yuzde": 1.0,
+            "test_ortam_c": 70,
+            "test_saat": 1000
+          }
+        },
+        {
+          "kod": "J",
+          "tolerans": 0.05,
+          "yaslanma": {
+            "ek_ohm": 0.05,
+            "sapma_yuzde": 3.0,
+            "test_ortam_c": 70,
+            "test_saat": 1000
+          }
+        }
+      ],
+      "uretici": "Yageo"
+    },
+    {
+      "anahtar": "genel-seramik-kondansator",
+      "eslesme": {
+        "tur": "capacitor"
+      },
+      "guven": "paket-tipik",
+      "kategori": "kondansator",
+      "kaynak": "EIA RS-198 dielektrik sinif tanimlari (X7R/X5R +-15%, C0G 0+-30 ppm/C)",
+      "notlar": [
+        "anma gerilimi paketten turetilemez; sembol alani ya da deger metni gerekir",
+        "sinif II seramikte DC bias kapasite kaybi uretici egrisinden okunmalidir"
+      ]
+    },
+    {
+      "anahtar": "AMS1117-3.3",
+      "eslesme": {
+        "desenler": [
+          "^AMS1117-3\\.3$"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "ldo",
+      "kaynak": "AMS1117 veri sayfasi (Advanced Monolithic Systems, ds1117.pdf)",
+      "mpn": "AMS1117-3.3",
+      "pinler": {
+        "1": {
+          "ad": "GND",
+          "islev": "gnd"
+        },
+        "2": {
+          "ad": "VO",
+          "islev": "guc-cikis"
+        },
+        "3": {
+          "ad": "VI",
+          "islev": "guc-giris"
+        }
+      },
+      "sinirlar": {
+        "akim_siniri": {
+          "birim": "A",
+          "kosul": "dahili akim siniri (en az)",
+          "onerilen_min": 0.9
+        },
+        "cout": {
+          "birim": "F",
+          "kosul": "cikis kararliligi, dusuk ESR",
+          "onerilen_min": 2.2e-05
+        },
+        "dusum": {
+          "birim": "V",
+          "kosul": "Iout = 800 mA, azami dusum",
+          "onerilen_max": 1.3
+        },
+        "iout": {
+          "birim": "A",
+          "kosul": "dusumun tanimlandigi en yuksek akim",
+          "onerilen_max": 0.8
+        },
+        "vin": {
+          "birim": "V",
+          "mutlak_max": 15
+        },
+        "vout": {
+          "birim": "V",
+          "kosul": "25 C, 1% cikis toleransi",
+          "onerilen_max": 3.333,
+          "onerilen_min": 3.267
+        }
+      },
+      "spice": {
+        "ad": "PCBQA_LDO",
+        "dugumler": [
+          "vin",
+          "vout",
+          "gnd"
+        ],
+        "ideal": true,
+        "kaynak": "pcbqa davranissal LDO sablonu (Vout = min(Vnom, Vin - dusum))",
+        "lisans": "pcbqa",
+        "parametreler": {
+          "dusum": 1.3,
+          "vnom": 3.3
+        },
+        "pin_esleme": {
+          "1": "gnd",
+          "2": "vout",
+          "3": "vin"
+        },
+        "tur": "davranissal"
+      },
+      "termal": {
+        "paket": "sot223",
+        "tj_max": 125
+      },
+      "uretici": "Advanced Monolithic Systems"
+    },
+    {
+      "addan_sinirlar": [
+        {
+          "birim": "V",
+          "desen": "78L?(\\d\\d)",
+          "kosul": "nominal cikis (addan)",
+          "sinir": "vout",
+          "tur": "nominal"
+        }
+      ],
+      "anahtar": "78xx-serisi",
+      "eslesme": {
+        "desenler": [
+          "^(L|LM|MC|UA|KA|NCV)?78L?\\d\\d"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "ldo",
+      "kaynak": "78xx sabit cikisli dogrusal regulator ailesi adlandirma kurali (son iki hane = cikis gerilimi)",
+      "notlar": [
+        "dusum, giris mutlak maksimumu ve Tj ureticiye ve pakete gore degisir; tam parca icin girilmeli"
+      ],
+      "spice": {
+        "ad": "PCBQA_LDO",
+        "dugumler": [
+          "vin",
+          "vout",
+          "gnd"
+        ],
+        "ideal": true,
+        "kaynak": "pcbqa davranissal dogrusal regulator sablonu",
+        "lisans": "pcbqa",
+        "parametreler": {
+          "dusum": "@dusum",
+          "vnom": "@vout"
+        },
+        "tur": "davranissal"
+      }
+    },
+    {
+      "anahtar": "STM32G031K8T6",
+      "eslesme": {
+        "desenler": [
+          "^STM32G031K8"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "mcu",
+      "kaynak": "STM32G031x4/x6/x8 veri sayfasi (DS12992), Mutlak azami degerler ve genel calisma kosullari",
+      "mpn": "STM32G031K8T6",
+      "notlar": [
+        "tj_max 105 C sicaklik kodu 6 (TA -40..85 C) icindir",
+        "I/O pin giris sinirlari FT/TT ayrimina gore pin pin girilmeli; girilmedikce CMOS genel kurali (VDD+0.3 V) uygulanir"
+      ],
+      "pin_adlari": [
+        {
+          "desen": "^VDD",
+          "islev": "guc-giris",
+          "sinirlar": {
+            "gerilim": {
+              "birim": "V",
+              "mutlak_max": 4.0,
+              "mutlak_min": -0.3,
+              "onerilen_max": 3.6,
+              "onerilen_min": 1.7
+            }
+          }
+        },
+        {
+          "desen": "^VSS",
+          "islev": "gnd"
+        },
+        {
+          "desen": "^NRST",
+          "islev": "giris"
+        },
+        {
+          "desen": "^P[A-F]\\d+",
+          "islev": "iki-yonlu"
+        }
+      ],
+      "sinirlar": {
+        "vdd": {
+          "birim": "V",
+          "mutlak_max": 4.0,
+          "mutlak_min": -0.3,
+          "onerilen_max": 3.6,
+          "onerilen_min": 1.7
+        }
+      },
+      "spice_eksik": "MCU icin SPICE modeli yok; benzetimde besleme akimi yuk olarak beyan edilmeli",
+      "termal": {
+        "tj_max": 105
+      },
+      "uretici": "STMicroelectronics"
+    },
+    {
+      "anahtar": "2N7002",
+      "eslesme": {
+        "desenler": [
+          "^2N7002$"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "mosfet-n",
+      "kaynak": "2N7002 veri sayfasi (onsemi)",
+      "mpn": "2N7002",
+      "pinler": {
+        "1": {
+          "ad": "G",
+          "islev": "gate"
+        },
+        "2": {
+          "ad": "S",
+          "islev": "source"
+        },
+        "3": {
+          "ad": "D",
+          "islev": "drain"
+        }
+      },
+      "sinirlar": {
+        "id": {
+          "birim": "A",
+          "kosul": "TA = 25 C surekli",
+          "onerilen_max": 0.115
+        },
+        "rds_on_vgs": {
+          "birim": "V",
+          "kosul": "Rds(on) VGS = 5 V ve 10 V icin tanimli",
+          "onerilen_min": 5.0
+        },
+        "vds": {
+          "birim": "V",
+          "mutlak_max": 60
+        },
+        "vgs": {
+          "birim": "V",
+          "mutlak_max": 20,
+          "mutlak_min": -20
+        },
+        "vgs_esik": {
+          "birim": "V",
+          "kosul": "VGS(th)",
+          "onerilen_max": 2.5,
+          "onerilen_min": 1.0
+        }
+      },
+      "spice_eksik": "uretici SPICE modeli kutuphaneye eklenmedi (bkz. Kicad-5d6.5)",
+      "termal": {
+        "tj_max": 150
+      },
+      "uretici": "onsemi"
+    },
+    {
+      "anahtar": "AO3400A",
+      "eslesme": {
+        "desenler": [
+          "^AO3400A?$"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "mosfet-n",
+      "kaynak": "AO3400A veri sayfasi (Alpha & Omega Semiconductor)",
+      "mpn": "AO3400A",
+      "pinler": {
+        "1": {
+          "ad": "G",
+          "islev": "gate"
+        },
+        "2": {
+          "ad": "S",
+          "islev": "source"
+        },
+        "3": {
+          "ad": "D",
+          "islev": "drain"
+        }
+      },
+      "sinirlar": {
+        "id": {
+          "birim": "A",
+          "kosul": "TA = 25 C surekli",
+          "onerilen_max": 5.7
+        },
+        "rds_on_vgs": {
+          "birim": "V",
+          "kosul": "Rds(on) VGS = 2.5 / 4.5 / 10 V icin tanimli",
+          "onerilen_min": 2.5
+        },
+        "vds": {
+          "birim": "V",
+          "mutlak_max": 30
+        },
+        "vgs": {
+          "birim": "V",
+          "mutlak_max": 12,
+          "mutlak_min": -12
+        },
+        "vgs_esik": {
+          "birim": "V",
+          "kosul": "VGS(th)",
+          "onerilen_max": 1.45,
+          "onerilen_min": 0.65
+        }
+      },
+      "spice_eksik": "uretici SPICE modeli kutuphaneye eklenmedi (bkz. Kicad-5d6.5)",
+      "termal": {
+        "tj_max": 150
+      },
+      "uretici": "Alpha & Omega Semiconductor"
+    },
+    {
+      "anahtar": "1N4007",
+      "eslesme": {
+        "desenler": [
+          "^1N4007$"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "diyot",
+      "kaynak": "1N4001-1N4007 veri sayfasi (cok ureticili JEDEC parca)",
+      "mpn": "1N4007",
+      "pinler": {
+        "1": {
+          "ad": "K",
+          "islev": "katot"
+        },
+        "2": {
+          "ad": "A",
+          "islev": "anot"
+        }
+      },
+      "sinirlar": {
+        "if_ort": {
+          "birim": "A",
+          "onerilen_max": 1.0
+        },
+        "vrrm": {
+          "birim": "V",
+          "mutlak_max": 1000
+        }
+      },
+      "spice_eksik": "uretici SPICE modeli kutuphaneye eklenmedi"
+    },
+    {
+      "anahtar": "1N5819",
+      "eslesme": {
+        "desenler": [
+          "^1N5819$"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "diyot",
+      "kaynak": "1N5817-1N5819 Schottky veri sayfasi (cok ureticili JEDEC parca)",
+      "mpn": "1N5819",
+      "pinler": {
+        "1": {
+          "ad": "K",
+          "islev": "katot"
+        },
+        "2": {
+          "ad": "A",
+          "islev": "anot"
+        }
+      },
+      "sinirlar": {
+        "if_ort": {
+          "birim": "A",
+          "onerilen_max": 1.0
+        },
+        "vrrm": {
+          "birim": "V",
+          "mutlak_max": 40
+        }
+      },
+      "spice_eksik": "uretici SPICE modeli kutuphaneye eklenmedi"
+    },
+    {
+      "addan_sinirlar": [
+        {
+          "birim": "V",
+          "desen": "SM[AB]J(\\d+(?:\\.\\d+)?)",
+          "kosul": "stand-off gerilimi",
+          "sinir": "vrwm"
+        }
+      ],
+      "anahtar": "SMBJ-serisi-TVS",
+      "eslesme": {
+        "desenler": [
+          "^SM[AB]J\\d"
+        ]
+      },
+      "guven": "dogrulanmamis",
+      "kategori": "tvs",
+      "kaynak": "Littelfuse SMAJ/SMBJ serisi adlandirma kurali (sayi = ters stand-off gerilimi VR)",
+      "notlar": [
+        "kenetleme gerilimi (VC) tam parca icin tablodan girilmeli"
+      ],
+      "spice_eksik": "TVS SPICE modeli yok"
+    }
+  ],
+  "version": 1
+}

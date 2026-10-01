@@ -679,7 +679,7 @@ gerçek kartta sıfır bulgu üretir (testle korunuyor).
 
 Eşiklerin **hepsinin kaynağı yazılı**, kaynağı olmayanlar "mühendislik seçimi"
 diye etiketli. Ayrıntı, çelişkiler ve ölçülemeyenler:
-[docs/tasarim-kurallari/](docs/tasarim-kurallari/README.md).
+[docs/tasarim-kurallari/](../docs/tasarim-kurallari/README.md).
 
 ### `exclusive` neden önemli?
 
@@ -790,7 +790,7 @@ Sıralama ancak farklı bulgu kümeleri karşılaştırılırken (sayı ile büy
 edilirken) değişir.
 
 Ağırlıkların kanıt gücüne göre nasıl seçileceği ve sıradaki adımlar:
-[docs/yol-haritasi-skorlama.md](docs/yol-haritasi-skorlama.md).
+[docs/yol-haritasi-skorlama.md](../docs/yol-haritasi-skorlama.md).
 
 Bu skor bilinçli olarak geçicidir. Aşama 3'te otomatik yerleştirme motorunun
 küçülteceği **maliyet fonksiyonuna** dönüşecek; o yüzden ürettiği ara değerler

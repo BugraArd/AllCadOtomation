@@ -1,0 +1,295 @@
+# Parca bilgi kutuphanesi - temel kayitlar.
+#
+# KURALLAR (proje ilkesi: uydurma sayi yazilmaz):
+#   * Her kaydin `kaynak` alani zorunludur (kod reddeder).
+#   * `guven`:
+#       parcaya-ozel   veri sayfasi sayfa/tablo referansiyla teyit edildi
+#       dogrulanmamis  veri sayfasindan elle aktarildi, sayfa referansiyla
+#                      TEYIT EDILMEDI - uretim kararindan once kontrol edin
+#       paket-tipik    tam parca degil, paket/aile icin tipik deger
+#   * Bilinmeyen alan YAZILMAZ; parca_bilgisi() onu eksik diye raporlar.
+#     Ornek: AMS1117'nin sukunet akimi (Iq) burada yok, cunku teyit edilmedi.
+#
+# Bu dosyanin JSON kopyasi `python -m pcbqa.bundle` ile uretilir.
+
+version: 1
+parcalar:
+  # ------------------------------------------------------------------ pasif
+  # Kalin film cip direnc - Yageo RC_L serisi (Kicad-7cb, 2026-10-01).
+  # Kaynak veri sayfasinin kendisinden aktarildi ve satir satir karsilastirildi:
+  #   "DATA SHEET GENERAL PURPOSE CHIP RESISTORS RC_L series +-0.1%, +-0.5%,
+  #   +-1%, +-5%", Product specification December 12, 2018 V.10
+  #   Tablo 2 (elektriksel ozellikler), Tablo 8 (testler), Sekil 10-1/10-2
+  #   (guc azaltma), "GLOBAL PART NUMBER" (siparis kodu).
+  # ESKI kayittaki uc hata bu surumle duzeldi: 0201 TCR'si +-200 ppm (100
+  # degil), 0201 125 C'de sifir guce iner (155 degil), J (%5) toleransin
+  # omur testi sapmasi %3 (+50 mohm), %1 degil. Seride %0.1 ve %0.5 de VAR
+  # (10 ohm - 1 Mohm); eski not "kutuphanede %1'den siki kayit yok" yanlisti.
+  #
+  # Iki eslesme yolu:
+  #   * MPN alani deseni tutarsa (RC0603FR-0728K7L) paket, tolerans ve deger
+  #     MPN'den okunur; guven: parcaya-ozel. Paket footprint'ten DEGIL MPN'den
+  #     gelir - footprint ile MPN paketi farkliysa bu ayri bir hatadir
+  #     (dogrulama: paket-uyumu).
+  #   * MPN yoksa herhangi bir direnc genel olarak eslesir; paket footprint'ten
+  #     okunur; guven: paket-tipik (gercek parca bu seri olmayabilir).
+  # "Normal guc" satirlari aktarildi; 7W/3W (2 x guc) siparis kodlari desene
+  # dahil DEGIL (makara kodu yalnizca 07/10/13).
+  - anahtar: yageo-rc-l-kalin-film
+    kategori: direnc
+    uretici: Yageo
+    eslesme:
+      tur: resistor
+      mpn_desen: '^RC(0201|0402|0603|0805|1206|1210|2010|2512)([BDFJ])([RK])-(07|10|13)([0-9]+[RKM]?[0-9]*)L$'
+    kaynak: 'Yageo RC_L series datasheet V.10 (2018-12-12): Tablo 2, Tablo 8, Sekil 10'
+    guven: parcaya-ozel
+    guven_genel: paket-tipik
+    # Sekil 10-1: anma gucu 70 C'ye kadar; 0402-2512 155 C'de sifir.
+    # Sekil 10-2: 0201 125 C'de sifir (paket satirinda ezilir).
+    termal: {tam_guc_ortam_c: 70, sifir_guc_ortam_c: 155}
+    # Tablo 8 Life/Endurance (70 C, 1000 saat, RCWV): B/D/F +-(1% + 50 mohm),
+    # J +-(3% + 50 mohm).
+    tolerans_siniflari:
+      - {kod: B, tolerans: 0.001, yaslanma: {test_saat: 1000, test_ortam_c: 70, sapma_yuzde: 1.0, ek_ohm: 0.05}}
+      - {kod: D, tolerans: 0.005, yaslanma: {test_saat: 1000, test_ortam_c: 70, sapma_yuzde: 1.0, ek_ohm: 0.05}}
+      - {kod: F, tolerans: 0.01, yaslanma: {test_saat: 1000, test_ortam_c: 70, sapma_yuzde: 1.0, ek_ohm: 0.05}}
+      - {kod: J, tolerans: 0.05, yaslanma: {test_saat: 1000, test_ortam_c: 70, sapma_yuzde: 3.0, ek_ohm: 0.05}}
+    # Tablo 2. tcr: [ust direnc siniri ohm, +-ppm/C] sirali; araliklar
+    # tolerans -> [min, max] ohm. E serisi: %5 E24, digerleri E24/E96.
+    paket_tablosu:
+      '0201':
+        guc: {birim: W, onerilen_max: 0.05}
+        gerilim: {birim: V, onerilen_max: 25}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 50}
+        tcr: [[10, 350], [10000000, 200]]
+        termal: {tam_guc_ortam_c: 70, sifir_guc_ortam_c: 125}
+        araliklar: {'0.05': [1, 10000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '0402':
+        guc: {birim: W, onerilen_max: 0.0625}
+        gerilim: {birim: V, onerilen_max: 50}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 100}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200]]
+        araliklar: {'0.05': [1, 22000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '0603':
+        guc: {birim: W, onerilen_max: 0.1}
+        gerilim: {birim: V, onerilen_max: 75}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 150}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200]]
+        araliklar: {'0.05': [1, 22000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '0805':
+        guc: {birim: W, onerilen_max: 0.125}
+        gerilim: {birim: V, onerilen_max: 150}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 300}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200], [100000000, 300]]
+        araliklar: {'0.05': [1, 100000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '1206':
+        guc: {birim: W, onerilen_max: 0.25}
+        gerilim: {birim: V, onerilen_max: 200}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 400}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200], [100000000, 300]]
+        araliklar: {'0.05': [1, 100000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '1210':
+        guc: {birim: W, onerilen_max: 0.5}
+        gerilim: {birim: V, onerilen_max: 200}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 500}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200]]
+        araliklar: {'0.05': [1, 22000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '2010':
+        guc: {birim: W, onerilen_max: 0.75}
+        gerilim: {birim: V, onerilen_max: 200}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 500}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200]]
+        araliklar: {'0.05': [1, 22000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+      '2512':
+        guc: {birim: W, onerilen_max: 1.0}
+        gerilim: {birim: V, onerilen_max: 200}
+        asiri_yuk_gerilimi: {birim: V, onerilen_max: 500}
+        tcr: [[10, 200], [10000000, 100], [22000000, 200]]
+        araliklar: {'0.05': [1, 22000000], '0.01': [1, 10000000], '0.005': [10, 1000000], '0.001': [10, 1000000]}
+    notlar:
+      - 'guc anma degeri 70 C ortamda; ustunde Sekil 10 egrisiyle dogrusal azaltma'
+      - 'surekli calisma gerilimi sqrt(P x R) ile azami calisma geriliminden kucuk olani (veri sayfasi RATED VOLTAGE)'
+
+  - anahtar: genel-seramik-kondansator
+    kategori: kondansator
+    eslesme: {tur: capacitor}
+    kaynak: 'EIA RS-198 dielektrik sinif tanimlari (X7R/X5R +-15%, C0G 0+-30 ppm/C)'
+    guven: paket-tipik
+    notlar:
+      - 'anma gerilimi paketten turetilemez; sembol alani ya da deger metni gerekir'
+      - 'sinif II seramikte DC bias kapasite kaybi uretici egrisinden okunmalidir'
+    # Yaslanma bilerek YOK: sinif II seramigin logaritmik kapasite kaybi
+    # dielektrige ve ureticiye bagli; deger veri sayfasindan girilmeli.
+
+  # ------------------------------------------------------------------ guc
+  - anahtar: AMS1117-3.3
+    kategori: ldo
+    uretici: Advanced Monolithic Systems
+    mpn: AMS1117-3.3
+    eslesme:
+      desenler: ['^AMS1117-3\.3$']
+    kaynak: 'AMS1117 veri sayfasi (Advanced Monolithic Systems, ds1117.pdf)'
+    guven: dogrulanmamis
+    pinler:
+      '1': {ad: GND, islev: gnd}
+      '2': {ad: VO, islev: guc-cikis}
+      '3': {ad: VI, islev: guc-giris}
+    sinirlar:
+      vin: {birim: V, mutlak_max: 15}
+      vout: {birim: V, onerilen_min: 3.267, onerilen_max: 3.333, kosul: '25 C, 1% cikis toleransi'}
+      dusum: {birim: V, onerilen_max: 1.3, kosul: 'Iout = 800 mA, azami dusum'}
+      iout: {birim: A, onerilen_max: 0.8, kosul: 'dusumun tanimlandigi en yuksek akim'}
+      akim_siniri: {birim: A, onerilen_min: 0.9, kosul: 'dahili akim siniri (en az)'}
+      # Kararlilik icin dusuk ESR'li en az 22 uF cikis kondansatoru
+      # (sablon ldo-ams1117-3v3 ayni kaynagi kullanir).
+      cout: {birim: F, onerilen_min: 0.000022, kosul: 'cikis kararliligi, dusuk ESR'}
+    termal:
+      paket: sot223
+      tj_max: 125
+    spice:
+      tur: davranissal
+      ad: PCBQA_LDO
+      dugumler: [vin, vout, gnd]
+      pin_esleme: {'3': vin, '2': vout, '1': gnd}
+      parametreler: {vnom: 3.3, dusum: 1.3}
+      kaynak: 'pcbqa davranissal LDO sablonu (Vout = min(Vnom, Vin - dusum))'
+      lisans: 'pcbqa'
+      ideal: true
+
+  - anahtar: 78xx-serisi
+    kategori: ldo
+    eslesme:
+      desenler: ['^(L|LM|MC|UA|KA|NCV)?78L?\d\d']
+    kaynak: '78xx sabit cikisli dogrusal regulator ailesi adlandirma kurali (son iki hane = cikis gerilimi)'
+    guven: dogrulanmamis
+    addan_sinirlar:
+      - {desen: '78L?(\d\d)', sinir: vout, birim: V, tur: nominal, kosul: 'nominal cikis (addan)'}
+    notlar:
+      - 'dusum, giris mutlak maksimumu ve Tj ureticiye ve pakete gore degisir; tam parca icin girilmeli'
+    spice:
+      tur: davranissal
+      ad: PCBQA_LDO
+      dugumler: [vin, vout, gnd]
+      parametreler: {vnom: '@vout', dusum: '@dusum'}
+      kaynak: 'pcbqa davranissal dogrusal regulator sablonu'
+      lisans: 'pcbqa'
+      ideal: true
+
+  # ------------------------------------------------------------------ MCU
+  - anahtar: STM32G031K8T6
+    kategori: mcu
+    uretici: STMicroelectronics
+    mpn: STM32G031K8T6
+    eslesme:
+      desenler: ['^STM32G031K8']
+    kaynak: 'STM32G031x4/x6/x8 veri sayfasi (DS12992), Mutlak azami degerler ve genel calisma kosullari'
+    guven: dogrulanmamis
+    pin_adlari:
+      - desen: '^VDD'
+        islev: guc-giris
+        sinirlar:
+          gerilim: {birim: V, onerilen_min: 1.7, onerilen_max: 3.6, mutlak_min: -0.3, mutlak_max: 4.0}
+      - desen: '^VSS'
+        islev: gnd
+      - desen: '^NRST'
+        islev: giris
+      - desen: '^P[A-F]\d+'
+        islev: iki-yonlu
+    sinirlar:
+      vdd: {birim: V, onerilen_min: 1.7, onerilen_max: 3.6, mutlak_min: -0.3, mutlak_max: 4.0}
+    termal:
+      tj_max: 105
+    notlar:
+      - 'tj_max 105 C sicaklik kodu 6 (TA -40..85 C) icindir'
+      - 'I/O pin giris sinirlari FT/TT ayrimina gore pin pin girilmeli; girilmedikce CMOS genel kurali (VDD+0.3 V) uygulanir'
+    spice_eksik: 'MCU icin SPICE modeli yok; benzetimde besleme akimi yuk olarak beyan edilmeli'
+
+  # ------------------------------------------------------------------ MOSFET
+  - anahtar: 2N7002
+    kategori: mosfet-n
+    uretici: onsemi
+    mpn: 2N7002
+    eslesme:
+      desenler: ['^2N7002$']
+    kaynak: '2N7002 veri sayfasi (onsemi)'
+    guven: dogrulanmamis
+    pinler:
+      '1': {ad: G, islev: gate}
+      '2': {ad: S, islev: source}
+      '3': {ad: D, islev: drain}
+    sinirlar:
+      vds: {birim: V, mutlak_max: 60}
+      vgs: {birim: V, mutlak_min: -20, mutlak_max: 20}
+      vgs_esik: {birim: V, onerilen_min: 1.0, onerilen_max: 2.5, kosul: 'VGS(th)'}
+      # Rds(on)'un veri sayfasinda tanimlandigi EN DUSUK Vgs. Gate surme bunun
+      # altindaysa iletim direnci tanimsizdir.
+      rds_on_vgs: {birim: V, onerilen_min: 5.0, kosul: 'Rds(on) VGS = 5 V ve 10 V icin tanimli'}
+      id: {birim: A, onerilen_max: 0.115, kosul: 'TA = 25 C surekli'}
+    termal:
+      tj_max: 150
+    spice_eksik: 'uretici SPICE modeli kutuphaneye eklenmedi (bkz. Kicad-5d6.5)'
+
+  - anahtar: AO3400A
+    kategori: mosfet-n
+    uretici: Alpha & Omega Semiconductor
+    mpn: AO3400A
+    eslesme:
+      desenler: ['^AO3400A?$']
+    kaynak: 'AO3400A veri sayfasi (Alpha & Omega Semiconductor)'
+    guven: dogrulanmamis
+    pinler:
+      '1': {ad: G, islev: gate}
+      '2': {ad: S, islev: source}
+      '3': {ad: D, islev: drain}
+    sinirlar:
+      vds: {birim: V, mutlak_max: 30}
+      vgs: {birim: V, mutlak_min: -12, mutlak_max: 12}
+      vgs_esik: {birim: V, onerilen_min: 0.65, onerilen_max: 1.45, kosul: 'VGS(th)'}
+      rds_on_vgs: {birim: V, onerilen_min: 2.5, kosul: 'Rds(on) VGS = 2.5 / 4.5 / 10 V icin tanimli'}
+      id: {birim: A, onerilen_max: 5.7, kosul: 'TA = 25 C surekli'}
+    termal:
+      tj_max: 150
+    spice_eksik: 'uretici SPICE modeli kutuphaneye eklenmedi (bkz. Kicad-5d6.5)'
+
+  # ------------------------------------------------------------------ diyot
+  - anahtar: 1N4007
+    kategori: diyot
+    mpn: 1N4007
+    eslesme:
+      desenler: ['^1N4007$']
+    kaynak: '1N4001-1N4007 veri sayfasi (cok ureticili JEDEC parca)'
+    guven: dogrulanmamis
+    pinler:
+      '1': {ad: K, islev: katot}
+      '2': {ad: A, islev: anot}
+    sinirlar:
+      vrrm: {birim: V, mutlak_max: 1000}
+      if_ort: {birim: A, onerilen_max: 1.0}
+    spice_eksik: 'uretici SPICE modeli kutuphaneye eklenmedi'
+
+  - anahtar: 1N5819
+    kategori: diyot
+    mpn: 1N5819
+    eslesme:
+      desenler: ['^1N5819$']
+    kaynak: '1N5817-1N5819 Schottky veri sayfasi (cok ureticili JEDEC parca)'
+    guven: dogrulanmamis
+    pinler:
+      '1': {ad: K, islev: katot}
+      '2': {ad: A, islev: anot}
+    sinirlar:
+      vrrm: {birim: V, mutlak_max: 40}
+      if_ort: {birim: A, onerilen_max: 1.0}
+    spice_eksik: 'uretici SPICE modeli kutuphaneye eklenmedi'
+
+  - anahtar: SMBJ-serisi-TVS
+    kategori: tvs
+    eslesme:
+      desenler: ['^SM[AB]J\d']
+    kaynak: 'Littelfuse SMAJ/SMBJ serisi adlandirma kurali (sayi = ters stand-off gerilimi VR)'
+    guven: dogrulanmamis
+    addan_sinirlar:
+      - {desen: 'SM[AB]J(\d+(?:\.\d+)?)', sinir: vrwm, birim: V, kosul: 'stand-off gerilimi'}
+    notlar:
+      - 'kenetleme gerilimi (VC) tam parca icin tablodan girilmeli'
+    spice_eksik: 'TVS SPICE modeli yok'

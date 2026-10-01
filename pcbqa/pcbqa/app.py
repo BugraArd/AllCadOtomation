@@ -2,6 +2,11 @@
 
     pcbqa tani                       ortami denetle
     pcbqa analiz  <proje>            kaliteyi olc ve raporla
+    pcbqa devre   <proje>            devre grafi: pinler, roller, sinirlar, eksikler
+    pcbqa dogrula <proje>            ERC/DRC + muhendislik + ngspice + PCB + 9 kontrol
+    pcbqa devre-duzelt <proje>       duzeltme adaylari: model sirasi + gercek kontrol
+    pcbqa duzeltme-proje deney ...   adaylari gercek proje kopyalarinda uygula + ERC/DRC/ngspice
+    pcbqa duzeltme-envanter <yol>    gercek deney (deney.jsonl) ya da bellek veri kumesi envanteri
     pcbqa uret    <niyet.yaml>       niyetten calisir bir kart uret
     pcbqa kesfet  <niyet.yaml>       N varyant uret, en iyisini sec
     pcbqa bagla   <sematik>          var olan sembolleri telle birlestir
@@ -45,7 +50,13 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("canli-pcb", "pcbqa.canli_pcb", "Acik PCB'yi oku; komutla konum/aci/kilit/deger yaz"),
     ("canli-sematik","pcbqa.canli_sematik", "Ayri KiCad nightly ile acik sematige komut uygula"),
     ("analiz", "pcbqa.__main__", "Bir KiCad projesinin kalitesini olc ve raporla"),
+    ("devre", "pcbqa.devre.__main__", "Devre grafi: her parcanin pinleri, rolu, sinirlari, PCB karsiligi, eksikleri"),
+    ("dogrula", "pcbqa.dogrulama.dogrula", "Uc seviyeli dogrulama (ERC/DRC, muhendislik, ngspice) + PCB + 9 kontrol"),
+    ("kontrol", "pcbqa.kontrol", "Butun kontroller tek kosuda: kalite skoru + dogrulama (ERC/DRC bir kez)"),
     ("duzelt", "pcbqa.duzelt", "Bir bulguyu kanitli ve guvenli bicimde duzelt"),
+    ("devre-duzelt", "pcbqa.duzeltme.sirala", "Elektriksel sorun icin duzeltme adaylarini sirala ve gercek kontrolle dogrula"),
+    ("duzeltme-proje", "pcbqa.duzeltme.proje", "Duzeltme adaylarini gercek KiCad dosyalarinda uygula: ERC/DRC/parite + ngspice + iz"),
+    ("duzeltme-envanter", "pcbqa.duzeltme.envanter", "Duzeltme verisi envanteri: gercek deney (deney.jsonl) ve bellek veri kumesi AYRI"),
     ("arayuz", "pcbqa.arayuz", "Masaustu arayuzunu ac (tkinter)"),
     ("yap", "pcbqa.komut", 'Dogal dil komutunu anla ve uygula ("10 adet kapasitor ekle")'),
     ("parcalar", "pcbqa.elektrik", "Her parca icin ag, gerilim, akim, MPN ve fiyat tablosu"),

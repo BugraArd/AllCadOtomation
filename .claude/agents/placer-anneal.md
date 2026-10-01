@@ -7,7 +7,7 @@ model: sonnet
 
 # Görevin: Benzetimli tavlama (simulated annealing)
 
-Önce `pcbqa/pcbqa/placement/AGENT_BRIEF.md` dosyasını **tamamen oku** — sözleşme,
+Önce `docs/AGENT_BRIEF.md` dosyasını **tamamen oku** — sözleşme,
 sınırlar, hedefler ve ölçüm yöntemi orada. Bu dosya sadece senin algoritma
 ödevini tanımlar.
 

@@ -69,10 +69,18 @@ def default_rules_path() -> Path:
     return Path(__file__).parent / "default_rules.yaml"
 
 
-def kicad_findings(path: Path | None, source: str) -> list[Finding]:
-    """ERC/DRC JSON raporunu Finding listesine cevirir."""
+def kicad_findings(path: Path | None, source: str, skip_groups: tuple[str, ...] = ()) -> list[Finding]:
+    """ERC/DRC JSON raporunu Finding listesine cevirir.
+
+    `skip_groups`: atlanacak DRC gruplari. `pcbqa kontrol` seviye 1'in
+    `--schematic-parity` ile kosulmus DRC raporunu yeniden kullanir; analiz
+    DRC'yi paritesiz kosar, o yuzden skorun degismemesi icin
+    "schematic_parity" grubu atlanir (bkz. `kontrol.py`).
+    """
     out: list[Finding] = []
     for item in load_violations(path) if path else []:
+        if item.get("_group") in skip_groups:
+            continue
         severity, code, text = describe_violation(item)
         if severity == "ignore":
             continue
@@ -85,6 +93,12 @@ def kicad_findings(path: Path | None, source: str) -> list[Finding]:
             )
         )
     return out
+
+
+def sort_findings(findings: list[Finding]) -> None:
+    """Rapor sirasi: once hata, sonra kaynak ve kural (yerinde siralar)."""
+    order = {"error": 0, "warning": 1, "info": 2}
+    findings.sort(key=lambda f: (order.get(f.severity, 9), f.source, f.rule_id))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -164,8 +178,7 @@ def analyze(args: argparse.Namespace, work: Path) -> Report:
         drc = cli.drc(pcb, work / "drc.json")
         findings += kicad_findings(drc.output_path, "kicad-drc")
 
-    order = {"error": 0, "warning": 1, "info": 2}
-    findings.sort(key=lambda f: (order.get(f.severity, 9), f.source, f.rule_id))
+    sort_findings(findings)
 
     return Report(
         design=design,

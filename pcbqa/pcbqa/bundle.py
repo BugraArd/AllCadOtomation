@@ -33,7 +33,7 @@ from .confload import RUNTIME_SUFFIX, ConfigError, load_config, runtime_twin, ya
 PACKAGE_ROOT = Path(__file__).parent
 
 # Calisma zamaninda okunan YAML tasiyan klasorler
-BUNDLED_DIRS = ("presets", "templates")
+BUNDLED_DIRS = ("presets", "templates", "data/parcalar")
 
 
 def yaml_sources(root: Path | None = None) -> list[Path]:

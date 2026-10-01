@@ -12,7 +12,7 @@ import json
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # Windows'ta varsayilan kurulum kokleri (surum klasoru joker)
@@ -73,6 +73,8 @@ class CliResult:
     stdout: str
     stderr: str
     returncode: int
+    # Calistirilan komut (deney kaydi icin; Kicad-ecd)
+    komut: list[str] = field(default_factory=list)
 
 
 class KicadCli:
@@ -104,13 +106,25 @@ class KicadCli:
             out,
         )
 
-    def drc(self, board: Path, out: Path) -> CliResult:
-        """KiCad'in kendi tasarim kurali kontrolu (JSON rapor)."""
+    def drc(self, board: Path, out: Path, schematic_parity: bool = False,
+            refill_zones: bool = False) -> CliResult:
+        """KiCad'in kendi tasarim kurali kontrolu (JSON rapor).
+
+        `schematic_parity`: kartin sematikle ayni baglantilari tasidigini da
+        denetler (KiCad'in "Schematic parity" kontrolu; ayni klasorde
+        .kicad_sch gerekir). Rapor `schematic_parity` grubuna yazilir.
+
+        `refill_zones`: bakir dokumleri DRC'den once yeniden doldurulur
+        (eski dolguyla kontrol yanlis sonuc verir). `--save-board` VERILMEZ:
+        dolgu yalnizca bellekte yapilir, dosya degismez.
+        """
         out.parent.mkdir(parents=True, exist_ok=True)
-        return self._run(
-            ["pcb", "drc", "--format", "json", "--severity-all", "-o", str(out), str(board)],
-            out,
-        )
+        args = ["pcb", "drc", "--format", "json", "--severity-all"]
+        if schematic_parity:
+            args.append("--schematic-parity")
+        if refill_zones:
+            args.append("--refill-zones")
+        return self._run([*args, "-o", str(out), str(board)], out)
 
     # ------------------------------------------------------------------ ic isler
 
@@ -136,6 +150,7 @@ class KicadCli:
             stdout=proc.stdout or "",
             stderr=proc.stderr or "",
             returncode=proc.returncode,
+            komut=[str(self.exe), *args],
         )
 
 

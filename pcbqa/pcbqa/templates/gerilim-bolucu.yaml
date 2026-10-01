@@ -1,0 +1,44 @@
+# Rezistif gerilim bolucu: VIN -> OUT (ADC girisi / referans pini) + olcum
+# header'i. Duzeltme siralama deneyinin ailesi (Kicad-u4k).
+#
+# Degerler bir ORNEKTIR: 12 V'u ~3 V'a indiren 30.1k/10k (E96, %1). Gercek
+# tasarimda hedef, pencere ve yuk `kosullar.yaml` ile beyan edilir; dogrulugu
+# `pcbqa dogrula` / `pcbqa devre-duzelt` olcer. Tolerans deger metninde durur
+# ("30.1k 1%") - parca bilgisi onu oradan okur.
+
+version: 1
+id: gerilim-bolucu
+description: "Rezistif gerilim bolucu (VIN -> OUT) + olcum header'i"
+
+provides: [bolucu-cikisi]
+requires: [guc-vbus]
+
+params:
+  vin: "VBUS"
+  vout: "OUT"
+  gnd: "GND"
+  r_ust: "30.1k 1%"
+  r_alt: "10k 1%"
+  # Paketler de parametredir: duzeltme deneyinin referans projeleri
+  # (Kicad-ecd) gucune gore 0402..1206 secer.
+  fp_ust: Resistor_SMD:R_0603_1608Metric
+  fp_alt: Resistor_SMD:R_0603_1608Metric
+
+components:
+  - name: ust-direnc
+    lib_id: Device:R
+    value: "${r_ust}"
+    footprint: "${fp_ust}"
+    connect: {"#1": "${vin}", "#2": "${vout}"}
+
+  - name: alt-direnc
+    lib_id: Device:R
+    value: "${r_alt}"
+    footprint: "${fp_alt}"
+    connect: {"#1": "${vout}", "#2": "${gnd}"}
+
+  - name: olcum-header
+    lib_id: Connector_Generic:Conn_01x02
+    value: OLCUM
+    footprint: Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
+    connect: {"#1": "${vout}", "#2": "${gnd}"}

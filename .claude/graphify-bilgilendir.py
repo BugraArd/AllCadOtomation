@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 KOK = Path(__file__).resolve().parent.parent
-HEDEF = KOK / "pcbqa" / "docs" / "hafiza"
+HEDEF = KOK / "docs" / "hafiza"
 # `bd` bir npm shim'i; Windows'ta subprocess uzantisiz adi bulamiyor.
 BD = str(Path.home() / "AppData" / "Roaming" / "npm" / "bd.cmd")
 
